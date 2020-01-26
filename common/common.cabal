@@ -1,0 +1,32 @@
+name: common
+version: 0.1
+cabal-version: >= 1.2
+build-type: Simple
+
+library
+  hs-source-dirs: src
+  build-depends: base
+               , obelisk-route
+               , mtl
+               , time
+               , aeson
+               , database-id-class
+               , rhyolite-common
+               , rhyolite-datastructures
+               , text
+               , monoidal-containers
+               , lens
+               , semialign
+               , bytestring
+               , witherable
+               , reflex
+               , constraints-extras
+               , aeson-gadt-th
+  default-extensions:
+    TypeFamilies
+    PolyKinds
+  exposed-modules:
+    Common.Api
+    Common.App
+    Common.Route
+    Common.Schema
