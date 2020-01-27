@@ -8,6 +8,7 @@
 module Frontend where
 
 import qualified Data.Text as T
+import qualified Data.Text.Lazy as LT
 import Obelisk.Frontend
 import Obelisk.Route
 import Reflex.Dom.Core
@@ -27,6 +28,7 @@ import Common.App
 import Common.Route
 import Obelisk.Generated.Static
 import Obelisk.Configs
+import Clay
 
 
 frontend :: Frontend (R FrontendRoute)
@@ -35,6 +37,7 @@ frontend = Frontend
      el "title" $ text "Obelisk Minimal Example"
      elAttr "link" ( "rel" =: "stylesheet" <> "media" =: "screen" <> "href" =: "https://fontlibrary.org/face/symbola" <> "type" =: "text/css") $ blank
   , _frontend_body = do
+      el "style" $ text cssText
       route <- fromMaybe "" <$> getTextConfig "common/route"
       --text "Welcome to Obelisk!"
       --el "p" $ text $ T.pack commonStuff
@@ -78,10 +81,33 @@ puzzleMasterList = do
   return ()
 
 
+cssText :: T.Text
+cssText = LT.toStrict $ Clay.render $ do
+  ".tooltip" ? do
+    Clay.position relative
+  ".tooltip" # ":hover" |> ".tooltiptext" ? do
+    Clay.display block
+    Clay.position absolute
+    Clay.background black
+    Clay.fontColor white
+    Clay.fontSize (pt 7)
+    Clay.padding (em 0.5) (em 0.5) (em 0.5) (em 0.5)
+    Clay.borderRadius (em 0.5) (em 0.5) (em 0.5) (em 0.5)
+  ".tooltip" |> ".tooltiptext" ? do
+    Clay.display none
+    Clay.position absolute
+  pre ? do
+    Clay.padding (em 0) (em 0) (em 0) (em 0)
+    Clay.margin (em 0) (em 0) (em 0) (em 0)
+
 backsolve1 :: DomBuilder t m => m ()
-backsolve1 = elAttr "span" ("style" =: "font-family: 'SymbolaRegular'") $ text " 🝡⃪"
+backsolve1 = elAttr "span" ("class" =: "tooltip" <> "style" =: "font-family: 'SymbolaRegular'") $ do
+  text " 🝡⃪"
+  elClass "span" "tooltiptext" $ text "This solution was backsolved."
+
 backsolve2 :: DomBuilder t m => m ()
-backsolve2 = elAttr "span" ("style" =: "font-family: 'SymbolaRegular'") $ text " 🝢⃪"
+backsolve2 = elAttr "span" ("style" =: "font-family: 'SymbolaRegular'") $ do
+   text " 🝢⃪"
 
 
 watchPuzzles :: (Reflex t, MonadQuery t (HMLViewSelector SelectedCount) m, MonadHold t m, MonadFix m)

@@ -31,6 +31,9 @@ library
                , obelisk-executable-config-lookup
                , groundhog-postgresql
                , mtl
+               , dependent-sum
+               , reflex
+               , aeson
   exposed-modules:
     Backend
     Backend.Schema

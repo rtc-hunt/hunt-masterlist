@@ -17,6 +17,7 @@ library
                , database-id-class
                , rhyolite-datastructures
                , obelisk-executable-config-lookup
+               , clay
   exposed-modules:
     Frontend
   ghc-options: -Wall
