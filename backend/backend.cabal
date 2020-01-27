@@ -45,6 +45,7 @@ executable backend
   hs-source-dirs: src-bin
   if impl(ghcjs)
     buildable: False
+  ghc-options: -threaded
   build-depends: base
                , backend
                , common
