@@ -12,10 +12,9 @@
 
 module Common.Route where
 
-{- -- You will probably want these imports for composing Encoders.
 import Prelude hiding (id, (.))
 import Control.Category
--}
+import Control.Lens.Iso
 
 import Data.Text (Text)
 import Data.Functor.Identity
@@ -24,6 +23,8 @@ import Data.Functor.Sum
 import Obelisk.Route
 import Obelisk.Route.TH
 import Data.Either
+import Common.Schema
+import Database.Id.Class
 
 data BackendRoute :: * -> * where
   -- | Used to handle unparseable routes.
@@ -34,19 +35,8 @@ data BackendRoute :: * -> * where
 
 data FrontendRoute :: * -> * where
   FrontendRoute_Main :: FrontendRoute ()
+  FrontendRoute_Puzzle :: FrontendRoute (Id Puzzle)
   -- This type is used to define frontend routes, i.e. ones for which the backend will serve the frontend.
-
-backendRouteEncoder
-  :: Encoder (Either Text) Identity (R (Sum BackendRoute (ObeliskRoute FrontendRoute))) PageName
-backendRouteEncoder = handleEncoder (const (InL BackendRoute_Missing :/ ())) $
-  pathComponentEncoder $ \case
-    InL backendRoute -> case backendRoute of
-      BackendRoute_Missing -> PathSegment "missing" $ unitEncoder mempty
-      BackendRoute_Listen -> PathSegment "listen" $ unitEncoder mempty
-    InR obeliskRoute -> obeliskRouteSegment obeliskRoute $ \case
-      -- The encoder given to PathEnd determines how to parse query parameters,
-      -- in this example, we have none, so we insist on it.
-      FrontendRoute_Main -> PathEnd $ unitEncoder mempty
 
 fullRouteEncoder
   :: Encoder (Either Text) Identity (R (FullRoute BackendRoute FrontendRoute)) PageName
@@ -57,7 +47,9 @@ fullRouteEncoder = mkFullRouteEncoder
       BackendRoute_Listen -> PathSegment "listen" $ unitEncoder mempty
     )
   (\case
-      FrontendRoute_Main -> PathEnd $ unitEncoder mempty)
+      FrontendRoute_Main -> PathEnd $ unitEncoder mempty
+      FrontendRoute_Puzzle -> PathSegment "puzzle" $ singlePathSegmentEncoder . unsafeTshowEncoder . isoEncoder (iso unId Id)
+    )
 
 checkedRouteEncoder :: Encoder Identity Identity (R (FullRoute BackendRoute FrontendRoute)) PageName
 checkedRouteEncoder = fromRight (error "Failed to check route") $ checkEncoder fullRouteEncoder

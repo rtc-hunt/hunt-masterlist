@@ -4,13 +4,18 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GADTs #-}
 
 module Frontend where
 
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as LT
+import Control.Monad.Trans
+import Control.Monad.Identity
+import Data.Dependent.Sum
 import Obelisk.Frontend
 import Obelisk.Route
+import Obelisk.Route.Frontend
 import Reflex.Dom.Core
 import Control.Monad.Fix (MonadFix)
 import Control.Monad
@@ -29,6 +34,7 @@ import Common.Route
 import Obelisk.Generated.Static
 import Obelisk.Configs
 import Clay
+import Debug.Trace
 
 
 frontend :: Frontend (R FrontendRoute)
@@ -43,21 +49,34 @@ frontend = Frontend
   , _frontend_body = do
       el "style" $ text cssText
       route <- fromMaybe "" <$> getTextConfig "common/route"
+      trace (show route) $ return ()
       --text "Welcome to Obelisk!"
       --el "p" $ text $ T.pack commonStuff
       --elAttr "img" ("src" =: static @"obelisk.jpg") blank
-      _ <- runRhyoliteWidget functorToWire (httpToWs route) $ 
-        puzzleMasterList
+      runApp $ 
+        subRoute_ $ \case
+          FrontendRoute_Main -> puzzleMasterList
+          FrontendRoute_Puzzle -> puzzlePage
       return ()
   }
 
   where
+    -- runApp :: (MonadWidget t m) => T.Text -> RhyoliteWidget (HMLViewSelector SelectedCount) HMLRequest t m a -> m a
+    runApp
+      :: (ObeliskWidget js t route m)
+      -- -> RhyoliteWidget (HMLViewSelector SelectedCount) HMLRequest t m a
+      -- -> Encoder Identity Identity (R (FullRoute BackendRoute FrontendRoute)) PageName
+      -- -> R BackendRoute
+      => RoutedT t (R FrontendRoute) (RhyoliteWidget (HMLViewSelector SelectedCount) HMLRequest t m) a
+      -> RoutedT t (R FrontendRoute) m a
+    runApp = runObeliskRhyoliteWidget functorToWire "common/route" checkedRouteEncoder (BackendRoute_Listen :=> Identity ())
+
     httpToWs url = fromMaybe "" $ (<> (renderBackendRoute checkedRouteEncoder $ BackendRoute_Listen :/ ())) . ("ws"<>) <$> T.stripPrefix "http" url
 
 tshow :: (Show a) => a -> T.Text
 tshow = T.pack . show
 
-puzzleMasterList :: MonadRhyoliteWidget (HMLViewSelector SelectedCount) HMLRequest t m => m ()
+puzzleMasterList :: (RouteToUrl (R FrontendRoute) m, SetRoute t (R FrontendRoute) m, MonadRhyoliteWidget (HMLViewSelector SelectedCount) HMLRequest t m) => m ()
 puzzleMasterList = do
   puzzles <- watchPuzzles
   elClass "table" "ui celled table" $ do
@@ -75,7 +94,7 @@ puzzleMasterList = do
 
 
     dyn_ $ ffor puzzles $ \pzlMap -> forM_ (MMap.toList pzlMap) $ \(pzlId, pzl) -> el "tr" $ do
-      (elem) <- el' "td" $ elAttr "div" ("class" =: "tooltip pointer" <> "data-tooltip" =: "Open Puzzle") $ do
+      el "td" $ routeLink (FrontendRoute_Puzzle ==> pzlId) $ elAttr "div" ("class" =: "tooltip pointer" <> "data-tooltip" =: "Open Puzzle") $ do
         text $ _puzzle_Title pzl
         -- elClass "span" "tooltiptext" $ text "Open Puzzle"
       --el "td" $ elAttr "a" ("href" =: _puzzle_URI pzl) $ text "Puzzle Page"
@@ -100,8 +119,76 @@ puzzleMasterList = do
   return ()
 
 
+puzzlePage :: (RouteToUrl (R FrontendRoute) m, SetRoute t (R FrontendRoute) m, Routed t (Id Puzzle) m, MonadRhyoliteWidget (HMLViewSelector SelectedCount) HMLRequest t m) => m ()
+puzzlePage = divClass "pzl-container" $ do
+  puz <- askRoute
+  puzzleData <- watchPuzzle puz
+  dyn_ $ ffor puzzleData $ \case
+    Just pzl -> do
+      elClass "span" "header" $ do
+        routeLink (FrontendRoute_Main ==> ()) $ text "Back"
+        el "h3" $ text $ _puzzle_Title $ pzl
+      
+      divClass "chatDropdown" $ do
+        text "This is some kind of chat dropdown thingie, that will shift itself up to the top of teh screen."
+
+      tabDisplay "tabbar" "activeTab" $
+        "puzzle" =: ("puzzle", do
+          divClass "framed" $ elAttr "iframe" ("src" =: _puzzle_URI pzl <> "width" =: "100%" <> "height" =: "100vw") $ blank
+          )
+        <> "sheet" =: ("sheet", do
+          divClass "framed" $ elAttr "iframe" ("src" =: fromMaybe "" (_puzzle_SheetURI pzl) <> "width" =: "100%" <> "height" =: "100vw") $ blank
+          )
+    Nothing -> blank
+
+
 cssText :: T.Text
 cssText = LT.toStrict $ Clay.render $ do
+  ".chatDropdown" ? do
+    Clay.display Clay.block
+    Clay.position Clay.absolute
+    Clay.width (Clay.vw 40)
+    Clay.right (Clay.em 0)
+    Clay.height (Clay.vh 5)
+    Clay.transitionProperty "height"
+    Clay.transitionDuration $ sec 1
+    Clay.padding (em 0.5) (em 0.5) (em 0.5) (em 0.5)
+    Clay.borderStyle Clay.solid
+    Clay.borderWidth (px 1)
+    Clay.borderRadius (em 1) (em 1) (em 1) (em 1)
+    Clay.borderColor Clay.black
+  ".chatDropdown" # ":hover" ? do
+    Clay.height (Clay.vh 90)
+  ".header" ? do
+    Clay.display flex
+    Clay.flexDirection Clay.row
+  ".header" |> Clay.h3 ? do
+    Clay.margin (px 0) (px 0) (px 0) (px 0)
+  ".pzl-container" ? do
+    Clay.display Clay.flex
+    Clay.flexDirection Clay.column
+    Clay.height (Clay.vh 96)
+  ".pzl-container" |> Clay.div ? do
+    Clay.flexGrow 1
+    -- Clay.backgroundColor Clay.orange
+    Clay.backgroundColor Clay.white
+    Clay.div ?
+      Clay.height (Clay.pct 100)
+  ".framed" ? do
+    Clay.backgroundColor Clay.lightgray
+  Clay.iframe ? do
+    Clay.width (Clay.pct 100)
+    Clay.height (Clay.pct 100)
+  ".tabbar" ? do
+    Clay.listStyleType Clay.none
+  ".tabbar" |> Clay.li ? do
+    Clay.display Clay.inlineBlock
+    Clay.padding (em 0) (em 1) (em 0) (em 1)
+    Clay.borderRadius (em 0.5) (em 0.5) (em 0.5) (em 0.5)
+    Clay.backgroundColor Clay.lightgray
+    cursor pointer
+  ".tabbar" |> Clay.li # ".activeTab" ? do
+    Clay.backgroundColor Clay.gray
   ".pointer" ? cursor pointer
   ".tooltip" ? do
     Clay.position relative
@@ -149,6 +236,18 @@ watchPuzzles = do
         Just (viewVal :: (SelectedCount, SemiMap (Id Puzzle) Puzzle)) -> getComplete $ snd viewVal
         Nothing -> Nothing
   return $ fmap (fromMaybe MMap.empty) mQueryResMap
+
+watchPuzzle :: (Reflex t, MonadQuery t (HMLViewSelector SelectedCount) m, MonadHold t m, MonadFix m)
+  => Dynamic t (Id Puzzle) -> m (Dynamic t (Maybe Puzzle))
+watchPuzzle pzl = do
+  let q = PuzzleQuery_byId <$> pzl
+  dynV <- watchViewSelector $ ffor q $ \q' -> mempty
+    { _hmlViewSelector_puzzle = MMap.singleton q' (1 :: SelectedCount) }
+  let queryRes = MMap.lookup <$> q <*> (_hmlView_puzzle <$> dynV)
+      mQueryResMap = ffor queryRes $ \case
+        Just (viewVal :: (SelectedCount, SemiMap (Id Puzzle) Puzzle)) -> getComplete $ snd viewVal
+        Nothing -> Nothing
+  return $ MMap.lookup <$> pzl <*> fmap (fromMaybe MMap.empty) mQueryResMap
 
 
 watchSolves :: (Reflex t, MonadQuery t (HMLViewSelector SelectedCount) m, MonadHold t m, MonadFix m)

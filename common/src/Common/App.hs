@@ -66,7 +66,7 @@ instance Filterable HMLView where
 
 
 data PuzzleQuery = PuzzleQuery_AllPuzzles
-                 | PuzzleQuery_Puzzle (Id Puzzle)
+                 | PuzzleQuery_byId (Id Puzzle)
   deriving (Eq, Ord, Show, Read, Generic)
 instance ToJSON PuzzleQuery
 instance FromJSON PuzzleQuery

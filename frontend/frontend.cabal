@@ -17,6 +17,8 @@ library
                , database-id-class
                , rhyolite-datastructures
                , obelisk-executable-config-lookup
+               , dependent-sum
+               , mtl
                , clay
   exposed-modules:
     Frontend

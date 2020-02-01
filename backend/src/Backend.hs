@@ -31,6 +31,7 @@ import Reflex.Query.Class
 import Data.Aeson
 import GHC.Generics
 
+import Debug.Trace
 
 backend :: Backend BackendRoute FrontendRoute
 backend = Backend
@@ -51,7 +52,7 @@ backend = Backend
              functorFromWire
              standardPipeline
            serve $ \case
-             BackendRoute_Missing :=> _ -> return ()
+             BackendRoute_Missing :=> _ -> traceShow "UNKNOWN ROUTE" $ return ()
              BackendRoute_Listen :=> Identity () -> listen
   , _backend_routeEncoder = fullRouteEncoder
   }

@@ -48,7 +48,7 @@ queryPuzzles = \case
     allPuzzles <- fmap (\(a,b) -> (toId a, b)) <$> project (AutoKeyField, PuzzleConstructor) CondEmpty 
     let puzzlesMap = MMap.MonoidalMap $ Map.fromList allPuzzles
     return $ SemiMap_Complete puzzlesMap
-  PuzzleQuery_Puzzle puzzleId -> do
+  PuzzleQuery_byId puzzleId -> do
     $(logDebugS) "" ""
     thePuzzles <- fmap (\(a,b) -> (toId a, b)) <$> project (AutoKeyField, PuzzleConstructor) (AutoKeyField ==. fromId puzzleId)
     let puzzlesMap = MMap.MonoidalMap $ Map.fromList thePuzzles

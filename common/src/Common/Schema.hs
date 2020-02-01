@@ -10,6 +10,7 @@ import Database.Id.Class
 data Puzzle = Puzzle
   { _puzzle_Title :: Text
   , _puzzle_URI :: Text
+  , _puzzle_SheetURI :: Maybe Text
   , _puzzle_FolderURI :: Text
   , _puzzle_IsMeta :: Bool
   , _puzzle_StartedAt :: Maybe UTCTime
