@@ -15,9 +15,14 @@
   }
 }:
 with obelisk;
-project ./. ({ ... }: {
-  android.applicationId = "systems.obsidian.obelisk.examples.minimal";
-  android.displayName = "Obelisk Minimal Example";
-  ios.bundleIdentifier = "systems.obsidian.obelisk.examples.minimal";
-  ios.bundleName = "Obelisk Minimal Example";
+project ./. ({ pkgs, hackGet, ... }@args: {
+  overrides = pkgs.lib.composeExtensions
+    (pkgs.callPackage (hackGet ./dep/rhyolite) args).haskellOverrides
+      (self: super: with pkgs.haskell.lib; {
+        # Your custom overrides go here.
+      });
+  android.applicationId = "systems.obsidian.obelisk.examples.rhyolite";
+  android.displayName = "Rhyolite Example App";
+  ios.bundleIdentifier = "systems.obsidian.obelisk.examples.rhyolite";
+  ios.bundleName = "Rhyolite Example App";
 })
