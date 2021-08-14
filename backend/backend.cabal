@@ -12,9 +12,12 @@ library
                , frontend
                , obelisk-backend
                , obelisk-route
+               -- Logging
+               , monad-logger
                -- Database
                , database-id-class
                , database-id-groundhog
+               , gargoyle-postgresql-connect
                , groundhog
                , groundhog-th
                , rhyolite-backend-db
