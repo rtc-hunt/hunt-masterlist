@@ -107,6 +107,6 @@ Rhyolite provides a type `Account`, a database schema for that type, and some co
 
 Now comes the tricky part.  Our goal here is to be able to call the function `serveDbOverWebsockets` from `Rhyolite.Backend.App`.  This function needs to be told how to respond to API requests, how to respond to notifications from the database indicating that some change has occurred, and how to compute Views of data that connected users are interested in.  It's an important function.  Some of its complexity comes from an attempt to avoid certain performance pitfalls.  For example, part of what this function does under the hood is take the View Selectors provided by connected users and aggregating them to make View computation cheaper.
 
-### Adding a route for websockets communication
+### Adding a route for websockets communication (8b6bdfc7)
 
 First, we add an endpoint to the list of backend routes in Common.Route and we'll add a stub handler for that route to the backend.  The actual websocket connection handler is going to be produced by `serveDbOverWebsockets`.
