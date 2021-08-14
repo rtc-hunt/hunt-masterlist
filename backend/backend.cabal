@@ -12,9 +12,22 @@ library
                , frontend
                , obelisk-backend
                , obelisk-route
+               -- Database
+               , database-id-class
+               , database-id-groundhog
+               , groundhog
+               , groundhog-th
+               , rhyolite-backend-db
   exposed-modules:
     Backend
+    Backend.Schema
   ghc-options: -Wall -Wredundant-constraints -Wincomplete-uni-patterns -Wincomplete-record-updates -O -fno-show-valid-hole-fits
+  default-extensions:
+    FlexibleInstances
+    GADTs
+    QuasiQuotes
+    TemplateHaskell
+    TypeFamilies
 
 executable backend
   main-is: main.hs

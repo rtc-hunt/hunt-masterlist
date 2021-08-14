@@ -1,5 +1,6 @@
 module Backend where
 
+import Backend.Schema
 import Common.Route
 import Obelisk.Backend
 

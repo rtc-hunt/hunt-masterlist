@@ -9,7 +9,11 @@ library
                , obelisk-route
                , mtl
                , text
+               , time
+               -- Schema
+               , database-id-class
   exposed-modules:
     Common.Api
     Common.Route
+    Common.Schema
   ghc-options: -Wall -Wredundant-constraints -Wincomplete-uni-patterns -Wincomplete-record-updates -O -fno-show-valid-hole-fits
