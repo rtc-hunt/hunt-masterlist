@@ -21,6 +21,8 @@ library
                , groundhog
                , groundhog-th
                , rhyolite-backend-db
+               -- Accounts
+               , rhyolite-backend
   exposed-modules:
     Backend
     Backend.Schema

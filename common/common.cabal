@@ -12,6 +12,8 @@ library
                , time
                -- Schema
                , database-id-class
+               -- Accounts
+               , rhyolite-common
   exposed-modules:
     Common.Api
     Common.Route

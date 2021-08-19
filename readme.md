@@ -99,3 +99,6 @@ Foreign-key constraints:
     "Message_chatroom_fkey" FOREIGN KEY (chatroom) REFERENCES "Chatroom"(id)
 ```
 
+### Adding the Rhyolite Account schema
+
+Rhyolite provides a type `Account`, a database schema for that type, and some common account operations (password verification, reset, etc). By importing `Rhyolite.Account` we can add a foreign key constraint on `Account` to one of our tables. On the backend, we need to run the `migrateAccount` function along with our other schema migration to actually create the right tables.

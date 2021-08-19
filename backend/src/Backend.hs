@@ -9,6 +9,7 @@ import Database.Groundhog.Generic.Migration (getTableAnalysis)
 import Gargoyle.PostgreSQL.Connect
 import Obelisk.Backend
 import Rhyolite.Backend.DB
+import Rhyolite.Backend.Account
 
 backend :: Backend BackendRoute FrontendRoute
 backend = Backend
@@ -16,7 +17,9 @@ backend = Backend
     withDb "db" $ \db -> runNoLoggingT $ do
       runDb (Identity db) $ do
         tables <- getTableAnalysis
-        runMigration $ migrateSchema tables
+        runMigration $ do
+          migrateAccount tables
+          migrateSchema tables
       return ()
     serve $ const $ return ()
   , _backend_routeEncoder = fullRouteEncoder

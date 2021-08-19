@@ -5,6 +5,7 @@ module Backend.Schema where
 import Common.Schema
 import Database.Groundhog.TH
 import Database.Id.Groundhog.TH
+import Rhyolite.Backend.Account ()
 import Rhyolite.Backend.Schema.TH
 
 mkRhyolitePersist (Just "migrateSchema") [groundhog|
