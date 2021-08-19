@@ -30,6 +30,7 @@ library
   default-extensions:
     FlexibleInstances
     GADTs
+    LambdaCase
     QuasiQuotes
     TemplateHaskell
     TypeFamilies

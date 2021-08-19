@@ -8,8 +8,9 @@ import Database.Groundhog (runMigration)
 import Database.Groundhog.Generic.Migration (getTableAnalysis)
 import Gargoyle.PostgreSQL.Connect
 import Obelisk.Backend
-import Rhyolite.Backend.DB
+import Obelisk.Route
 import Rhyolite.Backend.Account
+import Rhyolite.Backend.DB
 
 backend :: Backend BackendRoute FrontendRoute
 backend = Backend
@@ -21,6 +22,8 @@ backend = Backend
           migrateAccount tables
           migrateSchema tables
       return ()
-    serve $ const $ return ()
+    serve $ \case
+      BackendRoute_Listen :/ () -> return ()
+      BackendRoute_Missing :/ () -> return ()
   , _backend_routeEncoder = fullRouteEncoder
   }
