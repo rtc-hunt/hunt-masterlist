@@ -113,7 +113,7 @@ Now comes the tricky part.  Our goal here is to be able to call the function `se
 
 First, we add an endpoint to the list of backend routes in Common.Route and we'll add a stub handler for that route to the backend.  The actual websocket connection handler is going to be produced by `serveDbOverWebsockets`.
 
-### Defining an API
+### Defining an API (772d6da1)
 
 The second argument of `serveDbOverWebsockets` is a `RequestHandler`, which describes how API requests ought to be handled.
 
