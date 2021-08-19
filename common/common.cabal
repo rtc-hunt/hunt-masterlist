@@ -10,12 +10,23 @@ library
                , mtl
                , text
                , time
+               , rhyolite-common
                -- Schema
                , database-id-class
-               -- Accounts
-               , rhyolite-common
+               -- Api
+               , aeson
+               , aeson-gadt-th
+               , constraints-extras
   exposed-modules:
     Common.Api
     Common.Route
     Common.Schema
   ghc-options: -Wall -Wredundant-constraints -Wincomplete-uni-patterns -Wincomplete-record-updates -O -fno-show-valid-hole-fits
+  default-extensions:
+    FlexibleContexts
+    FlexibleInstances
+    GADTs
+    MultiParamTypeClasses
+    TemplateHaskell
+    TypeFamilies
+    UndecidableInstances

@@ -19,19 +19,25 @@ library
                , database-id-groundhog
                , gargoyle-postgresql-connect
                , groundhog
+               , groundhog-postgresql
                , groundhog-th
                , rhyolite-backend-db
                -- Accounts
                , rhyolite-backend
+               , clientsession
   exposed-modules:
     Backend
+    Backend.Request
     Backend.Schema
   ghc-options: -Wall -Wredundant-constraints -Wincomplete-uni-patterns -Wincomplete-record-updates -O -fno-show-valid-hole-fits
   default-extensions:
+    FlexibleContexts
     FlexibleInstances
     GADTs
     LambdaCase
+    OverloadedStrings
     QuasiQuotes
+    RankNTypes
     TemplateHaskell
     TypeFamilies
 
