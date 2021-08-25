@@ -119,7 +119,7 @@ The second argument of `serveDbOverWebsockets` is a `RequestHandler`, which desc
 
 In `Common.Api` we define a couple of GADTs representing our public (unauthenticated) and private (authenticated) request types, and then we define a GADT that includes both types of requests (aptly named `Request`). In `Backend.Request` we define the actual request handler that receives and processes API requests. For our login API, we can use the handler functions defined in `Rhyolite.Backend.Account`.
 
-### Defining View Selector and View types
+### Defining View Selector and View types (c11a5578)
 
 The request/response API that we set up will be useful for certain kinds of transactions, especially writes, but we still need a way to read data from the backend and *keep that data up-to-date* without polling.
 
@@ -140,12 +140,14 @@ A few important properties that must be preserved: It must be possible to combin
 
 We'll use the `vessel` library to define our View Selector and View.
 
-#### The View
+#### The View (c11a5578)
 
 In `Common.View` we define a GADT that represents both our view selector and view types.  We're using the `vessel` library to facilitate this: it contains data structures that can have both the "empty" (view selectors) and "full" (views) versions.
 
-#### Notifications
+#### Notifications (c11a5578)
 
 In `Backend.Listen` we define another GADT. This one describes the types of database change notifications our application will produce and handle.  These notifications are sent over a postgres [NOTIFY](https://www.postgresql.org/docs/current/sql-notify.html) channel, and every backend connected to the database will receive them.  Notifications are sent over the channel using the `notify` function from `Rhyolite.Backend.Listen` or one of the various specialized insert, delete, or update functions in that module (e.g., `insertAndNotify`).
 
 The third argument to `serveDbOverWebsockets` is a handler for these notifications. We define the `notifyHandler` function to check notifications against the aggregated view selectors and return patches.
+
+
