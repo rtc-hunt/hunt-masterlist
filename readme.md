@@ -118,3 +118,34 @@ First, we add an endpoint to the list of backend routes in Common.Route and we'l
 The second argument of `serveDbOverWebsockets` is a `RequestHandler`, which describes how API requests ought to be handled.
 
 In `Common.Api` we define a couple of GADTs representing our public (unauthenticated) and private (authenticated) request types, and then we define a GADT that includes both types of requests (aptly named `Request`). In `Backend.Request` we define the actual request handler that receives and processes API requests. For our login API, we can use the handler functions defined in `Rhyolite.Backend.Account`.
+
+### Defining View Selector and View types
+
+The request/response API that we set up will be useful for certain kinds of transactions, especially writes, but we still need a way to read data from the backend and *keep that data up-to-date* without polling.
+
+We do this buy defining a datatype that lets users indicate their interest in some data. The frontend sends this interest set to the backend, which immediately sends the data that the user is interested in, and keeps track of the fact that the user is interested. The backend will look out for changes to the database relevant to each user's interest set and send updates when those changes occur.
+
+The workflow looks like this:
+
+```
+User declares interest/sets View Selector
+  -> Backend receives View Selector
+    -> Backend sends back a View (the data corresponding to the declared interest)
+      -> Things that write to the db issue notifications that they're changing certain tables and rows
+        -> Backend reads these notifications and checks if they're relevant to any View Selectors
+          -> Backend computes a patch of information to get all relevant clients up-to-date and sends its out
+```
+
+A few important properties that must be preserved: It must be possible to combine all the View Selectors declared by a client (and ultimately, all the View Selectors declared by all clients) - we don't want to process everything individually for each client, or ask for the same data twice.  It must also be possible for users to declare that they're no longer interested in something, and it must be possible to remove things from the View that are no longer relevant.
+
+We'll use the `vessel` library to define our View Selector and View.
+
+#### The View
+
+In `Common.View` we define a GADT that represents both our view selector and view types.  We're using the `vessel` library to facilitate this: it contains data structures that can have both the "empty" (view selectors) and "full" (views) versions.
+
+#### Notifications
+
+In `Backend.Listen` we define another GADT. This one describes the types of database change notifications our application will produce and handle.  These notifications are sent over a postgres [NOTIFY](https://www.postgresql.org/docs/current/sql-notify.html) channel, and every backend connected to the database will receive them.  Notifications are sent over the channel using the `notify` function from `Rhyolite.Backend.Listen` or one of the various specialized insert, delete, or update functions in that module (e.g., `insertAndNotify`).
+
+The third argument to `serveDbOverWebsockets` is a handler for these notifications. We define the `notifyHandler` function to check notifications against the aggregated view selectors and return patches.

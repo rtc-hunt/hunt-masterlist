@@ -1,25 +1,29 @@
 module Backend.Request where
 
-import Control.Monad.IO.Class
+import Control.Monad.Logger
 import Data.Functor.Identity
 import Database.Groundhog
-import Rhyolite.Account
+import Database.PostgreSQL.Simple
+import Data.Pool
 import Rhyolite.Backend.Account (login)
 import Rhyolite.Backend.App
-import Rhyolite.Backend.DB (Db, getTime)
+import Rhyolite.Backend.DB
 import Rhyolite.Backend.Sign
 import Rhyolite.Sign
 import Web.ClientSession as CS
 
-import Backend.Schema
+import Backend.Schema ()
 import Common.Api
 import Common.Schema
 
-requestHandler :: (MonadIO m', Db m') => (forall a. m' a -> IO a) -> CS.Key -> RequestHandler (Request (Signed (AuthToken Identity))) IO
-requestHandler runDb csk = RequestHandler $ \case
+requestHandler
+  :: Pool Connection
+  -> CS.Key
+  -> RequestHandler (Request (Signed (AuthToken Identity))) IO
+requestHandler db csk = RequestHandler $ \case
   Request_Private token (PrivateRequest_SendMessage room content) -> do
     case readSignedWithKey csk token of
-      Just (AuthToken (Identity user)) -> runDb $ do
+      Just (AuthToken (Identity user)) -> runNoLoggingT $ runDb (Identity db) $ do
         t <- getTime
         let msg = Message
               { _message_chatroom = room
@@ -30,6 +34,8 @@ requestHandler runDb csk = RequestHandler $ \case
         _ <- insert_ msg
         pure $ Right ()
       _ -> pure $ Left "Unauthorized"
-  Request_Public (PublicRequest_Login user pass) -> runDb $ login (signWithKey csk) user pass >>= pure . \case
-    Nothing -> Left "Those credentials didn't work"
-    Just a -> Right a
+  Request_Public (PublicRequest_Login user pass) -> do
+    loginResult <- runNoLoggingT $ runDb (Identity db) $ login pure user pass
+    case loginResult of
+      Nothing -> pure $ Left "Those credentials didn't work"
+      Just a -> Right <$> signWithKey csk a

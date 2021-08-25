@@ -5,7 +5,11 @@ import Backend.Schema
 import Common.Route
 import Control.Monad.IO.Class
 import Control.Monad.Logger
+import Data.Coerce
 import Data.Functor.Identity
+import Data.Maybe
+import Data.Proxy
+import Data.Vessel
 import Database.Groundhog (runMigration)
 import Database.Groundhog.Generic.Migration (getTableAnalysis)
 import Database.Groundhog.Postgresql
@@ -15,7 +19,11 @@ import Obelisk.Route
 import Rhyolite.Backend.Account
 import Rhyolite.Backend.App
 import Rhyolite.Backend.DB
+import Rhyolite.Backend.Listen
 import qualified Web.ClientSession as CS
+
+import Backend.Listen
+import Common.View
 
 backend :: Backend BackendRoute FrontendRoute
 backend = Backend
@@ -27,7 +35,13 @@ backend = Backend
         runMigration $ do
           migrateAccount tables
           migrateSchema tables
-      -- liftIO $ serveDbOverWebsockets (Postgresql <$> db) (requestHandler db csk) _ _ _ _
+      (listen, _) <- liftIO $ serveDbOverWebsockets
+        (coerce db)
+        (requestHandler db csk)
+        (\nm q -> fmap (fromMaybe emptyV) $ mapDecomposedV (notifyHandler db nm) q)
+        undefined -- TODO
+        vesselFromWire
+        vesselPipeline
       return ()
     serve $ \case
       BackendRoute_Listen :/ () -> return ()

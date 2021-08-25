@@ -11,18 +11,24 @@ library
                , text
                , time
                , rhyolite-common
+               , dependent-sum-template
                -- Schema
                , database-id-class
                -- Api
                , aeson
                , aeson-gadt-th
                , constraints-extras
+               -- Views
+               , rhyolite-datastructures
+               , vessel
   exposed-modules:
     Common.Api
     Common.Route
     Common.Schema
+    Common.View
   ghc-options: -Wall -Wredundant-constraints -Wincomplete-uni-patterns -Wincomplete-record-updates -O -fno-show-valid-hole-fits
   default-extensions:
+    DeriveGeneric
     FlexibleContexts
     FlexibleInstances
     GADTs

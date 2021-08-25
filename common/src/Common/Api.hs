@@ -5,8 +5,6 @@ import Data.Aeson.GADT.TH
 import Data.Constraint.Extras.TH
 import Data.Functor.Identity
 import Data.Text
-import Database.Id.Class
-import Rhyolite.Account
 import Rhyolite.Sign
 
 import Common.Schema
