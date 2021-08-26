@@ -8,7 +8,6 @@ import Control.Monad.Logger
 import Data.Coerce
 import Data.Functor.Identity
 import Data.Maybe
-import Data.Proxy
 import Data.Vessel
 import Database.Groundhog (runMigration)
 import Database.Groundhog.Generic.Migration (getTableAnalysis)
@@ -19,18 +18,17 @@ import Obelisk.Route
 import Rhyolite.Backend.Account
 import Rhyolite.Backend.App
 import Rhyolite.Backend.DB
-import Rhyolite.Backend.Listen
 import qualified Web.ClientSession as CS
 
 import Backend.Listen
-import Common.View
+import Backend.View
 
 backend :: Backend BackendRoute FrontendRoute
 backend = Backend
   { _backend_run = \serve -> do
     csk <- CS.getKey "config/backend/clientSessionKey"
-    withDb "db" $ \db -> runNoLoggingT $ do
-      runDb (Identity db) $ do
+    withDb "db" $ \db -> do
+      runNoLoggingT $ runDb (Identity db) $ do
         tables <- getTableAnalysis
         runMigration $ do
           migrateAccount tables
@@ -39,12 +37,11 @@ backend = Backend
         (coerce db)
         (requestHandler db csk)
         (\nm q -> fmap (fromMaybe emptyV) $ mapDecomposedV (notifyHandler db nm) q)
-        undefined -- TODO
+        (QueryHandler $ \q -> fromMaybe emptyV <$> mapDecomposedV (queryHandler db) q)
         vesselFromWire
         vesselPipeline
-      return ()
-    serve $ \case
-      BackendRoute_Listen :/ () -> return ()
-      BackendRoute_Missing :/ () -> return ()
+      serve $ \case
+        BackendRoute_Listen :/ () -> listen
+        BackendRoute_Missing :/ () -> return ()
   , _backend_routeEncoder = fullRouteEncoder
   }

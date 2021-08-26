@@ -150,4 +150,8 @@ In `Backend.Listen` we define another GADT. This one describes the types of data
 
 The third argument to `serveDbOverWebsockets` is a handler for these notifications. We define the `notifyHandler` function to check notifications against the aggregated view selectors and return patches.
 
+#### Handling View Selector Queries
 
+We're already handling notifications that patch the View, but we haven't added the `QueryHandler` code that builds the View in the first instance. Note that it the order that we're doing this isn't particularly significant, we're just following the argument order of `serveDbOverWebsockets`, which takes a `QueryHandler` as its fourth argument.
+
+The query handler is straightforward to write: we're just grabbing all the data responsive to a particular query.  You'll notice here (as in the notification handler) we use `mapDecomposedV` to transform the aggregated queries before processing them.  The reason for that is that the queries are annotated with other information that's not relevant to us, but will be needed by the backend later (when, e.g., dispersing the query results).  We just want the queries themselves, and this function will give us those and then re-annotate the data afterward.

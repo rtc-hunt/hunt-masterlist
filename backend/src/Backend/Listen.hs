@@ -23,7 +23,7 @@ import Rhyolite.Backend.Listen
 import Rhyolite.SemiMap
 
 import Backend.Query
-import Backend.Schema
+import Backend.Schema ()
 import Common.Schema
 import Common.View
 
@@ -49,7 +49,7 @@ notifyHandler
   -> ChatV Proxy
   -> IO (ChatV Identity)
 notifyHandler db nm v = case _dbNotification_message nm of
-  Notify_Account :/ aid -> pure emptyV
+  Notify_Account :/ _ -> pure emptyV
   Notify_Chatroom :/ cid -> buildV v $ \case
     V_Chatrooms -> \(MapV queries) -> do
       results :: Map.MonoidalMap ChatroomQuery (SemiMap (Id Chatroom) Text) <- runNoLoggingT $ runDb (Identity db) $ searchForChatroom $ Map.keysSet queries
