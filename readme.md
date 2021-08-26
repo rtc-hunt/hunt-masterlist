@@ -46,7 +46,7 @@ Running `ob run` at this point probably won't do much different, since we're not
 
 ## Generating a schema with groundhog
 
-### Defining the schema (a7b866b0)
+### Defining the schema (4086ceb1)
 
 Defining the schema is pretty straightforward. We create a couple of Haskell datatypes in `Common.Schema`, and a foreign key constraint between them (messages belong to chatrooms). We need to add `database-id-class` to the common dependencies, since we'll need to be able to refer to database identifiers on both the frontend and backend (hence the `HasId` instances).
 
