@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 module Backend where
 
 import Backend.Request
@@ -22,7 +23,41 @@ import qualified Web.ClientSession as CS
 
 import Backend.Listen
 import Backend.View
+import Common.View
+import Data.Functor.Const
+import Data.Constraint.Extras
+import Data.Map.Monoidal (MonoidalMap)
+import qualified Data.Map.Monoidal as MMap
+import Reflex.Query.Class (SelectedCount(..))
+import Data.GADT.Compare
 
+simpleAuthPipeline
+  :: forall m err auth k. (Has View k, GCompare k, Ord auth, Monad m)
+  => FilterV m err auth k
+  -> Pipeline m
+       (MonoidalMap auth (Vessel k (Const SelectedCount)))
+       (Vessel k (Compose (WithAuth err auth) (Const SelectedCount)))
+simpleAuthPipeline fv = Pipeline $ \qh r -> pure $ (authQueryHandler qh, authRecipient r)
+ where
+  -- TODO: Use a newtype to give a different QueryResult instance for an auth map so that
+  -- the errors can be returned too.
+  disperseErrors = disperseV
+                 . mapV (Compose . MMap.mapMaybe (either (\_ -> Nothing) (Just . Identity)) . getCompose)
+  authQueryHandler
+    :: QueryHandler (Vessel k (Compose (WithAuth err auth) (Const SelectedCount))) m
+    -> QueryHandler (MonoidalMap auth (Vessel k (Const SelectedCount))) m
+  authQueryHandler qh = QueryHandler $ \qs -> do
+    r' <- runQueryHandler qh (condenseWithAuth qs)
+    r <- buildV r' (unFilterV fv)
+    pure $ disperseErrors r
+  authRecipient
+    :: Recipient (MonoidalMap auth (Vessel k (Const SelectedCount))) m
+    -> Recipient (Vessel k (Compose (WithAuth err auth) (Const SelectedCount))) m
+  authRecipient r = Recipient $ \qr' -> do
+    qr <- buildV qr' (unFilterV fv)
+    tellRecipient r $ disperseErrors qr
+
+{-
 backend :: Backend BackendRoute FrontendRoute
 backend = Backend
   { _backend_run = \serve -> do
@@ -36,8 +71,8 @@ backend = Backend
       (listen, _) <- liftIO $ serveDbOverWebsockets
         (coerce db)
         (requestHandler db csk)
-        (\nm q -> fmap (fromMaybe emptyV) $ mapDecomposedV (notifyHandler db nm) q)
-        (QueryHandler $ \q -> fromMaybe emptyV <$> mapDecomposedV (queryHandler db) q)
+        undefined -- (\nm q -> fmap (fromMaybe emptyV) $ mapDecomposedV (notifyHandler db nm) q)
+        undefined -- (QueryHandler $ \q -> fromMaybe emptyV <$> mapDecomposedV (privateQueryHandler db) q)
         vesselFromWire
         vesselPipeline
       serve $ \case
@@ -45,3 +80,4 @@ backend = Backend
         BackendRoute_Missing :/ () -> return ()
   , _backend_routeEncoder = fullRouteEncoder
   }
+-}
