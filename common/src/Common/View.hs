@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE QuantifiedConstraints #-}
@@ -26,11 +27,10 @@ import Data.Constraint.Extras
 import Data.Foldable
 import qualified Data.Functor.Sum as F
 import Data.GADT.Compare
-import Data.MonoidMap
+import Data.MonoidMap ()
 import Data.Map.Monoidal (MonoidalMap)
 import qualified Data.Map.Monoidal as MMap
 import Data.Set (Set)
-import qualified Data.Set as Set
 import Data.Void
 import Data.Type.Equality
 import Reflex.Query.Class
@@ -105,13 +105,21 @@ instance ArgDict c (AuthV auth public private) where
     AuthV_Public -> Dict
     AuthV_Private _ -> Dict
 
+newtype AuthMap (err :: * -> *) auth v (g :: * -> *) = AuthMap { unAuthMap :: MonoidalMap auth (v g) }
+  deriving (Semigroup, Monoid)
+
+instance (Ord auth, EmptyView v, Semigroup (v err), Query (v g)) => Query (AuthMap err auth v g) where
+  type QueryResult (AuthMap err auth v g) = (MonoidalMap auth (v err, QueryResult (v g)))
+  crop (AuthMap q) r = MMap.intersectionWith (\(re, rv) q' ->
+    (fromMaybe emptyV $ cropV (\_ x -> x) q' re, crop q' rv)) r q
+
 decomposeAuthV
   :: (Ord auth, Semigroup (private g), Monoid (public g))
   => Vessel (AuthV auth public private) g
-  -> (public g, MonoidalMap auth (private g))
+  -> (public g, AuthMap err auth private g)
 decomposeAuthV authv = flip foldMap (toListV authv) $ \case
   AuthV_Public :~> pubv -> (pubv, mempty)
-  AuthV_Private token :~> privv -> (mempty, MMap.singleton token privv)
+  AuthV_Private token :~> privv -> (mempty, AuthMap $ MMap.singleton token privv)
 
 condenseWithAuth
  :: ( View private
@@ -142,7 +150,7 @@ newtype FilterV m err auth k = FilterV
   }
 
 -- | A filter that never throws an error and returns the full result to all recipients.
-passthroughFilterV :: (Has View k, GCompare k, Applicative m) => FilterV m (Const Void) auth k
+passthroughFilterV :: (Has View k, Applicative m) => FilterV m (Const Void) auth k
 passthroughFilterV = FilterV $ \k -> has @View k $ (pure .) $ mapV $ \(Compose (WithAuth (auths, Identity m))) -> Compose $
   MMap.fromSet (\_ -> F.InR (Identity m)) auths
 
