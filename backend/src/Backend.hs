@@ -21,10 +21,13 @@ import Rhyolite.Backend.App
 import Rhyolite.Backend.DB
 import qualified Web.ClientSession as CS
 
+import Prelude hiding (id, (.))
 import Backend.Listen
 import Backend.View
 import Common.View
+import Control.Category
 import Data.Functor.Const
+import Data.Functor.Sum
 import Data.Constraint.Extras
 import Data.Map.Monoidal (MonoidalMap)
 import qualified Data.Map.Monoidal as MMap
@@ -41,8 +44,11 @@ simpleAuthPipeline fv = Pipeline $ \qh r -> pure $ (authQueryHandler qh, authRec
  where
   -- TODO: Use a newtype to give a different QueryResult instance for an auth map so that
   -- the errors can be returned too.
+  sumF f g = \case
+    InL x -> f x
+    InR x -> g x
   disperseErrors = disperseV
-                 . mapV (Compose . MMap.mapMaybe (either (\_ -> Nothing) (Just . Identity)) . getCompose)
+                 . mapV (Compose . MMap.mapMaybe (sumF (\_ -> Nothing) Just) . getCompose)
   authQueryHandler
     :: QueryHandler (Vessel k (Compose (WithAuth err auth) (Const SelectedCount))) m
     -> QueryHandler (MonoidalMap auth (Vessel k (Const SelectedCount))) m

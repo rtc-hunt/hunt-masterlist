@@ -24,6 +24,7 @@ import Common.Schema
 import Data.Constraint
 import Data.Constraint.Extras
 import Data.Foldable
+import qualified Data.Functor.Sum as F
 import Data.GADT.Compare
 import Data.MonoidMap
 import Data.Map.Monoidal (MonoidalMap)
@@ -63,7 +64,7 @@ deriveJSONGADT ''V
 deriveGEq ''V
 deriveGCompare ''V
 
-newtype WithAuth err auth a = WithAuth { unWithAuth :: (Set auth, a) }
+newtype WithAuth (err :: * -> *) auth a = WithAuth { unWithAuth :: (Set auth, a) }
   deriving (Functor)
 
 instance (Ord auth, Semigroup a) => Semigroup (WithAuth err auth a) where
@@ -137,13 +138,13 @@ newtype FilterV m err auth k = FilterV
     -- ^ Which part of the view is being filtered?
     -> v (Compose (WithAuth err auth) Identity)
     -- ^ What is the main result and who are the recipients?
-    -> m (v (Compose (MonoidalMap auth) (Either err)))
+    -> m (v (Compose (MonoidalMap auth) (F.Sum err Identity)))
   }
 
 -- | A filter that never throws an error and returns the full result to all recipients.
-passthroughFilterV :: (Has View k, GCompare k, Applicative m) => FilterV m Void auth k
+passthroughFilterV :: (Has View k, GCompare k, Applicative m) => FilterV m (Const Void) auth k
 passthroughFilterV = FilterV $ \k -> has @View k $ (pure .) $ mapV $ \(Compose (WithAuth (auths, Identity m))) -> Compose $
-  MMap.fromSet (\_ -> Right m) auths
+  MMap.fromSet (\_ -> F.InR (Identity m)) auths
 
 {-
 authVesselFromWire
