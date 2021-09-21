@@ -105,6 +105,7 @@ instance ArgDict c (AuthV auth public private) where
     AuthV_Public -> Dict
     AuthV_Private _ -> Dict
 
+-- | This type exists solely to give an appropriate 'Query' instance for authorized view selectors
 newtype AuthMap (err :: * -> *) auth v (g :: * -> *) = AuthMap { unAuthMap :: MonoidalMap auth (v g) }
   deriving (Semigroup, Monoid)
 
@@ -121,13 +122,13 @@ decomposeAuthV authv = flip foldMap (toListV authv) $ \case
   AuthV_Public :~> pubv -> (pubv, mempty)
   AuthV_Private token :~> privv -> (mempty, AuthMap $ MMap.singleton token privv)
 
-condenseWithAuth
+condenseAuthMap
  :: ( View private
     , forall a. Monoid (g a)
     )
- => MonoidalMap auth (private g)
+ => AuthMap err auth private g
  -> private (Compose (WithAuth err auth) g)
-condenseWithAuth = mapV (\(Compose m) -> Compose $ WithAuth (MMap.keysSet m, fold m)) . condenseV
+condenseAuthMap = mapV (\(Compose m) -> Compose $ WithAuth (MMap.keysSet m, fold m)) . condenseV . unAuthMap
 
 mapDecomposedV'
   :: forall f g m v. (Functor f, Functor m, View v)
