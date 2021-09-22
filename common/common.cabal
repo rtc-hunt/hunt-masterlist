@@ -25,6 +25,8 @@ library
                , constraints
                , some
                , reflex
+               , witherable
+               , patch
   exposed-modules:
     Common.Api
     Common.Route

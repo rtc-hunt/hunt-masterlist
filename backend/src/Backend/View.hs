@@ -5,9 +5,7 @@ import Data.Functor.Identity
 import qualified Data.Map.Monoidal as Map
 import Data.Pool
 import Data.Vessel
-import Data.Void
 import Database.PostgreSQL.Simple
-import Rhyolite.Account
 import Rhyolite.Backend.DB
 
 import Backend.Query

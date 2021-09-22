@@ -1,10 +1,13 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE QuantifiedConstraints #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeApplications #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module Common.View where
 
 import Data.Aeson
@@ -14,8 +17,10 @@ import Data.Maybe
 import Data.Text
 import Data.Time
 import Data.Vessel
+import Data.Vessel.Single
+import Data.Vessel.SubVessel
+import Data.Vessel.Vessel
 import Rhyolite.SemiMap
-import Rhyolite.Sign
 import Data.GADT.Compare.TH
 import GHC.Generics
 import Data.Semigroup
@@ -24,16 +29,16 @@ import Common.Schema
 
 import Data.Constraint
 import Data.Constraint.Extras
-import Data.Foldable
-import qualified Data.Functor.Sum as F
 import Data.GADT.Compare
 import Data.MonoidMap ()
-import Data.Map.Monoidal (MonoidalMap)
 import qualified Data.Map.Monoidal as MMap
+import Data.Patch
 import Data.Set (Set)
-import Data.Void
+import qualified Data.Set as Set
 import Data.Type.Equality
+import Data.Witherable
 import Reflex.Query.Class
+import Rhyolite.App
 
 data MsgView = MsgView
   { _msgView_handle :: Text
@@ -64,124 +69,220 @@ deriveJSONGADT ''V
 deriveGEq ''V
 deriveGCompare ''V
 
+type PrivateChatV = Vessel V
+
 newtype WithAuth (err :: * -> *) auth a = WithAuth { unWithAuth :: (Set auth, a) }
   deriving (Functor)
 
 instance (Ord auth, Semigroup a) => Semigroup (WithAuth err auth a) where
   WithAuth a <> WithAuth b = WithAuth $ a <> b
 
-data AuthV auth public private (g :: (* -> *) -> *) where
-  AuthV_Public :: AuthV auth public private public
-  AuthV_Private :: auth -> AuthV auth public private private
+data ErrorVK err view (v :: (* -> *) -> *) where
+  ErrorVK_Error :: ErrorVK err view (SingleV err)
+  ErrorVK_View :: ErrorVK err view view
 
-deriveJSONGADT ''AuthV
+deriveJSONGADT ''ErrorVK
 
-instance Eq auth => GEq (AuthV auth public private) where
+instance GEq (ErrorVK err view) where
   geq = \case
-    AuthV_Public -> \case
-      AuthV_Public -> Just Refl
-      _ -> Nothing
-    AuthV_Private t0 -> \case
-      AuthV_Private t2 -> case t0 == t2 of
-        True -> Just Refl
-        False -> Nothing
-      _ -> Nothing
+    ErrorVK_Error -> \case
+      ErrorVK_Error -> Just Refl
+      ErrorVK_View -> Nothing
+    ErrorVK_View -> \case
+      ErrorVK_Error -> Nothing
+      ErrorVK_View -> Just Refl
 
-instance Ord auth => GCompare (AuthV auth public private) where
+instance GCompare (ErrorVK err view) where
   gcompare = \case
-    AuthV_Public -> \case
-      AuthV_Public -> GEQ
-      _ -> GLT
-    AuthV_Private t0 -> \case
-      AuthV_Public -> GGT
-      AuthV_Private t1 -> case compare t0 t1 of
-        LT -> GLT
-        EQ -> GEQ
-        GT -> GGT
+    ErrorVK_Error -> \case
+      ErrorVK_Error -> GEQ
+      ErrorVK_View -> GLT
+    ErrorVK_View -> \case
+      ErrorVK_Error -> GGT
+      ErrorVK_View -> GEQ
 
-instance ArgDict c (AuthV auth public private) where
-  type ConstraintsFor (AuthV auth public private) c = (c public, c private)
+instance ArgDict c (ErrorVK err view) where
+  type ConstraintsFor (ErrorVK err view) c = (c (SingleV err), c view)
   argDict = \case
-    AuthV_Public -> Dict
-    AuthV_Private _ -> Dict
+    ErrorVK_Error -> Dict
+    ErrorVK_View -> Dict
 
--- | This type exists solely to give an appropriate 'Query' instance for authorized view selectors
-newtype AuthMap (err :: * -> *) auth v (g :: * -> *) = AuthMap { unAuthMap :: MonoidalMap auth (v g) }
-  deriving (Semigroup, Monoid)
+-- TODO: Abstract data type. Do not reexport
+newtype ErrorV err view g = ErrorV { unErrorV :: Vessel (ErrorVK err view) g }
+  deriving (Generic, EmptyView)
 
-instance (Ord auth, EmptyView v, Semigroup (v err), Query (v g)) => Query (AuthMap err auth v g) where
-  type QueryResult (AuthMap err auth v g) = (MonoidalMap auth (v err, QueryResult (v g)))
-  crop (AuthMap q) r = MMap.intersectionWith (\(re, rv) q' ->
-    (fromMaybe emptyV $ cropV (\_ x -> x) q' re, crop q' rv)) r q
+deriving instance (Eq (g (First (Maybe err))), Eq (view g)) => Eq (ErrorV err view g)
 
-decomposeAuthV
-  :: (Ord auth, Semigroup (private g), Monoid (public g))
-  => Vessel (AuthV auth public private) g
-  -> (public g, AuthMap err auth private g)
-decomposeAuthV authv = flip foldMap (toListV authv) $ \case
-  AuthV_Public :~> pubv -> (pubv, mempty)
-  AuthV_Private token :~> privv -> (mempty, AuthMap $ MMap.singleton token privv)
+instance View view => View (ErrorV err view)
 
-condenseAuthMap
- :: ( View private
-    , forall a. Monoid (g a)
-    )
- => AuthMap err auth private g
- -> private (Compose (WithAuth err auth) g)
-condenseAuthMap = mapV (\(Compose m) -> Compose $ WithAuth (MMap.keysSet m, fold m)) . condenseV . unAuthMap
+instance (ToJSON (g (First (Maybe err))), ToJSON (view g)) => ToJSON (ErrorV err view g)
+instance (View view, FromJSON (g (First (Maybe err))), FromJSON (view g)) => FromJSON (ErrorV err view g)
 
-mapDecomposedV'
-  :: forall f g m v. (Functor f, Functor m, View v)
-  => (v Proxy -> m (v Identity))
-  -> v (Compose f g)
-  -> m (Maybe (v (Compose f Identity)))
-mapDecomposedV' f v = cropV recompose v <$> (f $ mapV (\_ -> Proxy) v)
-  where
-    recompose :: Compose f g a -> Identity a -> Compose f Identity a
-    recompose (Compose s) i = Compose $ i <$ s
+deriving instance (Has' Semigroup (ErrorVK err v) (FlipAp g), View v) => Semigroup (ErrorV err v g)
+deriving instance (Has' Semigroup (ErrorVK err v) (FlipAp g), View v) => Monoid (ErrorV err v g)
+deriving instance (Has' Additive (ErrorVK err v) (FlipAp g), View v) => Additive (ErrorV err v g)
+deriving instance (Has' Group (ErrorVK err v) (FlipAp g), View v) => Group (ErrorV err v g)
+deriving instance (PositivePart (g (First (Maybe err))), PositivePart (v g)) => PositivePart (ErrorV err v g)
 
--- | Define a filter stage for a vessel-based view pipeline.
-newtype FilterV m err auth k = FilterV
-  { unFilterV
-    :: forall v. k v
-    -- ^ Which part of the view is being filtered?
-    -> v (Compose (WithAuth err auth) Identity)
-    -- ^ What is the main result and who are the recipients?
-    -> m (v (Compose (MonoidalMap auth) (F.Sum err Identity)))
-  }
+instance
+  ( Semigroup (v Identity)
+  , View v
+  , QueryResult (v Proxy) ~ v Identity
+  ) => Query (ErrorV err v Proxy) where
+  type QueryResult (ErrorV err v Proxy) = ErrorV err v Identity
+  crop (ErrorV s) (ErrorV r) = ErrorV $ crop s r
 
--- | A filter that never throws an error and returns the full result to all recipients.
-passthroughFilterV :: (Has View k, Applicative m) => FilterV m (Const Void) auth k
-passthroughFilterV = FilterV $ \k -> has @View k $ (pure .) $ mapV $ \(Compose (WithAuth (auths, Identity m))) -> Compose $
-  MMap.fromSet (\_ -> F.InR (Identity m)) auths
+instance
+  ( Semigroup (v Identity)
+  , View v
+  , QueryResult (v (Const ())) ~ v Identity
+  ) => Query (ErrorV err v (Const ())) where
+  type QueryResult (ErrorV err v (Const ())) = ErrorV err v Identity
+  crop (ErrorV s) (ErrorV r) = ErrorV $ crop s r
 
-{-
-authVesselFromWire
-  :: ()
-  => QueryMorphism (AuthV auth public private (Const ())) (AuthV auth public private (Const SelectedCount))
-authVesselFromWire = QueryMorphism
-  { _queryMorphism_mapQuery = mapV (mapV (const (Const 1)))
-  , _queryMorphism_mapQueryResult = id
-  }
--}
-{-
--- | Reverses vesselToWire
-vesselFromWire
-  :: ( View v
-     , QueryResult (v (Const ())) ~ v Identity
-     , QueryResult (v (Const SelectedCount)) ~ v Identity
-     )
-  => QueryMorphism (v (Const ())) (v (Const SelectedCount))
-vesselFromWire = QueryMorphism
-  { _queryMorphism_mapQuery = mapV (const (Const 1))
-  , _queryMorphism_mapQueryResult = id
-  }
--}
+instance
+  ( Semigroup (v Identity)
+  , View v
+  , QueryResult (v (Const SelectedCount)) ~ v Identity
+  ) => Query (ErrorV err v (Const SelectedCount)) where
+  type QueryResult (ErrorV err v (Const SelectedCount)) = ErrorV err v Identity
+  crop (ErrorV s) (ErrorV r) = ErrorV $ crop s r
 
-data EmptyV (g :: (* -> *))
+instance
+  ( View v
+  , Has' Semigroup (ErrorVK err v) (FlipAp (Compose c (VesselLeafWrapper (QueryResult (Vessel (ErrorVK err v) g)))))
+  , Query (Vessel (ErrorVK err v) g)
+  ) => Query (ErrorV err v (Compose c g)) where
+  type QueryResult (ErrorV err v (Compose c g)) = ErrorV err v (Compose c (VesselLeafWrapper (QueryResult (Vessel (ErrorVK err v) g))))
+  crop (ErrorV s) (ErrorV r) = ErrorV $ crop s r
 
-type PublicChatV = EmptyV
-type PrivateChatV = Vessel V
+-- | The error part of the view will never be present
+liftErrorV :: View v => v g -> ErrorV e v g
+liftErrorV = ErrorV . singletonV ErrorVK_View
 
-type AuthChatV a = Vessel (AuthV (Signed (AuthToken Identity)) PublicChatV PrivateChatV) a
+-- | The successful part of the view will never be present
+failureErrorV :: e -> ErrorV e v Identity
+failureErrorV = ErrorV . singletonV ErrorVK_Error . SingleV . Identity . First . Just
 
+buildErrorV
+  :: (View v, Monad m)
+  => (v Proxy -> m (Either e (v Identity)))
+  -> ErrorV e v Proxy
+  -> m (ErrorV e v Identity)
+buildErrorV f (ErrorV v) = case lookupV ErrorVK_View v of
+  Nothing -> pure (ErrorV emptyV)
+  Just v' -> f v' >>= \case
+    Left err -> pure $ failureErrorV err
+    Right val -> pure $ liftErrorV val
+
+observeErrorV
+  :: EmptyView v
+  => ErrorV e v Identity
+  -> Either e (v Identity)
+observeErrorV (ErrorV v) = case lookupV ErrorVK_Error v of
+  Nothing -> Right $ case lookupV ErrorVK_View v of
+    Nothing -> emptyV
+    Just v' -> v'
+  Just err -> case lookupSingleV err of
+    Nothing -> Right emptyV
+    Just e -> Left e
+
+newtype AuthenticatedV auth v g = AuthenticatedV { unAuthenticatedV :: SubVessel auth (ErrorV () v) g }
+  deriving (Generic)
+
+deriving instance (Ord auth, Eq (view g), Eq (g (First (Maybe ())))) => Eq (AuthenticatedV auth view g)
+
+instance (Ord auth, ToJSON auth, ToJSON (g (First (Maybe ()))), ToJSON (view g)) => ToJSON (AuthenticatedV auth view g)
+instance (Ord auth, FromJSON auth, View view, FromJSON (g (First (Maybe ()))), FromJSON (view g)) => FromJSON (AuthenticatedV auth view g)
+
+deriving instance
+  ( Ord auth
+  , Has' Semigroup (ErrorVK () v) (FlipAp g)
+  , View v
+  ) => Semigroup (AuthenticatedV auth v g)
+
+deriving instance
+  ( Ord auth
+  , Has' Semigroup (ErrorVK () v) (FlipAp g)
+  , View v
+  ) => Monoid (AuthenticatedV auth v g)
+
+deriving instance
+  ( Ord auth
+  , Has' Group (ErrorVK () v) (FlipAp g)
+  , View v
+  ) => Group (AuthenticatedV auth v g)
+
+deriving instance
+  ( Ord auth
+  , Has' Additive (ErrorVK () v) (FlipAp g)
+  , View v
+  ) => Additive (AuthenticatedV auth v g)
+
+deriving instance (Ord auth, PositivePart (g (First (Maybe ()))), PositivePart (v g)) => PositivePart (AuthenticatedV auth v g)
+
+instance (Ord auth, View v) => View (AuthenticatedV auth v)
+instance (Ord auth, View v) => EmptyView (AuthenticatedV auth v) where
+  emptyV = AuthenticatedV emptyV
+
+instance
+  ( Ord auth
+  , Semigroup (v Identity)
+  , View v
+  , QueryResult (v Proxy) ~ v Identity
+  ) => Query (AuthenticatedV auth v Proxy) where
+  type QueryResult (AuthenticatedV auth v Proxy) = AuthenticatedV auth v Identity
+  crop (AuthenticatedV s) (AuthenticatedV r) = AuthenticatedV $ crop s r
+
+instance
+  ( Ord auth
+  , Semigroup (v Identity)
+  , View v
+  , QueryResult (v (Const ())) ~ v Identity
+  ) => Query (AuthenticatedV auth v (Const ())) where
+  type QueryResult (AuthenticatedV auth v (Const ())) = AuthenticatedV auth v Identity
+  crop (AuthenticatedV s) (AuthenticatedV r) = AuthenticatedV $ crop s r
+
+instance
+  ( Ord auth
+  , Semigroup (v Identity)
+  , View v
+  , QueryResult (v (Const SelectedCount)) ~ v Identity
+  ) => Query (AuthenticatedV auth v (Const SelectedCount)) where
+  type QueryResult (AuthenticatedV auth v (Const SelectedCount)) = AuthenticatedV auth v Identity
+  crop (AuthenticatedV s) (AuthenticatedV r) = AuthenticatedV $ crop s r
+
+instance
+  ( Ord auth
+  , View v
+  , Has' Semigroup (ErrorVK () v) (FlipAp (Compose c (VesselLeafWrapper (QueryResult (Vessel (SubVesselKey auth (ErrorV () v)) g)))))
+  , Query (Vessel (SubVesselKey auth (ErrorV () v)) g)
+  ) => Query (AuthenticatedV auth v (Compose c g)) where
+  type QueryResult (AuthenticatedV auth v (Compose c g)) = AuthenticatedV auth v (Compose c (VesselLeafWrapper (QueryResult (Vessel (SubVesselKey auth (ErrorV () v)) g))))
+  crop (AuthenticatedV s) (AuthenticatedV r) = AuthenticatedV $ crop s r
+
+-- TODO ORPHAN
+instance Additive (g (f x)) => Additive (Compose g f x)
+
+-- token is usually (Signed (AuthToken Identity))
+-- user is usually (Id Account), iso to AuthToken Identity
+handleAuthenticatedQuery
+  :: (Monad m, Ord token, View v)
+  => (token -> m (Maybe user))
+  -- ^ How to figure out the identity corresponding to a token
+  -> (v Proxy -> m (v Identity))
+  -- ^ Handle the aggregate query for all identities
+  -> AuthenticatedV token v Proxy
+  -- ^ Private views parameterized by tokens
+  -> m (AuthenticatedV token v Identity)
+handleAuthenticatedQuery readToken handler (AuthenticatedV vt) = do
+  let unfilteredVt = getSubVessel vt
+      unvalidatedTokens = MMap.keys unfilteredVt
+  validTokens <- Set.fromList <$> witherM (\t -> pure t <$ readToken t) unvalidatedTokens
+  let filteredVt = MMap.intersectionWith const unfilteredVt (MMap.fromSet (\_ -> ()) validTokens)
+      invalidTokens = MMap.fromSet (\_ -> failureErrorV ()) $
+        Set.difference (Set.fromList unvalidatedTokens) validTokens
+      v = condenseV filteredVt
+  v' <- disperseV . fromMaybe emptyV <$> mapDecomposedV (buildErrorV (fmap Right . handler)) v
+  -- The use of mapDecomposedV guarantees that the valid and invalid token sets are disjoint
+  pure $ AuthenticatedV $ mkSubVessel $ MMap.unionWith const invalidTokens v'
