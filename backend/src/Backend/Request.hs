@@ -5,13 +5,14 @@ import Data.Functor.Identity
 import Database.Groundhog
 import Database.PostgreSQL.Simple
 import Data.Pool
-import Rhyolite.Backend.Account (login)
+import Rhyolite.Backend.Account (login, ensureAccountExists, setAccountPassword)
 import Rhyolite.Backend.App
 import Rhyolite.Backend.DB
 import Rhyolite.Backend.Sign
 import Rhyolite.Sign
 import Web.ClientSession as CS
 
+import Backend.Listen
 import Backend.Schema ()
 import Common.Api
 import Common.Schema
@@ -39,3 +40,15 @@ requestHandler db csk = RequestHandler $ \case
     case loginResult of
       Nothing -> pure $ Left "Those credentials didn't work"
       Just a -> Right <$> signWithKey csk a
+  ExampleRequest_Public (PublicRequest_SignUp user pass) -> do
+    res <- runNoLoggingT $ runDb (Identity db) $ do
+      (new, aid) <- ensureAccountExists Notify_Account user
+      case not new of
+        True -> pure $ Left "Account already exists"
+        False -> do
+          setAccountPassword aid pass
+          pure $ Right aid
+    case res of
+      Left err -> pure $ Left err
+      Right aid ->
+        Right <$> signWithKey csk aid

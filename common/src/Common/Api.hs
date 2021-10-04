@@ -17,6 +17,7 @@ data PrivateRequest a where
 
 data PublicRequest a where
   PublicRequest_Login :: Text -> Text -> PublicRequest (Either Text (Signed (AuthToken Identity)))
+  PublicRequest_SignUp :: Text -> Text -> PublicRequest (Either Text (Signed (AuthToken Identity)))
 
 data ExampleRequest token a where
   ExampleRequest_Private :: token -> PrivateRequest a -> ExampleRequest token a

@@ -55,8 +55,27 @@ frontendBody
      )
   => RoutedT t (R FrontendRoute) m ()
 frontendBody = subRoute_ $ \case
+  FrontendRoute_SignUp -> do
+    username <- el "div" . el "label" $ do
+      text "Email"
+      fmap value $ inputElement def
+    password <- el "div" . el "label" $ do
+      text "Password"
+      fmap value . inputElement $
+        def & inputElementConfig_elementConfig
+            . elementConfig_initialAttributes
+            .~ (AttributeName Nothing "type" =: "password")
+    signupSubmit <- el "div" . el "label" $ do
+      text "\160"
+      signupClick <- button "Sign Up"
+      -- We tag the Event of clicks on the log in button with the current values of
+      -- the username and password text fields.
+      return $ tag (current (zipDyn username password)) signupClick
+    -- Here, we translate the signup submit events into API requests to log in.
+    signupResponse <- requesting . ffor signupSubmit $ \(user, pw) ->
+      ExampleRequest_Public $ PublicRequest_SignUp user pw
+    pure ()
   FrontendRoute_Login -> do
-    text "tiny rick!!!"
     username <- el "div" . el "label" $ do
       text "Email"
       fmap value $ inputElement def
