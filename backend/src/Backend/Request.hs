@@ -5,6 +5,7 @@ import Data.Functor.Identity
 import Database.Groundhog
 import Database.PostgreSQL.Simple
 import Data.Pool
+import Rhyolite.Api
 import Rhyolite.Backend.Account (login, ensureAccountExists, setAccountPassword)
 import Rhyolite.Backend.App
 import Rhyolite.Backend.DB
@@ -20,9 +21,9 @@ import Common.Schema
 requestHandler
   :: Pool Connection
   -> CS.Key
-  -> RequestHandler (ExampleRequest (Signed (AuthToken Identity))) IO
+  -> RequestHandler (ApiRequest (Signed (AuthToken Identity)) PublicRequest PrivateRequest) IO
 requestHandler db csk = RequestHandler $ \case
-  ExampleRequest_Private token (PrivateRequest_SendMessage room content) -> do
+  ApiRequest_Private token (PrivateRequest_SendMessage room content) -> do
     case readSignedWithKey csk token of
       Just (AuthToken (Identity user)) -> runNoLoggingT $ runDb (Identity db) $ do
         t <- getTime
@@ -35,12 +36,12 @@ requestHandler db csk = RequestHandler $ \case
         _ <- insert_ msg
         pure $ Right ()
       _ -> pure $ Left "Unauthorized"
-  ExampleRequest_Public (PublicRequest_Login user pass) -> do
+  ApiRequest_Public (PublicRequest_Login user pass) -> do
     loginResult <- runNoLoggingT $ runDb (Identity db) $ login pure user pass
     case loginResult of
       Nothing -> pure $ Left "Those credentials didn't work"
       Just a -> Right <$> signWithKey csk a
-  ExampleRequest_Public (PublicRequest_SignUp user pass) -> do
+  ApiRequest_Public (PublicRequest_SignUp user pass) -> do
     res <- runNoLoggingT $ runDb (Identity db) $ do
       (new, aid) <- ensureAccountExists Notify_Account user
       case not new of

@@ -22,6 +22,7 @@ import Obelisk.Route
 import Obelisk.Route.Frontend
 import Obelisk.Generated.Static
 import Rhyolite.Account
+import Rhyolite.Api (ApiRequest(..))
 import Rhyolite.Frontend.App
 import Rhyolite.Sign
 
@@ -47,7 +48,7 @@ frontendBody
      ( Adjustable t m
      , MonadHold t m
      , MonadFix m
-     , Request m ~ ExampleRequest token
+     , Request m ~ ApiRequest token PublicRequest PrivateRequest
      , DomBuilder t m
      , Requester t m
      , Prerender js t m
@@ -73,7 +74,7 @@ frontendBody = subRoute_ $ \case
       return $ tag (current (zipDyn username password)) signupClick
     -- Here, we translate the signup submit events into API requests to log in.
     signupResponse <- requesting . ffor signupSubmit $ \(user, pw) ->
-      ExampleRequest_Public $ PublicRequest_SignUp user pw
+      ApiRequest_Public $ PublicRequest_SignUp user pw
     pure ()
   FrontendRoute_Login -> do
     username <- el "div" . el "label" $ do
@@ -93,7 +94,7 @@ frontendBody = subRoute_ $ \case
       return $ tag (current (zipDyn username password)) loginClick
     -- Here, we translate the login submit events into API requests to log in.
     _ <- requesting . ffor loginSubmit $ \(user, pw) ->
-      ExampleRequest_Public $ PublicRequest_Login user pw
+      ApiRequest_Public $ PublicRequest_Login user pw
     pure ()
   FrontendRoute_Main -> do
     el "h1" $ text "Welcome to Obelisk!"
@@ -126,7 +127,7 @@ runExampleWidget
       (R FrontendRoute)
       (RhyoliteWidget
          ((AuthenticatedV (Signed (AuthToken Identity)) PrivateChatV) (Const SelectedCount))
-         (ExampleRequest (Signed (AuthToken Identity))) t m)
+         (ApiRequest (Signed (AuthToken Identity)) PublicRequest PrivateRequest) t m)
       a
   -- ^ Child widget
   -> RoutedT t (R FrontendRoute) m a
