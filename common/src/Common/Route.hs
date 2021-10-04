@@ -31,6 +31,7 @@ data BackendRoute :: * -> * where
 
 data FrontendRoute :: * -> * where
   FrontendRoute_Main :: FrontendRoute ()
+  FrontendRoute_Login :: FrontendRoute ()
   -- This type is used to define frontend routes, i.e. ones for which the backend will serve the frontend.
 
 fullRouteEncoder
@@ -41,7 +42,13 @@ fullRouteEncoder = mkFullRouteEncoder
       BackendRoute_Missing -> PathSegment "missing" $ unitEncoder mempty
       BackendRoute_Listen -> PathSegment "listen" $ unitEncoder mempty)
   (\case
-      FrontendRoute_Main -> PathEnd $ unitEncoder mempty)
+      FrontendRoute_Main -> PathEnd $ unitEncoder mempty
+      FrontendRoute_Login -> PathSegment "login" $ unitEncoder mempty)
+
+checkedFullRouteEncoder :: Encoder Identity Identity (R (FullRoute BackendRoute FrontendRoute)) PageName
+checkedFullRouteEncoder = case checkEncoder fullRouteEncoder of
+  Left e -> error $ show e
+  Right x -> x
 
 concat <$> mapM deriveRouteComponent
   [ ''BackendRoute

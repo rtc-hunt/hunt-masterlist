@@ -286,3 +286,15 @@ handleAuthenticatedQuery readToken handler (AuthenticatedV vt) = do
   v' <- disperseV . fromMaybe emptyV <$> mapDecomposedV (buildErrorV (fmap Right . handler)) v
   -- The use of mapDecomposedV guarantees that the valid and invalid token sets are disjoint
   pure $ AuthenticatedV $ mkSubVessel $ MMap.unionWith const invalidTokens v'
+
+authenticatedQueryMorphism
+  :: (Ord token, View v)
+  => token
+  -> QueryMorphism
+       (ErrorV () v (Const SelectedCount))
+       (AuthenticatedV token v (Const SelectedCount))
+authenticatedQueryMorphism token = QueryMorphism
+  { _queryMorphism_mapQuery = AuthenticatedV . singletonSubVessel token
+  , _queryMorphism_mapQueryResult = maybe emptyV id . lookupSubVessel token . unAuthenticatedV
+  }
+

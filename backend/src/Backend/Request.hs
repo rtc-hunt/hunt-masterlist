@@ -19,9 +19,9 @@ import Common.Schema
 requestHandler
   :: Pool Connection
   -> CS.Key
-  -> RequestHandler (Request (Signed (AuthToken Identity))) IO
+  -> RequestHandler (ExampleRequest (Signed (AuthToken Identity))) IO
 requestHandler db csk = RequestHandler $ \case
-  Request_Private token (PrivateRequest_SendMessage room content) -> do
+  ExampleRequest_Private token (PrivateRequest_SendMessage room content) -> do
     case readSignedWithKey csk token of
       Just (AuthToken (Identity user)) -> runNoLoggingT $ runDb (Identity db) $ do
         t <- getTime
@@ -34,7 +34,7 @@ requestHandler db csk = RequestHandler $ \case
         _ <- insert_ msg
         pure $ Right ()
       _ -> pure $ Left "Unauthorized"
-  Request_Public (PublicRequest_Login user pass) -> do
+  ExampleRequest_Public (PublicRequest_Login user pass) -> do
     loginResult <- runNoLoggingT $ runDb (Identity db) $ login pure user pass
     case loginResult of
       Nothing -> pure $ Left "Those credentials didn't work"

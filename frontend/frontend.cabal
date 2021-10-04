@@ -11,6 +11,7 @@ library
                , obelisk-route
                , jsaddle
                , reflex-dom-core
+               , rhyolite-frontend
                , obelisk-executable-config-lookup
                , obelisk-generated-static
                , text
