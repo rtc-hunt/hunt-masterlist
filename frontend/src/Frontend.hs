@@ -9,7 +9,6 @@ module Frontend where
 
 import Control.Monad
 import Control.Monad.Fix
-import Control.Monad.Trans
 import Data.Functor.Const
 import Data.Functor.Identity
 import qualified Data.Text as T
@@ -23,7 +22,6 @@ import Obelisk.Route
 import Obelisk.Route.Frontend
 import Obelisk.Generated.Static
 import Rhyolite.Account
-import Rhyolite.Api hiding (Request)
 import Rhyolite.Frontend.App
 import Rhyolite.Sign
 
@@ -43,8 +41,6 @@ frontend = Frontend
       elAttr "link" ("href" =: $(static "main.css") <> "type" =: "text/css" <> "rel" =: "stylesheet") blank
   , _frontend_body = runExampleWidget frontendBody
   }
-
-instance HasCookies m => HasCookies (RhyoliteWidget v r t m)
 
 frontendBody
   :: forall js t m token.
@@ -77,7 +73,7 @@ frontendBody = subRoute_ $ \case
       -- the username and password text fields.
       return $ tag (current (zipDyn username password)) loginClick
     -- Here, we translate the login submit events into API requests to log in.
-    loginResponse <- requesting . ffor loginSubmit $ \(user, pw) ->
+    _ <- requesting . ffor loginSubmit $ \(user, pw) ->
       ExampleRequest_Public $ PublicRequest_Login user pw
     pure ()
   FrontendRoute_Main -> do
