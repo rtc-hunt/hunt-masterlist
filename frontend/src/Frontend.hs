@@ -3,17 +3,22 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RecursiveDo #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 module Frontend where
 
 import Control.Monad
 import Control.Monad.Fix
+import qualified Data.Aeson as A
 import Data.Functor.Const
 import Data.Functor.Identity
+import qualified Data.List as L
+import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Data.Vessel.Class
+import GHCJS.DOM (currentDocumentUnchecked)
 import Language.Javascript.JSaddle (eval, liftJSM)
 
 import Obelisk.Frontend
@@ -24,6 +29,7 @@ import Obelisk.Generated.Static
 import Rhyolite.Account
 import Rhyolite.Api (ApiRequest(..))
 import Rhyolite.Frontend.App
+import Rhyolite.Frontend.Cookie
 import Rhyolite.Sign
 
 import Reflex.Dom.Core
@@ -31,6 +37,9 @@ import Reflex.Dom.Core
 import Common.Api
 import Common.Route
 import Common.View
+
+authCookieName :: Text
+authCookieName = "auth"
 
 -- This runs in a monad that can be run on the client or the server.
 -- To run code in a pure client or pure server context, use one of the
@@ -45,73 +54,96 @@ frontend = Frontend
 
 frontendBody
   :: forall js t m token.
-     ( Adjustable t m
-     , MonadHold t m
-     , MonadFix m
-     , Request m ~ ApiRequest token PublicRequest PrivateRequest
-     , DomBuilder t m
-     , Requester t m
-     , Prerender js t m
-     , HasConfigs m
+     ( ObeliskWidget js t (R FrontendRoute) m
+     , Requester t m, Request m ~ ApiRequest token PublicRequest PrivateRequest
+     , Response m ~ Identity
      )
   => RoutedT t (R FrontendRoute) m ()
-frontendBody = subRoute_ $ \case
-  FrontendRoute_SignUp -> do
-    username <- el "div" . el "label" $ do
-      text "Email"
-      fmap value $ inputElement def
-    password <- el "div" . el "label" $ do
-      text "Password"
-      fmap value . inputElement $
-        def & inputElementConfig_elementConfig
-            . elementConfig_initialAttributes
-            .~ (AttributeName Nothing "type" =: "password")
-    signupSubmit <- el "div" . el "label" $ do
-      text "\160"
-      signupClick <- button "Sign Up"
-      -- We tag the Event of clicks on the log in button with the current values of
-      -- the username and password text fields.
-      return $ tag (current (zipDyn username password)) signupClick
-    -- Here, we translate the signup submit events into API requests to log in.
-    signupResponse <- requesting . ffor signupSubmit $ \(user, pw) ->
-      ApiRequest_Public $ PublicRequest_SignUp user pw
-    pure ()
-  FrontendRoute_Login -> do
-    username <- el "div" . el "label" $ do
-      text "Email"
-      fmap value $ inputElement def
-    password <- el "div" . el "label" $ do
-      text "Password"
-      fmap value . inputElement $
-        def & inputElementConfig_elementConfig
-            . elementConfig_initialAttributes
-            .~ (AttributeName Nothing "type" =: "password")
-    loginSubmit <- el "div" . el "label" $ do
-      text "\160"
-      loginClick <- button "Log In"
-      -- We tag the Event of clicks on the log in button with the current values of
-      -- the username and password text fields.
-      return $ tag (current (zipDyn username password)) loginClick
-    -- Here, we translate the login submit events into API requests to log in.
-    _ <- requesting . ffor loginSubmit $ \(user, pw) ->
-      ApiRequest_Public $ PublicRequest_Login user pw
-    pure ()
-  FrontendRoute_Main -> do
-    el "h1" $ text "Welcome to Obelisk!"
-    el "p" $ text $ T.pack commonStuff
-    -- `prerender` and `prerender_` let you choose a widget to run on the server
-    -- during prerendering and a different widget to run on the client with
-    -- JavaScript. The following will generate a `blank` widget on the server and
-    -- print "Hello, World!" on the client.
-    prerender_ blank $ liftJSM $ void $ eval ("console.log('Hello, World!')" :: T.Text)
+frontendBody = do
+  cookies <- askCookies
+  let mAuthCookie0 = A.decodeStrict =<< L.lookup (T.encodeUtf8 authCookieName) cookies
+  rec mAuthCookie <- holdDyn mAuthCookie0 authChange
+  -- We have to give a type signature to the argument of subRoute because
+  -- (at least on GHC 8.6.5) the compiler cannot properly infer that
+  -- this function has the proper higher rank type.
+      authChange <- fmap switchDyn $ subRoute $ ((\case
+        FrontendRoute_SignUp -> redirectIfAuthenticated mAuthCookie $ do
+          username <- el "div" . el "label" $ do
+            text "Email"
+            fmap value $ inputElement def
+          password <- el "div" . el "label" $ do
+            text "Password"
+            fmap value . inputElement $
+              def & inputElementConfig_elementConfig
+                  . elementConfig_initialAttributes
+                  .~ (AttributeName Nothing "type" =: "password")
+          signupSubmit <- el "div" . el "label" $ do
+            text "\160"
+            signupClick <- button "Sign Up"
+            return $ tag (current (zipDyn username password)) signupClick
+          (_signupFailed, signupSuccess) <- fmap fanEither . requestingIdentity . ffor signupSubmit $ \(user, pw) ->
+            ApiRequest_Public $ PublicRequest_SignUp user pw
+          pure (fmap Just signupSuccess)
+        FrontendRoute_Login -> redirectIfAuthenticated mAuthCookie $ do
+          username <- el "div" . el "label" $ do
+            text "Email"
+            fmap value $ inputElement def
+          password <- el "div" . el "label" $ do
+            text "Password"
+            fmap value . inputElement $
+              def & inputElementConfig_elementConfig
+                  . elementConfig_initialAttributes
+                  .~ (AttributeName Nothing "type" =: "password")
+          loginSubmit <- el "div" . el "label" $ do
+            text "\160"
+            loginClick <- button "Log In"
+            return $ tag (current (zipDyn username password)) loginClick
+          (_loginFailed, loginSuccess) <- fmap fanEither . requestingIdentity . ffor loginSubmit $ \(user, pw) ->
+            ApiRequest_Public $ PublicRequest_Login user pw
+          pure (fmap Just loginSuccess)
+        FrontendRoute_Main -> do
+          el "h1" $ text "Welcome to Obelisk!"
+          el "p" $ text $ T.pack commonStuff
+          -- `prerender` and `prerender_` let you choose a widget to run on the server
+          -- during prerendering and a different widget to run on the client with
+          -- JavaScript. The following will generate a `blank` widget on the server and
+          -- print "Hello, World!" on the client.
+          prerender_ blank $ liftJSM $ void $ eval ("console.log('Hello, World!')" :: T.Text)
 
-    elAttr "img" ("src" =: $(static "obelisk.jpg")) blank
-    el "div" $ do
-      exampleConfig <- getConfig "common/example"
-      case exampleConfig of
-        Nothing -> text "No config file found in config/common/example"
-        Just s -> text $ T.decodeUtf8 s
+          elAttr "img" ("src" =: $(static "obelisk.jpg")) blank
+          el "div" $ do
+            exampleConfig <- getConfig "common/example"
+            case exampleConfig of
+              Nothing -> text "No config file found in config/common/example"
+              Just s -> text $ T.decodeUtf8 s
+          pure never
+        ) :: forall a. FrontendRoute a -> RoutedT t a m (Event t (Maybe (Signed (AuthToken Identity)))))
+  -- Handle setting the cookies on auth change if we're running in the browser
+  prerender_ (pure ()) $ do
+    doc <- currentDocumentUnchecked
+    performEvent_ $ ffor authChange $ \newAuth -> do
+      cookie <- defaultCookieJson authCookieName newAuth
+      setPermanentCookie doc cookie
     pure ()
+  pure ()
+
+testCase :: Applicative m => FrontendRoute a -> RoutedT t a m ()
+testCase = \case
+    FrontendRoute_Main -> pure ()
+    FrontendRoute_Login -> pure ()
+    FrontendRoute_SignUp -> pure ()
+
+redirectIfAuthenticated
+  :: ( PostBuild t m
+     , SetRoute t (R FrontendRoute) m
+     )
+  => Dynamic t (Maybe token)
+  -> m a
+  -> m a
+redirectIfAuthenticated mAuthCookie w = do
+  pb <- getPostBuild
+  setRoute $ FrontendRoute_Main :/ () <$ leftmost [ tag (current mAuthCookie) pb, updated mAuthCookie ]
+  w
 
 runExampleWidget
   :: ( DomBuilder t m
