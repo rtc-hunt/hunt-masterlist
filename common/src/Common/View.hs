@@ -187,6 +187,29 @@ observeErrorV (ErrorV v) = case lookupV ErrorVK_Error v of
     Nothing -> Right emptyV
     Just e -> Left e
 
+unsafeProjectE
+  :: ( EmptyView v
+     )
+  => QueryMorphism
+       ()
+       (ErrorV () v (Const SelectedCount))
+unsafeProjectE = QueryMorphism
+  { _queryMorphism_mapQuery = const (liftErrorV emptyV)
+  , _queryMorphism_mapQueryResult = const ()
+  }
+
+unsafeProjectV
+  :: (EmptyView v, QueryResult (v (Const SelectedCount)) ~ v Identity)
+  => QueryMorphism
+       (v (Const SelectedCount))
+       (ErrorV () v (Const SelectedCount))
+unsafeProjectV = QueryMorphism
+  { _queryMorphism_mapQuery = liftErrorV
+  , _queryMorphism_mapQueryResult = \r -> case observeErrorV r of
+      Left _ -> emptyV
+      Right r' -> r'
+  }
+
 newtype AuthenticatedV auth v g = AuthenticatedV { unAuthenticatedV :: SubVessel auth (ErrorV () v) g }
   deriving (Generic)
 

@@ -18,6 +18,7 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Data.Vessel.Class
+import Data.Witherable
 import GHCJS.DOM (currentDocumentUnchecked)
 import Language.Javascript.JSaddle (eval, liftJSM)
 
@@ -38,6 +39,11 @@ import Common.Api
 import Common.Route
 import Common.View
 
+type ExampleCredential = Signed (AuthToken Identity)
+type ExampleWidget = RhyoliteWidget
+  (AuthenticatedV ExampleCredential PrivateChatV (Const SelectedCount))
+  (ApiRequest ExampleCredential PublicRequest PrivateRequest)
+
 authCookieName :: Text
 authCookieName = "auth"
 
@@ -53,12 +59,10 @@ frontend = Frontend
   }
 
 frontendBody
-  :: forall js t m token.
+  :: forall js t m.
      ( ObeliskWidget js t (R FrontendRoute) m
-     , Requester t m, Request m ~ ApiRequest token PublicRequest PrivateRequest
-     , Response m ~ Identity
      )
-  => RoutedT t (R FrontendRoute) m ()
+  => RoutedT t (R FrontendRoute) (ExampleWidget t m) ()
 frontendBody = do
   cookies <- askCookies
   let mAuthCookie0 = A.decodeStrict =<< L.lookup (T.encodeUtf8 authCookieName) cookies
@@ -116,8 +120,27 @@ frontendBody = do
             case exampleConfig of
               Nothing -> text "No config file found in config/common/example"
               Just s -> text $ T.decodeUtf8 s
-          pure never
-        ) :: forall a. FrontendRoute a -> RoutedT t a m (Event t (Maybe (Signed (AuthToken Identity)))))
+          el "div" $ do
+            el "h1" $ text "The contents of this section depend on your authentication state"
+            pb <- getPostBuild
+            fmap switchDyn $ widgetHold (pure never) $ ffor (leftmost [tag (current mAuthCookie) pb, updated mAuthCookie]) $ \case
+              Nothing -> do
+                el "p" $ text $ "You are not authenticated."
+                goToLoginClick <- button "Log In"
+                setRoute $ FrontendRoute_Login :/ () <$ goToLoginClick
+                pure never
+              Just authToken -> do
+                fmap switchDyn $ mapRoutedT (authenticatedWidget authToken) $ handleAuthFailure
+                  (do
+                    el "p" $ text $ "Your token is invalid."
+                    pure never
+                  )
+                  (do
+                    el "p" $ text $ "You are authenticated."
+                    logoutClick <- button "Log Out"
+                    pure $ Nothing <$ logoutClick
+                  )
+        ) :: forall a. FrontendRoute a -> RoutedT t a (ExampleWidget t m) (Event t (Maybe (Signed (AuthToken Identity)))))
   -- Handle setting the cookies on auth change if we're running in the browser
   prerender_ (pure ()) $ do
     doc <- currentDocumentUnchecked
@@ -126,12 +149,6 @@ frontendBody = do
       setPermanentCookie doc cookie
     pure ()
   pure ()
-
-testCase :: Applicative m => FrontendRoute a -> RoutedT t a m ()
-testCase = \case
-    FrontendRoute_Main -> pure ()
-    FrontendRoute_Login -> pure ()
-    FrontendRoute_SignUp -> pure ()
 
 redirectIfAuthenticated
   :: ( PostBuild t m
@@ -142,7 +159,7 @@ redirectIfAuthenticated
   -> m a
 redirectIfAuthenticated mAuthCookie w = do
   pb <- getPostBuild
-  setRoute $ FrontendRoute_Main :/ () <$ leftmost [ tag (current mAuthCookie) pb, updated mAuthCookie ]
+  setRoute $ FrontendRoute_Main :/ () <$ catMaybes (leftmost [ tag (current mAuthCookie) pb, updated mAuthCookie ])
   w
 
 runExampleWidget
@@ -157,9 +174,7 @@ runExampleWidget
      )
   => RoutedT t
       (R FrontendRoute)
-      (RhyoliteWidget
-         ((AuthenticatedV (Signed (AuthToken Identity)) PrivateChatV) (Const SelectedCount))
-         (ApiRequest (Signed (AuthToken Identity)) PublicRequest PrivateRequest) t m)
+      (ExampleWidget t m)
       a
   -- ^ Child widget
   -> RoutedT t (R FrontendRoute) m a
@@ -169,48 +184,39 @@ runExampleWidget = fmap snd . runObeliskRhyoliteWidget
   checkedFullRouteEncoder
   (BackendRoute_Listen :/ ())
 
-authQueryDyn
+queryDynE
   :: ( MonadQuery t (ErrorV e v (Const SelectedCount)) m
      , Reflex t
      , EmptyView v
      )
   => Dynamic t (ErrorV e v (Const SelectedCount))
   -> m (Dynamic t (Either e (v Identity)))
-authQueryDyn = fmap (fmap observeErrorV) . queryDyn
+queryDynE = fmap (fmap observeErrorV) . queryDyn
 
-{-
-authWidget
-  :: forall m t a publicRequest privateRequest cred v.
-     ( Ord cred
-     , MonadFix m, Reflex t, PostBuild t m
+authenticatedWidget
+  :: ( Ord token, View v
+     , Group (v (Const SelectedCount)), Additive (v (Const SelectedCount)), Semigroup (v Identity)
      , QueryResult (v (Const SelectedCount)) ~ v Identity
-     , Semigroup (v Identity)
-     , Group (v (Const SelectedCount))
-     , Additive (v (Const SelectedCount))
-     , View v
+     , MonadFix m, PostBuild t m
      )
-  => cred
-  -> RequesterT t (ApiRequest () publicRequest privateRequest) Identity m a
-  -> QueryT t (v (Const SelectedCount))
-       (RequesterT t (ApiRequest () publicRequest privateRequest) Identity m) a
-  -> RhyoliteWidget
-       (AuthenticatedV cred v (Const SelectedCount))
-       (ApiRequest cred publicRequest privateRequest) t m (Dynamic t a)
-authWidget cred errorChild authenticatedChild = RhyoliteWidget $ do
-  v <- askQueryResult
-  (a, vs) <- lift $ withRequesterT authenticateReq id $ runQueryT
-    (withQueryT (authenticatedQueryMorphism cred) child) v
-  pure undefined
- where
-   authenticateReq
-     :: forall x. ApiRequest () publicRequest privateRequest x
-     -> ApiRequest cred publicRequest privateRequest x
-   authenticateReq = \case
-     ApiRequest_Public a -> ApiRequest_Public a
-     ApiRequest_Private () a -> ApiRequest_Private cred a
-   child = do
-     pb <- getPostBuild
-     v <- askQueryResult
-     ev <- eitherDyn (fmap observeErrorV v)
-     widgetHold 
--}
+  => token
+  -> QueryT t (ErrorV () v (Const SelectedCount)) (RequesterT t (ApiRequest () publicRequest privateRequest) Identity m) a
+  -> RhyoliteWidget (AuthenticatedV token v (Const SelectedCount)) (ApiRequest token publicRequest privateRequest) t m a
+authenticatedWidget token = mapAuth token (authenticatedQueryMorphism token)
+
+handleAuthFailure
+  :: ( EmptyView v, PostBuild t m
+     , Group (v (Const SelectedCount)), Additive (v (Const SelectedCount)), Semigroup (v Identity)
+     , QueryResult (v (Const SelectedCount)) ~ v Identity
+     , Adjustable t m, MonadHold t m, MonadFix m
+     , Eq (v (Const SelectedCount))
+     )
+  => RoutedT t r (QueryT t () m) a
+  -> RoutedT t r (QueryT t (v (Const SelectedCount)) m) a
+  -> RoutedT t r (QueryT t (ErrorV () v (Const SelectedCount)) m) (Dynamic t a)
+handleAuthFailure placeholder authenticatedChild = do
+  pb <- getPostBuild
+  ev <- eitherDyn . fmap observeErrorV =<< askQueryResult
+  widgetHold (mapRoutedT (withQueryT unsafeProjectE) placeholder) $ ffor (leftmost [tag (current ev) pb, updated ev]) $ \case
+    Left _ -> mapRoutedT (withQueryT unsafeProjectE) placeholder
+    Right _ -> mapRoutedT (withQueryT unsafeProjectV) authenticatedChild
