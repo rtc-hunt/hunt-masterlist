@@ -41,7 +41,7 @@ import Common.View
 
 type ExampleCredential = Signed (AuthToken Identity)
 type ExampleWidget = RhyoliteWidget
-  (AuthenticatedV ExampleCredential PrivateChatV (Const SelectedCount))
+  (AuthMapV ExampleCredential PrivateChatV (Const SelectedCount))
   (ApiRequest ExampleCredential PublicRequest PrivateRequest)
 
 authCookieName :: Text
@@ -201,8 +201,8 @@ authenticatedWidget
      )
   => token
   -> QueryT t (ErrorV () v (Const SelectedCount)) (RequesterT t (ApiRequest () publicRequest privateRequest) Identity m) a
-  -> RhyoliteWidget (AuthenticatedV token v (Const SelectedCount)) (ApiRequest token publicRequest privateRequest) t m a
-authenticatedWidget token = mapAuth token (authenticatedQueryMorphism token)
+  -> RhyoliteWidget (AuthMapV token v (Const SelectedCount)) (ApiRequest token publicRequest privateRequest) t m a
+authenticatedWidget token = mapAuth token (authMapQueryMorphism token)
 
 handleAuthFailure
   :: ( EmptyView v, PostBuild t m

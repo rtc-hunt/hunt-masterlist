@@ -41,8 +41,8 @@ backend = Backend
       (listen, _) <- liftIO $ serveDbOverWebsockets
         (coerce db)
         (requestHandler db csk)
-        (\nm q -> fmap (fromMaybe emptyV) $ mapDecomposedV (handleAuthenticatedQuery (pure . (readSignedWithKey @(AuthToken Identity) csk)) (notifyHandler db nm)) q)
-        (QueryHandler $ \q -> fromMaybe emptyV <$> mapDecomposedV (handleAuthenticatedQuery (pure . (readSignedWithKey @(AuthToken Identity) csk)) (privateQueryHandler db)) q)
+        (\nm q -> fmap (fromMaybe emptyV) $ mapDecomposedV (handleAuthMapQuery (pure . (readSignedWithKey @(AuthToken Identity) csk)) (notifyHandler db nm)) q)
+        (QueryHandler $ \q -> fromMaybe emptyV <$> mapDecomposedV (handleAuthMapQuery (pure . (readSignedWithKey @(AuthToken Identity) csk)) (privateQueryHandler db)) q)
         vesselFromWire
         vesselPipeline
       serve $ \case
