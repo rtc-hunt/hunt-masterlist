@@ -22,11 +22,11 @@ import Rhyolite.Backend.Account
 import Rhyolite.Backend.App
 import Rhyolite.Backend.DB
 import Rhyolite.Backend.Sign
+import Rhyolite.Vessel.AuthMapV
 import qualified Web.ClientSession as CS
 
 import Backend.Listen
 import Backend.View
-import Common.View
 
 backend :: Backend BackendRoute FrontendRoute
 backend = Backend

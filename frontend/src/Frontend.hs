@@ -32,6 +32,8 @@ import Rhyolite.Api (ApiRequest(..))
 import Rhyolite.Frontend.App
 import Rhyolite.Frontend.Cookie
 import Rhyolite.Sign
+import Rhyolite.Vessel.ErrorV
+import Rhyolite.Vessel.AuthMapV
 
 import Reflex.Dom.Core
 
