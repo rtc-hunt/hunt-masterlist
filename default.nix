@@ -21,6 +21,8 @@ project ./. ({ pkgs, hackGet, ... }@args: {
       (self: super: with pkgs.haskell.lib; {
         # Your custom overrides go here.
       });
+
+  staticFiles = import ./static {inherit pkgs; };
   android.applicationId = "systems.obsidian.obelisk.examples.rhyolite";
   android.displayName = "Rhyolite Example App";
   ios.bundleIdentifier = "systems.obsidian.obelisk.examples.rhyolite";
