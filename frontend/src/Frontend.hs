@@ -35,13 +35,15 @@ import Rhyolite.Sign
 import Rhyolite.Vessel.ErrorV
 import Rhyolite.Vessel.AuthMapV
 
-import Reflex.Dom.Core hiding (link)
+import Reflex.Dom.Core hiding (link, textInput)
 
 import Common.Api
 import Common.Route
 import Common.View
 
 import Data.Bool (bool)
+
+import Frontend.Templates.Partials.TextInput
 
 type ExampleCredential = Signed (AuthToken Identity)
 type ExampleWidget = RhyoliteWidget
@@ -79,17 +81,6 @@ header showMenu = do
                 , bool "px-4 py-5" "px-4 py-2" showMenu
                 ]
 
-input :: DomBuilder t m => T.Text -> m ()
-input label = do
-  elClass "div" "flex flex-col mt-8" $ do
-    elClass "div" "font-facit font-label text-label" $ text label
-    _ <- inputElement $ def
-      & initialAttributes .~ ("class" =: "font-facit font-label text-label placeholder-light p-4 bg-inset rounded shadow-input"
-                             <> "placeholder" =: label
-                             <> "type" =: "text"
-                             )
-    pure ()
-
 classList :: [T.Text] -> T.Text
 classList =
   T.intercalate " "
@@ -103,7 +94,7 @@ passwordInput =
     elClass "div" "font-facit font-label text-label" $ text "Passphrase"
     elClass "div" "bg-inset rounded shadow-input flex flex-row items-center overflow-hidden" $ do
       _ <- inputElement $ def
-        & initialAttributes .~ ("class" =: "flex-grow w-full h-full font-facit font-label text-label bg-transparent placeholder-light p-4"
+        & initialAttributes .~ ("class" =: "focus:outline-none flex-grow w-full h-full font-facit font-label text-label bg-transparent placeholder-light p-4"
                                <> "placeholder" =: "Passphrase"
                                <> "type" =: "password"
                                )
@@ -112,7 +103,7 @@ passwordInput =
 
 cta :: DomBuilder t m => T.Text -> m ()
 cta =
-  elClass "button" "w-full p-4 mt-16 shadow-button bg-primary font-facit font-bold text-white text-body text-center rounded" . text
+  elClass "button" "focus:outline-none w-full p-4 mt-16 shadow-button bg-primary font-facit font-bold text-white text-body text-center rounded" . text
 
 link :: (DomBuilder t m, RouteToUrl route m, SetRoute t route m, Prerender js t m) => route -> T.Text -> m ()
 link route label = do
@@ -124,7 +115,7 @@ logIn = elClass "div" "w-screen h-screen bg-background" $ do
   elClass "div" "p-4" $ do
     h1 "mt-12" "Log In"
 
-    input "Email/Profile Name"
+    textInput "Email/Profile Name"
     passwordInput
 
     cta "Log In"
@@ -137,8 +128,8 @@ signUp = elClass "div" "w-screen h-screen bg-background" $ do
   elClass "div" "p-4" $ do
     h1 "mt-12" "Sign Up"
 
-    input "Email"
-    input "Profile Name"
+    textInput "Email"
+    textInput "Profile Name"
     passwordInput
 
     cta "Sign Up"
@@ -165,7 +156,7 @@ searchbar = do
   elClass "div" "mt-2 w-full shadow-button bg-white rounded flex flex-row" $ do
     elClass "button" "font-icon text-icon text-light pl-2" $ text "search"
     _ <- inputElement $ def
-      & initialAttributes .~ ("class" =: "flex-grow w-full h-full font-facit font-label text-label bg-transparent placeholder-light pl-1 pt-3 pb-3 pr-3"
+      & initialAttributes .~ ("class" =: "focus:outline-none flex-grow w-full h-full font-facit font-label text-label bg-transparent placeholder-light pl-1 pt-3 pb-3 pr-3"
                              <> "placeholder" =: "Search for a channel"
                              <> "type" =: "text"
                              )
@@ -173,11 +164,11 @@ searchbar = do
 
 iconCta :: DomBuilder t m => T.Text -> m ()
 iconCta icon = do
-  elClass "button" "flex-shrink-0 bg-primary rounded p-2.5 font-icon text-icon text-white leading-none shadow-button" $ text icon
+  elClass "button" "focus:outline-none flex-shrink-0 bg-primary rounded p-2.5 font-icon text-icon text-white leading-none shadow-button" $ text icon
 
 secondaryIconButton :: DomBuilder t m => T.Text -> T.Text -> m ()
 secondaryIconButton cs icon = do
-  elClass "button" (classList ["rounded border border-metaline p-2.5 flex-shrink-0 bg-primary-light", cs]) $
+  elClass "button" (classList ["focus:outline-none rounded border border-metaline p-2.5 flex-shrink-0 bg-primary-light", cs]) $
     elClass "div" "font-icon leading-none text-icon text-primary-dark" $ text icon
 
 secondaryButton :: DomBuilder t m => T.Text -> m ()
@@ -208,7 +199,33 @@ settings = elClass "div" "w-screen h-screen bg-background flex flex-col" $ do
   elClass "div" "p-4 bg-raised flex flex-row justify-between items-center border-b border-metaline" $ do
     blank
 
-channel :: DomBuilder t m => m ()
+messageFullWidth :: DomBuilder t m => m ()
+messageFullWidth = do
+  elClass "div" "font-facit text-copy flex flex-col" $ do
+    elClass "div" "flex flex-row items-baseline justify-between" $ do
+      elClass "div" "text-label" $ text "Tanko"
+      elClass "div" "font-bold text-label text-light" $ text "2:00am"
+    elClass "div" "p-4 rounded border border-metaline bg-white" $ text "What is good?"
+
+data MessageConfig t = MessageConfig
+   { _messageConfig_viewer :: Dynamic t Bool
+   }
+
+message :: (PostBuild t m, DomBuilder t m) => MessageConfig t -> m ()
+message (MessageConfig dViewer) = do
+  elDynClass "div" (mkClasses <$> dViewer) $ do
+    elClass "div" "flex flex-row items-baseline justify-between" $ do
+      elClass "div" "text-label" $ text "Tanko"
+      elClass "div" "font-bold text-label text-light" $ text "2:00am"
+    elClass "div" "p-4 rounded border border-metaline bg-white" $ text "What is good?"
+
+  where
+    mkClasses b =
+      classList [ "font-facit text-copy flex flex-col mb-6"
+                , bool "mr-16" "ml-16" b
+                ]
+
+channel :: (PostBuild t m, DomBuilder t m) => m ()
 channel = elClass "div" "w-screen h-screen bg-background flex flex-col" $ do
   header True
   elClass "div" "p-4 bg-raised flex flex-row justify-between items-center border-b border-metaline" $ do
@@ -222,16 +239,14 @@ channel = elClass "div" "w-screen h-screen bg-background flex flex-col" $ do
       secondaryIconButton "ml-2" "more_horiz"
 
   elClass "div" "flex-grow flex flex-col p-4" $ do
-    elClass "div" "font-facit text-copy flex flex-col" $ do
-      elClass "div" "flex flex-row items-baseline justify-between" $ do
-        elClass "div" "text-label" $ text "Tanko"
-        elClass "div" "font-bold text-label text-light" $ text "2:00am"
-      elClass "div" "p-4 rounded border border-metaline bg-white" $ text "What is good?"
+    message $ MessageConfig $ pure False
+    message $ MessageConfig $ pure False
+    message $ MessageConfig $ pure True
 
   elClass "div" "p-1 bg-white flex flex-row justify-center" $ do
     secondaryIconButton "" "add"
     _ <- inputElement $ def
-      & initialAttributes .~ ( "class" =: "mx-1 font-facit font-label text-label placeholder-light px-3.5 bg-inset rounded shadow-input flex-grow"
+      & initialAttributes .~ ( "class" =: "focus:outline-none mx-1 font-facit font-label text-label placeholder-light px-3.5 bg-inset rounded shadow-input flex-grow"
                                <> "placeholder" =: "Type your message"
                                <> "type" =: "text"
                              )
@@ -288,7 +303,10 @@ frontendBody = do
         FrontendRoute_Widgets -> do
           widgets
           pure never
-        FrontendRoute_SignUp -> redirectIfAuthenticated mAuthCookie $ do
+        FrontendRoute_SignUp -> do
+          signUp
+          pure never
+          {- redirectIfAuthenticated mAuthCookie $ do
           username <- el "div" . el "label" $ do
             text "Email"
             fmap value $ inputElement def
@@ -304,8 +322,11 @@ frontendBody = do
             return $ tag (current (zipDyn username password)) signupClick
           (_signupFailed, signupSuccess) <- fmap fanEither . requestingIdentity . ffor signupSubmit $ \(user, pw) ->
             ApiRequest_Public $ PublicRequest_SignUp user pw
-          pure (fmap Just signupSuccess)
-        FrontendRoute_Login -> redirectIfAuthenticated mAuthCookie $ do
+          pure (fmap Just signupSuccess)-}
+        FrontendRoute_Login -> do
+          logIn
+          pure never
+          {- redirectIfAuthenticated mAuthCookie $ do
           username <- el "div" . el "label" $ do
             text "Email"
             fmap value $ inputElement def
@@ -321,7 +342,7 @@ frontendBody = do
             return $ tag (current (zipDyn username password)) loginClick
           (_loginFailed, loginSuccess) <- fmap fanEither . requestingIdentity . ffor loginSubmit $ \(user, pw) ->
             ApiRequest_Public $ PublicRequest_Login user pw
-          pure (fmap Just loginSuccess)
+          pure (fmap Just loginSuccess)-}
         FrontendRoute_Main -> do
           el "h1" $ text "Welcome to Obelisk!"
           el "p" $ text $ T.pack commonStuff
