@@ -16,6 +16,8 @@ library
                , obelisk-executable-config-lookup
                , obelisk-generated-static
                , text
+               , data-default
+               , lens
   exposed-modules:
     Frontend
   ghc-options: -Wall -Wredundant-constraints -Wincomplete-uni-patterns -Wincomplete-record-updates -O -fno-show-valid-hole-fits

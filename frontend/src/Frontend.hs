@@ -6,6 +6,7 @@
 {-# LANGUAGE RecursiveDo #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
+
 module Frontend where
 
 import Control.Monad
@@ -35,7 +36,14 @@ import Rhyolite.Sign
 import Rhyolite.Vessel.ErrorV
 import Rhyolite.Vessel.AuthMapV
 
-import Reflex.Dom.Core hiding (link, textInput)
+import Reflex.Dom.Core hiding ( link
+                              , textInput
+                              , TextInputConfig
+                              , TextInput(..)
+                              , textInput_value
+                              , textInput_input
+                              , _textInput_value
+                              )
 
 import Common.Api
 import Common.Route
@@ -43,7 +51,16 @@ import Common.View
 
 import Data.Bool (bool)
 
+import Frontend.Utils
+import Frontend.Templates.Partials.Switch
 import Frontend.Templates.Partials.TextInput
+import Frontend.Templates.Partials.PasswordInput
+import Frontend.Templates.Partials.SegmentedButton
+import Frontend.Templates.Partials.ChannelList
+import Frontend.Templates.Partials.Buttons
+import Frontend.Templates.Partials.Headers
+import Frontend.Templates.Partials.Lists
+import Frontend.Templates.Partials.Searchbar
 
 type ExampleCredential = Signed (AuthToken Identity)
 type ExampleWidget = RhyoliteWidget
@@ -59,7 +76,7 @@ authCookieName = "auth"
 frontend :: Frontend (R FrontendRoute)
 frontend = Frontend
   { _frontend_head = do
-      el "title" $ text "Obelisk Minimal Example"
+      el "title" $ text "Rhyolite Example"
       elAttr "link" ("rel" =: "stylesheet" <> "href" =: "https://use.typekit.net/csf8rij.css") blank
       elAttr "link" ("href" =: $(static "styles.css") <> "type" =: "text/css" <> "rel" =: "stylesheet") blank
       elAttr "link" ("rel" =: "preconnect" <> "href" =: "https://fonts.googleapis.com") blank
@@ -74,134 +91,132 @@ header :: DomBuilder t m => Bool -> m ()
 header showMenu = do
   elClass "div" classes $ do
     elClass "div" "" $ text "RhyoliteExample"
-    when showMenu $ secondaryIconButton "" "menu"
+    when showMenu $ secondaryIconButton "" "menu" >> pure ()
   where
     classes =
       classList [ "font-karla font-bold text-copy bg-white shadow-header flex flex-row justify-between items-center z-10"
                 , bool "px-4 py-5" "px-4 py-2" showMenu
                 ]
 
-classList :: [T.Text] -> T.Text
-classList =
-  T.intercalate " "
-
-h1 :: DomBuilder t m => T.Text -> T.Text -> m ()
-h1 cs = elClass "h1" (classList ["font-karla font-bold text-h1 text-copy", cs]) . text
-
-passwordInput :: DomBuilder t m => m ()
-passwordInput =
-  elClass "div" "flex flex-col mt-8" $ do
-    elClass "div" "font-facit font-label text-label" $ text "Passphrase"
-    elClass "div" "bg-inset rounded shadow-input flex flex-row items-center overflow-hidden" $ do
-      _ <- inputElement $ def
-        & initialAttributes .~ ("class" =: "focus:outline-none flex-grow w-full h-full font-facit font-label text-label bg-transparent placeholder-light p-4"
-                               <> "placeholder" =: "Passphrase"
-                               <> "type" =: "password"
-                               )
-      elClass "button" "font-icon text-icon text-primary-darker px-4" $ text "visibility"
-      pure ()
-
-cta :: DomBuilder t m => T.Text -> m ()
-cta =
-  elClass "button" "focus:outline-none w-full p-4 mt-16 shadow-button bg-primary font-facit font-bold text-white text-body text-center rounded" . text
-
 link :: (DomBuilder t m, RouteToUrl route m, SetRoute t route m, Prerender js t m) => route -> T.Text -> m ()
 link route label = do
   routeLink route $ elClass "div" "font-facit font-label underline text-label text-link text-center mt-4" $ text label
 
-logIn :: (DomBuilder t m, RouteToUrl (R FrontendRoute) m, SetRoute t (R FrontendRoute) m, Prerender js t m) => m ()
+logIn :: forall js t m. (PostBuild t m, MonadFix m, MonadHold t m, DomBuilder t m, RouteToUrl (R FrontendRoute) m, SetRoute t (R FrontendRoute) m, Prerender js t m) => m ()
 logIn = elClass "div" "w-screen h-screen bg-background" $ do
   header False
-  elClass "div" "p-4" $ do
-    h1 "mt-12" "Log In"
+  elClass "div" "p-4 mx-auto md:w-sm" $ mdo
+    h1 $ def
+      & headerConfig_header .~ "Log In"
+      & headerConfig_classes .~ "mt-12"
 
-    textInput "Email/Profile Name"
-    passwordInput
+    dError <- holdDyn Nothing $ testValidation <$> _textInput_input ti
+    ti <- textInput $ (def :: TextInputConfig t)
+      & textInputConfig_label .~ "Email/Profile Name"
+      & textInputConfig_errorMessage .~ dError
 
-    cta "Log In"
+    dPError <- holdDyn Nothing $ passwordValidation <$> _passwordInput_input pi
+    pi <- passwordInput $ (def :: PasswordInputConfig t)
+      & passwordInputConfig_error .~ dPError
+
+    primaryButton "Log In"
     link (FrontendRoute_SignUp :/ ()) "Don't have an account?"
   pure ()
 
-signUp :: (DomBuilder t m, RouteToUrl (R FrontendRoute) m, SetRoute t (R FrontendRoute) m, Prerender js t m) => m ()
+passwordValidation :: T.Text -> Maybe T.Text
+passwordValidation t
+  | T.length t < 3 = Just "Not a valid password"
+  | otherwise = Nothing
+
+testValidation :: T.Text -> Maybe T.Text
+testValidation t
+  | T.length t < 3 = Just "This isn't a valid email"
+  | otherwise = Nothing
+
+signUp :: forall js t m. (MonadFix m, MonadHold t m, PostBuild t m, DomBuilder t m, RouteToUrl (R FrontendRoute) m, SetRoute t (R FrontendRoute) m, Prerender js t m) => m ()
 signUp = elClass "div" "w-screen h-screen bg-background" $ do
   header False
-  elClass "div" "p-4" $ do
-    h1 "mt-12" "Sign Up"
+  elClass "div" "p-4 mx-auto md:w-sm" $ do
+    h1 $ def
+      & headerConfig_header .~ "Sign Up"
+      & headerConfig_classes .~ "mt-12"
 
-    textInput "Email"
-    textInput "Profile Name"
-    passwordInput
+    textInput $ def
+      & textInputConfig_label .~ "Email"
+      & textInputConfig_type .~ "email"
 
-    cta "Sign Up"
+    textInput $ def
+      & textInputConfig_label .~ "Profile Name"
+
+    passwordInput def
+
+    primaryButton "Sign Up"
     link (FrontendRoute_Login :/ ()) "Already have an account?"
 
-widgets :: (DomBuilder t m, RouteToUrl (R FrontendRoute) m, SetRoute t (R FrontendRoute) m, Prerender js t m) => m ()
-widgets =
-  signUp
+channelSearch :: (MonadHold t m, PostBuild t m, DomBuilder t m, MonadFix m) => m ()
+channelSearch = elClass "div" "w-screen h-screen bg-background flex flex-col" $ do
+  header True
+  elClass "div" "p-4 bg-raised flex flex-row items-center border-b border-metaline" $ do
+    secondaryIconButton "" "arrow_back"
+    elClass "div" "ml-4 flex flex-col" $ do
+      elClass "div" "font-karla font-bold text-h2 text-copy leading-none" $ text "Message Search"
+      elClass "div" "mt-1 leading-none font-facit text-label text-light" $ do
+        text "#Channel Name"
 
-listItem :: DomBuilder t m => T.Text -> Maybe T.Text -> m ()
-listItem label mSubtext = do
-  elClass "div" "flex flex-col py-2 border-b border-metaline" $ do
-    elClass "div" "leading-none font-facit text-body text-copy" $ text label
-    case mSubtext of
-      Just subtext -> elClass "div" "mt-1 leading-none font-facit text-label text-light" $ text subtext
-      Nothing -> blank
+  elClass "div" "p-4" $ do
+    searchbar "Search messages in #Channel Name"
+    elClass "div" "flex flex-row mb-4" $ segmentedButton $ def
+      & segmentedButtonConfig_segments .~ ["New", "Old", "Relevant"]
+      & segmentedButtonConfig_classes .~ "mt-4"
 
--- TODO(skylar): Is this just a link?
-channelItem :: DomBuilder t m => m ()
-channelItem = listItem "#ChannelName" $ Just "543 members \x00b7 13 online"
-
-searchbar :: DomBuilder t m => m ()
-searchbar = do
-  elClass "div" "mt-2 w-full shadow-button bg-white rounded flex flex-row" $ do
-    elClass "button" "font-icon text-icon text-light pl-2" $ text "search"
-    _ <- inputElement $ def
-      & initialAttributes .~ ("class" =: "focus:outline-none flex-grow w-full h-full font-facit font-label text-label bg-transparent placeholder-light pl-1 pt-3 pb-3 pr-3"
-                             <> "placeholder" =: "Search for a channel"
-                             <> "type" =: "text"
-                             )
-    pure ()
-
-iconCta :: DomBuilder t m => T.Text -> m ()
-iconCta icon = do
-  elClass "button" "focus:outline-none flex-shrink-0 bg-primary rounded p-2.5 font-icon text-icon text-white leading-none shadow-button" $ text icon
-
-secondaryIconButton :: DomBuilder t m => T.Text -> T.Text -> m ()
-secondaryIconButton cs icon = do
-  elClass "button" (classList ["focus:outline-none rounded border border-metaline p-2.5 flex-shrink-0 bg-primary-light", cs]) $
-    elClass "div" "font-icon leading-none text-icon text-primary-dark" $ text icon
-
-secondaryButton :: DomBuilder t m => T.Text -> m ()
-secondaryButton label = do
-  elClass "button" "w-full mt-4 p-2.5 leading-none text-center rounded border border-metaline bg-primary-light text-primary-darker font-bold font-facit" $
-    text label
+    replicateM_ 4 messageFullWidth
 
 channelMembers :: DomBuilder t m => m ()
 channelMembers = elClass "div" "w-screen h-screen bg-background flex flex-col" $ do
   header True
-  elClass "div" "p-4 bg-raised flex flex-row items-center border-b border-metaline" $ do
+  elClass "div" "p-4 bg-raised flex flex-row items-center border-b border-metaline mb-8" $ do
     secondaryIconButton "" "arrow_back"
     elClass "div" "ml-4 flex flex-col" $ do
       elClass "div" "font-karla font-bold text-h2 text-copy leading-none" $ text "Members"
       elClass "div" "mt-1 leading-none font-facit text-label text-light" $ do
         text "#Channel Name"
 
-  elClass "div" "mt-8 p-4" $ do
+  channelMembersWidget
+
+channelMembersWidget :: DomBuilder t m => m ()
+channelMembersWidget = do
+  elClass "div" "p-4" $ do
     elClass "div" "font-facit text-h2 text-copy" $ text "Online"
     replicateM_ 4 $ listItem "Yasuke" Nothing
 
     elClass "div" "font-facit text-h2 text-copy mt-6" $ text "Offline"
     replicateM_ 4 $ listItem "Yasuke" Nothing
 
-settings :: DomBuilder t m => m ()
+settings :: forall t m. (DomBuilder t m, PostBuild t m, MonadHold t m) => m ()
 settings = elClass "div" "w-screen h-screen bg-background flex flex-col" $ do
   header True
-  elClass "div" "p-4 bg-raised flex flex-row justify-between items-center border-b border-metaline" $ do
-    blank
+  elClass "div" "p-4 bg-raised flex flex-row items-center border-b border-metaline" $ do
+    secondaryIconButton "" "arrow_back"
+    elClass "div" "ml-4 flex flex-col" $ do
+      elClass "div" "font-karla font-bold text-h2 text-copy leading-none" $ text "Settings"
+
+  elClass "div" "flex flex-col flex-grow p-4" $ do
+    elClass "div" "flex justify-center items-center" $ elClass "div" "mt-8 w-32 h-32 rounded-full bg-black" blank
+
+    textInput $ def & textInputConfig_label .~ "Account Name"
+    textInput $ def & textInputConfig_label .~ "Email"
+
+    switchButton $ (def :: SwitchConfig t)
+      & switchConfig_label .~ "Enable Push Notifications"
+      & switchConfig_icon .~ Just "notifications_none"
+      & switchConfig_classes .~ "mt-8"
+      & switchConfig_disabled .~ pure True
+
+    secondaryButton "mt-8" "Reset your password"
 
 messageFullWidth :: DomBuilder t m => m ()
 messageFullWidth = do
-  elClass "div" "font-facit text-copy flex flex-col" $ do
+  elClass "div" "font-facit text-copy flex flex-col mt-4" $ do
     elClass "div" "flex flex-row items-baseline justify-between" $ do
       elClass "div" "text-label" $ text "Tanko"
       elClass "div" "font-bold text-label text-light" $ text "2:00am"
@@ -215,65 +230,77 @@ message :: (PostBuild t m, DomBuilder t m) => MessageConfig t -> m ()
 message (MessageConfig dViewer) = do
   elDynClass "div" (mkClasses <$> dViewer) $ do
     elClass "div" "flex flex-row items-baseline justify-between" $ do
-      elClass "div" "text-label" $ text "Tanko"
+      elClass "div" "text-label md:mr-4" $ text "Tanko"
       elClass "div" "font-bold text-label text-light" $ text "2:00am"
-    elClass "div" "p-4 rounded border border-metaline bg-white" $ text "What is good?"
+    elClass "div" "p-4 rounded border border-metaline bg-white w-auto" $ text "What is good?"
 
   where
     mkClasses b =
       classList [ "font-facit text-copy flex flex-col mb-6"
-                , bool "mr-16" "ml-16" b
+                , bool "mr-16 md:mr-0 md:items-start" "ml-16 md:ml-0 md:items-end" b
                 ]
 
-channel :: (PostBuild t m, DomBuilder t m) => m ()
+channel :: forall t m js. (PostBuild t m, DomBuilder t m, MonadHold t m, MonadFix m, SetRoute t (R FrontendRoute) m, RouteToUrl (R FrontendRoute) m, Prerender js t m) => m ()
 channel = elClass "div" "w-screen h-screen bg-background flex flex-col" $ do
   header True
-  elClass "div" "p-4 bg-raised flex flex-row justify-between items-center border-b border-metaline" $ do
+  elClass "div" "w-full flex flex-row flex-grow" $ do
+    elClass "div" "flex-shrink-0 w-1/4 h-full flex-col bg-sunken hidden md:flex border-r border-metaline" $
+      channelList $ def & channelListConfig_useH2 .~ True
+    channelInterior
+    elClass "div" "flex-shrink-0 w-1/5 bg-sunken hidden md:flex" $ do
+      channelMembersWidget
+
+channelInterior :: forall t m js. (PostBuild t m, DomBuilder t m, MonadHold t m, MonadFix m, SetRoute t (R FrontendRoute) m, RouteToUrl (R FrontendRoute) m, Prerender js t m) => m ()
+channelInterior = elClass "div" "w-full flex flex-col" $ do
+  elClass "div" "p-4 bg-raised flex flex-row justify-between items-center border-b border-metaline relative" $ do
     elClass "div" "flex flex-col" $ do
-      elClass "div" "font-karla font-bold text-h2 text-copy leading-none" $ text "#Channel Name"
+      elClass "div" "font-karla font-bold text-h2 md:text-h1 text-copy leading-none" $ text "#Channel Name"
       elClass "div" "mt-1 leading-none font-facit text-label text-light" $ do
         text "543 members \x00b7 13 online"
 
     elClass "div" "flex flex-row items-center" $ do
       secondaryIconButton "" "search"
-      secondaryIconButton "ml-2" "more_horiz"
+      elClass "div" "" $ do
+        eClickMore <- secondaryIconButton "ml-2 md:hidden" "more_horiz"
+
+        dMoreOpen <- foldDyn ($) False $ not <$ eClickMore
+        let
+          mkMenuClasses b =
+            classList [ "absolute left-0 right-0 top-full p-4 md:hidden"
+                      , "tranform transition-all duration-150"
+                      , bool "pointer-events-none opacity-0" "pointer-events-auto opacity-100" b
+                      ]
+
+        elDynClass "div" (mkMenuClasses <$> dMoreOpen) $ do
+          elClass "div" "bg-white rounded p-4 shadow-button z-10" $ do
+            switchButton $ (def :: SwitchConfig t)
+              & switchConfig_label .~ "Notifications"
+              & switchConfig_icon .~ Just "notifications_none"
+              & switchConfig_disabled .~ pure True
+
+            elClass "div" "flex flex-row items-center mt-4" $ do
+              elClass "div" "font-icon leading-none text-icon text-copy mr-1 " $ text "person_outline"
+              elClass "div" "font-facit text-body text-copy" $ text "Members"
 
   elClass "div" "flex-grow flex flex-col p-4" $ do
     message $ MessageConfig $ pure False
     message $ MessageConfig $ pure False
     message $ MessageConfig $ pure True
 
-  elClass "div" "p-1 bg-white flex flex-row justify-center" $ do
+  elClass "div" "p-1 bg-white flex flex-row justify-center border-t border-metaline" $ do
     secondaryIconButton "" "add"
     _ <- inputElement $ def
       & initialAttributes .~ ( "class" =: "focus:outline-none mx-1 font-facit font-label text-label placeholder-light px-3.5 bg-inset rounded shadow-input flex-grow"
                                <> "placeholder" =: "Type your message"
                                <> "type" =: "text"
                              )
-    iconCta "send"
+    iconButton "send"
 
-channels :: (DomBuilder t m, RouteToUrl (R FrontendRoute) m, SetRoute t (R FrontendRoute) m, Prerender js t m) => m ()
-channels = elClass "div" "w-screen h-screen bg-background flex flex-col" $ do
+-- Surrounds view with header in a screen sized div, default for most pages
+appPage :: DomBuilder t m => m a -> m a
+appPage action = elClass "div" "w-screen h-screen bg-background flex flex-col" $ do
   header True
-  elClass "div" "flex-grow p-4" $ do
-    elClass "div" "w-full flex flex-row mt-10 items-center justify-between" $ do
-      h1 "" "Channels"
-      iconCta "add"
-    searchbar
-
-    elClass "div" "mt-8 font-facit text-h2 text-copy" $ text "Recent channels"
-
-    replicateM_ 4 channelItem
-
-  elClass "div" "w-full p-4 border-t border-metaline bg-white" $ do
-    elClass "div" "w-full flex flex-row items-center" $ do
-      elClass "div" "w-12 h-12 rounded-full bg-primary-darker mr-2 flex-shrink-0" blank
-      elClass "div" "flex flex-col font-facit text-label h-full flex-grow" $ do
-        elClass "div" "text-copy" $ text "Sky"
-        elClass "div" "text-light" $ text "soquinn@obsidian.systems"
-
-      secondaryIconButton "" "settings"
-    secondaryButton "Logout"
+  action
 
 frontendBody
   :: forall js t m.
@@ -291,17 +318,18 @@ frontendBody = do
         FrontendRoute_Settings -> do
           settings
           pure never
+        FrontendRoute_ChannelSearch -> do
+          channelSearch
+          pure never
         FrontendRoute_ChannelMembers -> do
           channelMembers
           pure never
         FrontendRoute_Channels -> do
-          channels
+          appPage $ channelList $ def
+            & channelListConfig_headerClasses .~ "mt-6"
           pure never
         FrontendRoute_Channel -> do
           channel
-          pure never
-        FrontendRoute_Widgets -> do
-          widgets
           pure never
         FrontendRoute_SignUp -> do
           signUp

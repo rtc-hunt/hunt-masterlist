@@ -33,12 +33,10 @@ data FrontendRoute :: * -> * where
   FrontendRoute_Main :: FrontendRoute ()
   FrontendRoute_Login :: FrontendRoute ()
   FrontendRoute_SignUp :: FrontendRoute ()
-
-  -- TODO(skylar): These are temp to show off static stuff potentially
-  FrontendRoute_Widgets :: FrontendRoute ()
   FrontendRoute_Channels :: FrontendRoute ()
   FrontendRoute_Channel :: FrontendRoute ()
   FrontendRoute_ChannelMembers :: FrontendRoute ()
+  FrontendRoute_ChannelSearch :: FrontendRoute ()
   FrontendRoute_Settings :: FrontendRoute ()
   -- This type is used to define frontend routes, i.e. ones for which the backend will serve the frontend.
 
@@ -54,10 +52,10 @@ fullRouteEncoder = mkFullRouteEncoder
       FrontendRoute_Login -> PathSegment "login" $ unitEncoder mempty
       FrontendRoute_SignUp -> PathSegment "signup" $ unitEncoder mempty
       FrontendRoute_Main -> PathEnd $ unitEncoder mempty
-      FrontendRoute_Widgets -> PathSegment "widgets" $ unitEncoder mempty
       FrontendRoute_Channels -> PathSegment "channels" $ unitEncoder mempty
       FrontendRoute_Channel -> PathSegment "channel" $ unitEncoder mempty
       FrontendRoute_ChannelMembers -> PathSegment "members" $ unitEncoder mempty
+      FrontendRoute_ChannelSearch -> PathSegment "search" $ unitEncoder mempty
       FrontendRoute_Settings -> PathSegment "settings" $ unitEncoder mempty
   )
 
