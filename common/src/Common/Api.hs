@@ -14,6 +14,7 @@ commonStuff = "Here is a string defined in Common.Api"
 
 data PrivateRequest a where
   PrivateRequest_SendMessage :: Id Chatroom -> Text -> PrivateRequest (Either Text ())
+  PrivateRequest_CreateChatroom :: Text -> PrivateRequest (Either Text (Id Chatroom))
 
 data PublicRequest a where
   PublicRequest_Login :: Text -> Text -> PublicRequest (Either Text (Signed (AuthToken Identity)))

@@ -9,6 +9,8 @@
 
 module Frontend where
 
+import Prelude hiding (id, (.))
+import Control.Category
 import Control.Monad
 import Control.Monad.Fix
 import qualified Data.Aeson as A
@@ -20,6 +22,8 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Data.Vessel.Class
+import Data.Vessel.Map
+import Data.Vessel.Vessel
 import Data.Witherable as W
 import GHCJS.DOM (currentDocumentUnchecked)
 import Language.Javascript.JSaddle (eval, liftJSM)
@@ -180,7 +184,6 @@ channelSearch = elClass "div" "w-screen h-screen bg-background flex flex-col" $ 
       elClass "div" "font-karla font-bold text-h2 text-copy leading-none" $ text "Message Search"
       elClass "div" "mt-1 leading-none font-facit text-label text-light" $ do
         text "#Channel Name"
-
   elClass "div" "p-4" $ do
     searchbar "Search messages in #Channel Name"
     elClass "div" "flex flex-row mb-4" $ segmentedButton $ def
@@ -407,7 +410,6 @@ frontendBody = do
           -- print "Hello, World!" on the client.
           prerender_ blank $ liftJSM $ void $ eval ("console.log('Hello, World!')" :: T.Text)
 
-          elAttr "img" ("src" =: $(static "obelisk.jpg")) blank
           el "div" $ do
             exampleConfig <- getConfig "common/example"
             case exampleConfig of
@@ -423,16 +425,17 @@ frontendBody = do
                 setRoute $ FrontendRoute_Login :/ () <$ goToLoginClick
                 pure never
               Just authToken -> do
-                fmap switchDyn $ mapRoutedT (authenticatedWidget authToken) $ handleAuthFailure
-                  (do
-                    el "p" $ text $ "Your token is invalid."
-                    pure never
-                  )
-                  (do
-                    el "p" $ text $ "You are authenticated."
-                    logoutClick <- button "Log Out"
-                    pure $ Nothing <$ logoutClick
-                  )
+                let renderInvalid = do
+                      el "p" $ text $ "Your token is invalid."
+                      pure never
+                fmap switchDyn $ mapRoutedT (authenticatedWidget authToken) $ handleAuthFailure renderInvalid $ do
+                  el "p" $ text $ "You are authenticated."
+                  logoutClick <- button "Log Out"
+                  mRooms <- (maybeDyn =<<) $ watchView $ pure $ vessel V_Chatrooms . mapVMorphism (ChatroomQuery "")
+                  _ <- dyn $ ffor mRooms $ \case
+                    Nothing -> text "Getting rooms"
+                    Just _rooms -> text "Got rooms"
+                  pure $ Nothing <$ logoutClick
         ) :: forall a. FrontendRoute a -> RoutedT t a (ExampleWidget t m) (Event t (Maybe (Signed (AuthToken Identity)))))
   -- Handle setting the cookies on auth change if we're running in the browser
   prerender_ (pure ()) $ do
