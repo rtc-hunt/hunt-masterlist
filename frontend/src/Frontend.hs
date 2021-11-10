@@ -15,11 +15,12 @@ import qualified Data.Aeson as A
 import Data.Functor.Const
 import Data.Functor.Identity
 import qualified Data.List as L
+import Data.Maybe (isNothing)
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Data.Vessel.Class
-import Data.Witherable
+import Data.Witherable as W
 import GHCJS.DOM (currentDocumentUnchecked)
 import Language.Javascript.JSaddle (eval, liftJSM)
 
@@ -102,8 +103,11 @@ link :: (DomBuilder t m, RouteToUrl route m, SetRoute t route m, Prerender js t 
 link route label = do
   routeLink route $ elClass "div" "font-facit font-label underline text-label text-link text-center mt-4" $ text label
 
-logIn :: forall js t m. (PostBuild t m, MonadFix m, MonadHold t m, DomBuilder t m, RouteToUrl (R FrontendRoute) m, SetRoute t (R FrontendRoute) m, Prerender js t m) => m ()
-logIn = elClass "div" "w-screen h-screen bg-background" $ do
+logIn
+  :: forall js t m. (PostBuild t m, MonadFix m, MonadHold t m, DomBuilder t m, RouteToUrl (R FrontendRoute) m, SetRoute t (R FrontendRoute) m, Prerender js t m)
+  => Event t (Maybe Text)
+  -> m (Event t (Text, Text))
+logIn serverError = elClass "div" "w-screen h-screen bg-background" $ do
   header False
   elClass "div" "p-4 mx-auto md:w-sm" $ mdo
     h1 $ def
@@ -115,13 +119,18 @@ logIn = elClass "div" "w-screen h-screen bg-background" $ do
       & textInputConfig_label .~ "Email/Profile Name"
       & textInputConfig_errorMessage .~ dError
 
-    dPError <- holdDyn Nothing $ passwordValidation <$> _passwordInput_input pi
+    dPError <- holdDyn Nothing $ leftmost [passwordValidation <$> _passwordInput_input pi, serverError]
     pi <- passwordInput $ (def :: PasswordInputConfig t)
       & passwordInputConfig_error .~ dPError
 
-    primaryButton "Log In"
+    let
+      usernameEvent = W.filter (isNothing . testValidation) $ _textInput_input ti
+      passwordEvent = W.filter (isNothing . passwordValidation) $ _passwordInput_input pi
+
+    click <- primaryButton "Log In"
     link (FrontendRoute_SignUp :/ ()) "Don't have an account?"
-  pure ()
+    credentials <- zipDyn <$> holdDyn "" usernameEvent <*> holdDyn "" passwordEvent
+    pure $ tagPromptlyDyn credentials click
 
 passwordValidation :: T.Text -> Maybe T.Text
 passwordValidation t
@@ -133,7 +142,7 @@ testValidation t
   | T.length t < 3 = Just "This isn't a valid email"
   | otherwise = Nothing
 
-signUp :: forall js t m. (MonadFix m, MonadHold t m, PostBuild t m, DomBuilder t m, RouteToUrl (R FrontendRoute) m, SetRoute t (R FrontendRoute) m, Prerender js t m) => m ()
+signUp :: forall js t m. (MonadFix m, MonadHold t m, PostBuild t m, DomBuilder t m, RouteToUrl (R FrontendRoute) m, SetRoute t (R FrontendRoute) m, Prerender js t m) => m (Event t (Text, Text))
 signUp = elClass "div" "w-screen h-screen bg-background" $ do
   header False
   elClass "div" "p-4 mx-auto md:w-sm" $ do
@@ -141,17 +150,19 @@ signUp = elClass "div" "w-screen h-screen bg-background" $ do
       & headerConfig_header .~ "Sign Up"
       & headerConfig_classes .~ "mt-12"
 
-    textInput $ def
+    ti <- textInput $ def
       & textInputConfig_label .~ "Email"
       & textInputConfig_type .~ "email"
 
     textInput $ def
       & textInputConfig_label .~ "Profile Name"
 
-    passwordInput def
+    pi <- passwordInput def
 
-    primaryButton "Sign Up"
+    click <- primaryButton "Sign Up"
     link (FrontendRoute_Login :/ ()) "Already have an account?"
+    credentials <- zipDyn <$> holdDyn "" (_textInput_input ti) <*> holdDyn "" (_passwordInput_input pi)
+    pure $ tagPromptlyDyn credentials click
 
 channelSearch :: (MonadHold t m, PostBuild t m, DomBuilder t m, MonadFix m) => m ()
 channelSearch = elClass "div" "w-screen h-screen bg-background flex flex-col" $ do
@@ -212,7 +223,7 @@ settings = elClass "div" "w-screen h-screen bg-background flex flex-col" $ do
       & switchConfig_classes .~ "mt-8"
       & switchConfig_disabled .~ pure True
 
-    secondaryButton "mt-8" "Reset your password"
+    void $ secondaryButton "mt-8" "Reset your password"
 
 messageFullWidth :: DomBuilder t m => m ()
 messageFullWidth = do
@@ -240,15 +251,16 @@ message (MessageConfig dViewer) = do
                 , bool "mr-16 md:mr-0 md:items-start" "ml-16 md:ml-0 md:items-end" b
                 ]
 
-channel :: forall t m js. (PostBuild t m, DomBuilder t m, MonadHold t m, MonadFix m, SetRoute t (R FrontendRoute) m, RouteToUrl (R FrontendRoute) m, Prerender js t m) => m ()
+channel :: forall t m js. (PostBuild t m, DomBuilder t m, MonadHold t m, MonadFix m, SetRoute t (R FrontendRoute) m, RouteToUrl (R FrontendRoute) m, Prerender js t m) => m (Event t ())
 channel = elClass "div" "w-screen h-screen bg-background flex flex-col" $ do
   header True
   elClass "div" "w-full flex flex-row flex-grow" $ do
-    elClass "div" "flex-shrink-0 w-1/4 h-full flex-col bg-sunken hidden md:flex border-r border-metaline" $
+    click <- elClass "div" "flex-shrink-0 w-1/4 h-full flex-col bg-sunken hidden md:flex border-r border-metaline" $
       channelList $ def & channelListConfig_useH2 .~ True
     channelInterior
     elClass "div" "flex-shrink-0 w-1/5 bg-sunken hidden md:flex" $ do
       channelMembersWidget
+    pure click
 
 channelInterior :: forall t m js. (PostBuild t m, DomBuilder t m, MonadHold t m, MonadFix m, SetRoute t (R FrontendRoute) m, RouteToUrl (R FrontendRoute) m, Prerender js t m) => m ()
 channelInterior = elClass "div" "w-full flex flex-col" $ do
@@ -329,11 +341,15 @@ frontendBody = do
             & channelListConfig_headerClasses .~ "mt-6"
           pure never
         FrontendRoute_Channel -> do
-          channel
-          pure never
+          click <- channel
+          setRoute $ FrontendRoute_Login :/ () <$ click
+          pure $ Nothing <$ click
         FrontendRoute_SignUp -> do
-          signUp
-          pure never
+          credentials <- signUp
+          redirectIfAuthenticated mAuthCookie $ do
+            (_loginFailed, loginSuccess) <- fmap fanEither . requestingIdentity . ffor credentials $ \(user, pw) ->
+              ApiRequest_Public $ PublicRequest_SignUp user pw
+            pure (fmap Just loginSuccess)
           {- redirectIfAuthenticated mAuthCookie $ do
           username <- el "div" . el "label" $ do
             text "Email"
@@ -351,9 +367,13 @@ frontendBody = do
           (_signupFailed, signupSuccess) <- fmap fanEither . requestingIdentity . ffor signupSubmit $ \(user, pw) ->
             ApiRequest_Public $ PublicRequest_SignUp user pw
           pure (fmap Just signupSuccess)-}
-        FrontendRoute_Login -> do
-          logIn
-          pure never
+        FrontendRoute_Login -> mdo
+          credentials <- logIn loginError
+          (loginError, cookie) <- redirectIfAuthenticated mAuthCookie $ do
+            (loginFailed, loginSuccess) <- fmap fanEither . requestingIdentity . ffor credentials $ \(user, pw) ->
+              ApiRequest_Public $ PublicRequest_Login user pw
+            pure (fmap Just loginFailed, fmap Just loginSuccess)
+          pure cookie
           {- redirectIfAuthenticated mAuthCookie $ do
           username <- el "div" . el "label" $ do
             text "Email"
@@ -425,7 +445,7 @@ redirectIfAuthenticated
   -> m a
 redirectIfAuthenticated mAuthCookie w = do
   pb <- getPostBuild
-  setRoute $ FrontendRoute_Main :/ () <$ catMaybes (leftmost [ tag (current mAuthCookie) pb, updated mAuthCookie ])
+  setRoute $ FrontendRoute_Channel :/ () <$ catMaybes (leftmost [ tag (current mAuthCookie) pb, updated mAuthCookie ])
   w
 
 runExampleWidget

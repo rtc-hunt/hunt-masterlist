@@ -33,7 +33,7 @@ data ChannelListConfig t = ChannelListConfig
 instance Default (ChannelListConfig t) where
   def = ChannelListConfig "" False
 
-channelList :: (DomBuilder t m, RouteToUrl (R FrontendRoute) m, SetRoute t (R FrontendRoute) m, Prerender js t m) => ChannelListConfig t -> m ()
+channelList :: (DomBuilder t m, RouteToUrl (R FrontendRoute) m, SetRoute t (R FrontendRoute) m, Prerender js t m) => ChannelListConfig t -> m (Event t ())
 channelList (ChannelListConfig headerClasses useH2) = do
   elClass "div" "flex-grow p-4" $ do
     elClass "div" (classList ["w-full flex flex-row items-center justify-between", headerClasses]) $ do

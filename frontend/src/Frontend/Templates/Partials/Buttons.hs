@@ -17,9 +17,10 @@ iconButton icon = do
                 , "p-2.5 font-icon text-icon text-white leading-none shadow-button"
                 ]
 
-primaryButton :: DomBuilder t m => T.Text -> m ()
-primaryButton =
-  elClass "button" classes . text
+primaryButton :: DomBuilder t m => T.Text -> m (Event t ())
+primaryButton buttonText = do
+  (e, _) <- elClass' "button" classes $ text buttonText
+  pure $ domEvent Click e
   where
     classes =
       classList [ "focus:outline-none w-full p-4 mt-16 shadow-button bg-primary"
@@ -42,10 +43,11 @@ secondaryIconButton cs icon = do
                 ]
 
 
-secondaryButton :: DomBuilder t m => T.Text -> T.Text -> m ()
+secondaryButton :: DomBuilder t m => T.Text -> T.Text -> m (Event t ())
 secondaryButton cs label = do
-  elClass "button" classes $
+  (e, _) <- elClass' "button" classes $
     text label
+  pure $ domEvent Click e
   where
     classes =
       classList [ "w-full p-2.5 leading-none text-center rounded border border-metaline"
