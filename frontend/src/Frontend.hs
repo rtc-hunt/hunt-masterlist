@@ -114,23 +114,26 @@ logIn serverError = elClass "div" "w-screen h-screen bg-background" $ do
       & headerConfig_header .~ "Log In"
       & headerConfig_classes .~ "mt-12"
 
-    dError <- holdDyn Nothing $ testValidation <$> _textInput_input ti
+    let
+      usernameEvent = _textInput_input ti
+      passwordEvent = _passwordInput_input pi
+
+    dError <- holdDyn Nothing $ testValidation <$> usernameEvent
     ti <- textInput $ (def :: TextInputConfig t)
       & textInputConfig_label .~ "Email/Profile Name"
       & textInputConfig_errorMessage .~ dError
 
-    dPError <- holdDyn Nothing $ leftmost [passwordValidation <$> _passwordInput_input pi, serverError]
+    dPError <- holdDyn Nothing $ leftmost [passwordValidation <$> passwordEvent, serverError]
     pi <- passwordInput $ (def :: PasswordInputConfig t)
       & passwordInputConfig_error .~ dPError
-
-    let
-      usernameEvent = W.filter (isNothing . testValidation) $ _textInput_input ti
-      passwordEvent = W.filter (isNothing . passwordValidation) $ _passwordInput_input pi
 
     click <- primaryButton "Log In"
     link (FrontendRoute_SignUp :/ ()) "Don't have an account?"
     credentials <- zipDyn <$> holdDyn "" usernameEvent <*> holdDyn "" passwordEvent
-    pure $ tagPromptlyDyn credentials click
+    pure $ W.filter testCredentials $ tagPromptlyDyn credentials click
+
+testCredentials :: (T.Text, T.Text) -> Bool
+testCredentials (user, pass) = all isNothing [testValidation user, passwordValidation pass]
 
 passwordValidation :: T.Text -> Maybe T.Text
 passwordValidation t
@@ -159,10 +162,14 @@ signUp = elClass "div" "w-screen h-screen bg-background" $ do
 
     pi <- passwordInput def
 
+    let
+      usernameEvent = _textInput_input ti
+      passwordEvent = _passwordInput_input pi
+
     click <- primaryButton "Sign Up"
     link (FrontendRoute_Login :/ ()) "Already have an account?"
-    credentials <- zipDyn <$> holdDyn "" (_textInput_input ti) <*> holdDyn "" (_passwordInput_input pi)
-    pure $ tagPromptlyDyn credentials click
+    credentials <- zipDyn <$> holdDyn "" usernameEvent <*> holdDyn "" passwordEvent
+    pure $ W.filter testCredentials $ tagPromptlyDyn credentials click
 
 channelSearch :: (MonadHold t m, PostBuild t m, DomBuilder t m, MonadFix m) => m ()
 channelSearch = elClass "div" "w-screen h-screen bg-background flex flex-col" $ do
