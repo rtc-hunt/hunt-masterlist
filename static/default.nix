@@ -1,8 +1,9 @@
-{ pkgs }:
+{ pkgs ? (import ../. {}).obelisk.nixpkgs
+}:
 let
   # The nixified node project was generated from a package.json file in src using node2nix
   # See https://github.com/svanderburg/node2nix#using-the-nodejs-environment-in-other-nix-derivations
-  nodePkgs = (pkgs.callPackage ./src { nodejs = nixos-unstable.nodejs-14_x; }).shell.nodeDependencies;
+  nodePkgs = (pkgs.callPackage ./src/node { nodejs = nixos-unstable.nodejs-14_x; }).shell.nodeDependencies;
 
   # This is a newer nixpkgs pin to unstable to get a much newer version of node that supports ES6 module imports,
   # this is necessary to use a newer version of tailwind (as we need a newer postcss that requires node 12 or higher)
