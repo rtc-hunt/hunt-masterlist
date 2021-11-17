@@ -8,9 +8,10 @@ import qualified Data.Text as T
 import Frontend.Utils
 
 -- TODO(skylar): Should this become a config
-iconButton :: DomBuilder t m => T.Text -> m ()
+iconButton :: DomBuilder t m => T.Text -> m (Event t ())
 iconButton icon = do
-  elClass "button" classes $ text icon
+  (e, _) <- elClass' "button" classes $ text icon
+  pure $ domEvent Click e
   where
     classes =
       classList [ "focus:outline-none flex-shrink-0 bg-primary rounded"

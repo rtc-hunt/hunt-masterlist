@@ -12,6 +12,7 @@ library
                , jsaddle
                , ghcjs-dom
                , reflex-dom-core
+               , ref-tf
                , rhyolite-frontend
                , obelisk-executable-config-lookup
                , obelisk-generated-static
@@ -20,11 +21,12 @@ library
                , lens
   exposed-modules:
     Frontend
-    Frontend.Templates.Login
+    Frontend.Templates.Helpers.Authentication
     Frontend.Templates.Partials.Common
     Frontend.Templates.Partials.Header
     Frontend.Templates.Partials.TextInput
     Frontend.Templates.Partials.MessageView
+    Frontend.Templates.Login
   ghc-options: -Wall -Wredundant-constraints -Wincomplete-uni-patterns -Wincomplete-record-updates -O -fno-show-valid-hole-fits
 
 executable frontend

@@ -14,6 +14,7 @@ import Control.Category
 import Control.Monad
 import Control.Monad.Fix
 import qualified Data.Aeson as A
+import Data.Bool (bool)
 import Data.Functor.Const
 import Data.Functor.Identity
 import qualified Data.List as L
@@ -27,20 +28,11 @@ import Data.Vessel.Vessel
 import Data.Witherable as W
 import GHCJS.DOM (currentDocumentUnchecked)
 import Language.Javascript.JSaddle (eval, liftJSM)
-
 import Obelisk.Frontend
 import Obelisk.Configs
 import Obelisk.Route
 import Obelisk.Route.Frontend
 import Obelisk.Generated.Static
-import Rhyolite.Account
-import Rhyolite.Api (ApiRequest(..))
-import Rhyolite.Frontend.App
-import Rhyolite.Frontend.Cookie
-import Rhyolite.Sign
-import Rhyolite.Vessel.ErrorV
-import Rhyolite.Vessel.AuthMapV
-
 import Reflex.Dom.Core hiding ( link
                               , textInput
                               , TextInputConfig
@@ -49,14 +41,20 @@ import Reflex.Dom.Core hiding ( link
                               , textInput_input
                               , _textInput_value
                               )
+import Rhyolite.Account
+import Rhyolite.Api (ApiRequest(..))
+import Rhyolite.Frontend.App
+import Rhyolite.Frontend.Cookie
+import Rhyolite.Sign
+import Rhyolite.Vessel.ErrorV
+import Rhyolite.Vessel.AuthMapV
 
 import Common.Api
 import Common.Route
 import Common.View
 
-import Data.Bool (bool)
-
 import Frontend.Utils
+import Frontend.Templates.Helpers.Authentication
 import Frontend.Templates.Partials.Switch
 import Frontend.Templates.Partials.TextInput
 import Frontend.Templates.Partials.PasswordInput
@@ -189,7 +187,11 @@ channelSearch = elClass "div" "w-screen h-screen bg-background flex flex-col" $ 
 
     replicateM_ 4 messageFullWidth
 
-channelMembers :: DomBuilder t m => m ()
+channelMembers
+  :: ( DomBuilder t m
+     , PostBuild t m
+     )
+  => m ()
 channelMembers = elClass "div" "w-screen h-screen bg-background flex flex-col" $ do
   header True
   elClass "div" "p-4 bg-raised flex flex-row items-center border-b border-metaline mb-8" $ do
@@ -201,14 +203,18 @@ channelMembers = elClass "div" "w-screen h-screen bg-background flex flex-col" $
 
   channelMembersWidget
 
-channelMembersWidget :: DomBuilder t m => m ()
+channelMembersWidget
+  :: ( DomBuilder t m
+     , PostBuild t m
+     )
+  => m ()
 channelMembersWidget = do
   elClass "div" "p-4" $ do
     elClass "div" "font-facit text-h2 text-copy" $ text "Online"
-    replicateM_ 4 $ listItem "Yasuke" Nothing
+    replicateM_ 4 $ listItem def "Yasuke"
 
     elClass "div" "font-facit text-h2 text-copy mt-6" $ text "Offline"
-    replicateM_ 4 $ listItem "Yasuke" Nothing
+    replicateM_ 4 $ listItem def "Yasuke"
 
 settings :: forall t m. (DomBuilder t m, PostBuild t m, MonadHold t m) => m ()
 settings = elClass "div" "w-screen h-screen bg-background flex flex-col" $ do
@@ -258,7 +264,19 @@ message (MessageConfig dViewer) = do
                 , bool "mr-16 md:mr-0 md:items-start" "ml-16 md:ml-0 md:items-end" b
                 ]
 
-channel :: forall t m js. (PostBuild t m, DomBuilder t m, MonadHold t m, MonadFix m, SetRoute t (R FrontendRoute) m, RouteToUrl (R FrontendRoute) m, Prerender js t m) => m (Event t ())
+channel
+  :: forall t m js.
+     ( PostBuild t m
+     , DomBuilder t m
+     , MonadQuery t (Vessel V (Const SelectedCount)) m
+     , MonadHold t m
+     , MonadFix m
+     , SetRoute t (R FrontendRoute) m
+     , RouteToUrl (R FrontendRoute) m
+     , Prerender js t m
+     , Requester t m, Response m ~ Identity, Request m ~ ApiRequest () PublicRequest PrivateRequest
+     )
+  => m (Event t ())
 channel = elClass "div" "w-screen h-screen bg-background flex flex-col" $ do
   header True
   elClass "div" "w-full flex flex-row flex-grow" $ do
@@ -269,7 +287,17 @@ channel = elClass "div" "w-screen h-screen bg-background flex flex-col" $ do
       channelMembersWidget
     pure click
 
-channelInterior :: forall t m js. (PostBuild t m, DomBuilder t m, MonadHold t m, MonadFix m, SetRoute t (R FrontendRoute) m, RouteToUrl (R FrontendRoute) m, Prerender js t m) => m ()
+channelInterior
+  :: forall t m js.
+     (PostBuild t m
+     , DomBuilder t m
+     , MonadHold t m
+     , MonadFix m
+     , SetRoute t (R FrontendRoute) m
+     , RouteToUrl (R FrontendRoute) m
+     , Prerender js t m
+     )
+  => m ()
 channelInterior = elClass "div" "w-full flex flex-col" $ do
   elClass "div" "p-4 bg-raised flex flex-row justify-between items-center border-b border-metaline relative" $ do
     elClass "div" "flex flex-col" $ do
@@ -314,6 +342,7 @@ channelInterior = elClass "div" "w-full flex flex-col" $ do
                                <> "type" =: "text"
                              )
     iconButton "send"
+    pure ()
 
 -- Surrounds view with header in a screen sized div, default for most pages
 appPage :: DomBuilder t m => m a -> m a
@@ -343,11 +372,11 @@ frontendBody = do
         FrontendRoute_ChannelMembers -> do
           channelMembers
           pure never
-        FrontendRoute_Channels -> do
+        FrontendRoute_Channels -> authenticateWithToken mAuthCookie $ do
           appPage $ channelList $ def
             & channelListConfig_headerClasses .~ "mt-6"
           pure never
-        FrontendRoute_Channel -> do
+        FrontendRoute_Channel -> authenticateWithToken mAuthCookie $ do
           click <- channel
           setRoute $ FrontendRoute_Login :/ () <$ click
           pure $ Nothing <$ click
@@ -381,24 +410,14 @@ frontendBody = do
           el "div" $ do
             el "h1" $ text "The contents of this section depend on your authentication state"
             pb <- getPostBuild
-            fmap switchDyn $ widgetHold (pure never) $ ffor (leftmost [tag (current mAuthCookie) pb, updated mAuthCookie]) $ \case
-              Nothing -> do
-                el "p" $ text $ "You are not authenticated."
-                goToLoginClick <- button "Log In"
-                setRoute $ FrontendRoute_Login :/ () <$ goToLoginClick
-                pure never
-              Just authToken -> do
-                let renderInvalid = do
-                      el "p" $ text $ "Your token is invalid."
-                      pure never
-                fmap switchDyn $ mapRoutedT (authenticatedWidget authToken) $ handleAuthFailure renderInvalid $ do
-                  el "p" $ text $ "You are authenticated."
-                  logoutClick <- button "Log Out"
-                  mRooms <- (maybeDyn =<<) $ watchView $ pure $ vessel V_Chatrooms . mapVMorphism (ChatroomQuery "")
-                  _ <- dyn $ ffor mRooms $ \case
-                    Nothing -> text "Getting rooms"
-                    Just _rooms -> text "Got rooms"
-                  pure $ Nothing <$ logoutClick
+            authenticateWithToken mAuthCookie $ do
+              el "p" $ text $ "You are authenticated."
+              logoutClick <- button "Log Out"
+              mRooms <- (maybeDyn =<<) $ watchView $ pure $ vessel V_Chatrooms . mapVMorphism (ChatroomQuery "")
+              _ <- dyn $ ffor mRooms $ \case
+                Nothing -> text "Getting rooms"
+                Just rooms -> dynText $ fmap (T.pack . show) rooms
+              pure $ Nothing <$ logoutClick
         ) :: forall a. FrontendRoute a -> RoutedT t a (ExampleWidget t m) (Event t (Maybe (Signed (AuthToken Identity)))))
   -- Handle setting the cookies on auth change if we're running in the browser
   prerender_ (pure ()) $ do
@@ -418,7 +437,7 @@ redirectIfAuthenticated
   -> m a
 redirectIfAuthenticated mAuthCookie w = do
   pb <- getPostBuild
-  setRoute $ FrontendRoute_Channel :/ () <$ catMaybes (leftmost [ tag (current mAuthCookie) pb, updated mAuthCookie ])
+  setRoute $ FrontendRoute_Channels :/ () <$ catMaybes (leftmost [ tag (current mAuthCookie) pb, updated mAuthCookie ])
   w
 
 runExampleWidget
@@ -451,31 +470,3 @@ queryDynE
   => Dynamic t (ErrorV e v (Const SelectedCount))
   -> m (Dynamic t (Either e (v Identity)))
 queryDynE = fmap (fmap observeErrorV) . queryDyn
-
-authenticatedWidget
-  :: ( Ord token, View v
-     , Group (v (Const SelectedCount)), Additive (v (Const SelectedCount)), Semigroup (v Identity)
-     , QueryResult (v (Const SelectedCount)) ~ v Identity
-     , MonadFix m, PostBuild t m
-     )
-  => token
-  -> QueryT t (ErrorV () v (Const SelectedCount)) (RequesterT t (ApiRequest () publicRequest privateRequest) Identity m) a
-  -> RhyoliteWidget (AuthMapV token v (Const SelectedCount)) (ApiRequest token publicRequest privateRequest) t m a
-authenticatedWidget token = mapAuth token (authMapQueryMorphism token)
-
-handleAuthFailure
-  :: ( EmptyView v, PostBuild t m
-     , Group (v (Const SelectedCount)), Additive (v (Const SelectedCount)), Semigroup (v Identity)
-     , QueryResult (v (Const SelectedCount)) ~ v Identity
-     , Adjustable t m, MonadHold t m, MonadFix m
-     , Eq (v (Const SelectedCount))
-     )
-  => RoutedT t r (QueryT t () m) a
-  -> RoutedT t r (QueryT t (v (Const SelectedCount)) m) a
-  -> RoutedT t r (QueryT t (ErrorV () v (Const SelectedCount)) m) (Dynamic t a)
-handleAuthFailure placeholder authenticatedChild = do
-  pb <- getPostBuild
-  ev <- eitherDyn . fmap observeErrorV =<< askQueryResult
-  widgetHold (mapRoutedT (withQueryT unsafeProjectE) placeholder) $ ffor (leftmost [tag (current ev) pb, updated ev]) $ \case
-    Left _ -> mapRoutedT (withQueryT unsafeProjectE) placeholder
-    Right _ -> mapRoutedT (withQueryT unsafeProjectV) authenticatedChild

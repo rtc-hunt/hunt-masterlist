@@ -53,9 +53,10 @@ notifyHandler db nm v = case _dbNotification_message nm of
   Notify_Chatroom :/ cid -> buildV v $ \case
     V_Chatrooms -> \(MapV queries) -> do
       results :: Map.MonoidalMap ChatroomQuery (SemiMap (Id Chatroom) Text) <- runNoLoggingT $ runDb (Identity db) $ searchForChatroom $ Map.keysSet queries
-      pure $ if Map.null results
-        then emptyV
-        else MapV $ pure <$> results
+      let x = if Map.null results
+            then emptyV
+            else MapV $ pure <$> results
+      pure x
     V_Chatroom -> \(MapV cs) -> if Map.member cid cs
       then runNoLoggingT $ runDb (Identity db) (get $ fromId cid) >>= pure . \case
         Nothing -> emptyV

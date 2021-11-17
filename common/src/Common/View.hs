@@ -27,7 +27,7 @@ data MsgView = MsgView
   { _msgView_handle :: Text
   , _msgView_text :: Text
   }
-  deriving (Generic, Eq)
+  deriving (Show, Generic, Eq)
 
 instance ToJSON MsgView
 instance FromJSON MsgView
@@ -35,7 +35,7 @@ instance FromJSON MsgView
 data ChatroomQuery = ChatroomQuery
   { _chatroomQuery_search :: Text
   }
-  deriving (Generic, Eq, Ord)
+  deriving (Show, Generic, Eq, Ord)
 
 instance ToJSON ChatroomQuery
 instance FromJSON ChatroomQuery
@@ -53,8 +53,3 @@ deriveGEq ''V
 deriveGCompare ''V
 
 type PrivateChatV = Vessel V
-
-{-
--- TODO ORPHAN
-instance Additive (g (f x)) => Additive (Compose g f x)
--}

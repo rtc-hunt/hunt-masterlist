@@ -16,11 +16,11 @@ import Common.View
 
 searchForChatroom :: Db m => Set ChatroomQuery -> m (MonoidalMap ChatroomQuery (SemiMap (Id Chatroom) Text))
 searchForChatroom qs = fmap (Map.unionsWith (<>)) $ forM (Set.toList qs) $ \q -> do
-    let textQuery = _chatroomQuery_search q
+    let textQuery = "%" <> _chatroomQuery_search q <> "%"
     results <- [queryQ|
       select id, title
       from "Chatroom"
-      where title ilike '%?textQuery%'
+      where title ilike ?textQuery
       order by id desc
       limit 10
     |]

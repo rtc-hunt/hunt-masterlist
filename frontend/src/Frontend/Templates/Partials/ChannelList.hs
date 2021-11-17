@@ -1,29 +1,39 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 -- | This is kind of a hefty widget, not just the channel list but your access to settings and what not
 
 module Frontend.Templates.Partials.ChannelList where
 
+import Prelude hiding ((.), id)
+import Control.Category
+import Control.Lens
+import Control.Monad.Fix
 import Data.Bool
 import Data.Default
+import qualified Data.Map as Map
+import Data.Text (Text)
 import qualified Data.Text as T
-
-import Reflex.Dom.Core
-
-import Frontend.Utils
-
-import Common.Route
 import Obelisk.Route.Frontend
+import Reflex.Dom.Core
+import Rhyolite.Api hiding (Request)
+import Rhyolite.Frontend.App
+import Data.Vessel.Map
+import Data.Vessel.Vessel
 
-import Control.Lens
-import Control.Monad
+import Common.Api
+import Common.Route
+import Common.View
 
 import Frontend.Templates.Partials.Searchbar
 import Frontend.Templates.Partials.Headers
 import Frontend.Templates.Partials.Buttons
 import Frontend.Templates.Partials.Lists
+import Frontend.Utils
 
 data ChannelListConfig t = ChannelListConfig
   { _channelListConfig_headerClasses :: T.Text
@@ -33,18 +43,40 @@ data ChannelListConfig t = ChannelListConfig
 instance Default (ChannelListConfig t) where
   def = ChannelListConfig "" False
 
-channelList :: (DomBuilder t m, RouteToUrl (R FrontendRoute) m, SetRoute t (R FrontendRoute) m, Prerender js t m) => ChannelListConfig t -> m (Event t ())
+channelList
+  :: ( MonadFix m
+     , MonadHold t m
+     , MonadQuery t (Vessel V (Const SelectedCount)) m
+     , DomBuilder t m
+     , SetRoute t (R FrontendRoute) m
+     , PostBuild t m
+     , Requester t m, Response m ~ Identity, Request m ~ ApiRequest () publicRequest PrivateRequest
+     )
+  => ChannelListConfig t
+  -> m (Event t ())
 channelList (ChannelListConfig headerClasses useH2) = do
   elClass "div" "flex-grow p-4" $ do
-    elClass "div" (classList ["w-full flex flex-row items-center justify-between", headerClasses]) $ do
+    createClick <- elClass "div" (classList ["w-full flex flex-row items-center justify-between", headerClasses]) $ do
       header $ def
         & headerConfig_header .~ "Channels"
       iconButton "add"
-    searchbar "Search for a channel"
+    channelSearch <- searchbar "Search for a channel"
+    mRooms <- (maybeDyn . fmap (completeMapOf =<<) =<<) $ watchView $ fmap (\q -> vessel V_Chatrooms . mapVMorphism (ChatroomQuery q)) $
+      _searchbarOutput_query channelSearch
 
     elClass "div" "mt-8 font-facit text-h2 text-copy" $ text "Recent channels"
 
-    replicateM_ 4 channelItem
+    channelClick <- (switchHold never =<<) $ dyn $ ffor mRooms $ \case
+      Nothing -> pure never
+      Just rooms -> switchDyn . fmap mergeMap <$> list rooms channelItem
+
+    fmap fanEither . requestingIdentity . ffor (tag (current (_searchbarOutput_query channelSearch)) createClick) $ \newName ->
+      ApiRequest_Private () $ PrivateRequest_CreateChatroom newName
+
+    setRoute $ fforMaybe channelClick $ \clicks -> ffor (Map.minViewWithKey clicks) $ \((k,_),_) ->
+      FrontendRoute_Channel :/ k
+
+    pure ()
 
   -- TODO(skylar): This could be its own component but currently it always appears with the channel list
   elClass "div" "w-full p-4 border-t border-metaline bg-white md:bg-less-sunken" $ do
@@ -59,8 +91,14 @@ channelList (ChannelListConfig headerClasses useH2) = do
   where
     header = bool h1 h2 useH2
 
--- TODO(skylar): Is this just a link?
-channelItem :: DomBuilder t m => m ()
-channelItem = listItem "#ChannelName" $ Just "543 members \x00b7 13 online"
+channelItem
+  :: ( DomBuilder t m
+     , PostBuild t m
+     )
+  => Dynamic t Text
+  -> m (Event t ())
+channelItem = listItem $ def
+  { _listItemConfig_clickable = True
+  }
 
 makeLenses ''ChannelListConfig
