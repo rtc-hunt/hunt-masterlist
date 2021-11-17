@@ -21,7 +21,7 @@ searchForChatroom qs = fmap (Map.unionsWith (<>)) $ forM (Set.toList qs) $ \q ->
       select id, title
       from "Chatroom"
       where title ilike '%?textQuery%'
-      order by id descending
+      order by id desc
       limit 10
     |]
     pure $ Map.singleton q $ SemiMap_Complete $ Map.fromList results

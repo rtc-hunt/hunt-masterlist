@@ -157,18 +157,15 @@ signUp = elClass "div" "w-screen h-screen bg-background" $ do
       & headerConfig_header .~ "Sign Up"
       & headerConfig_classes .~ "mt-12"
 
-    ti <- textInput $ def
+    newAccount <- textInput $ def
       & textInputConfig_label .~ "Email"
       & textInputConfig_type .~ "email"
 
-    textInput $ def
-      & textInputConfig_label .~ "Profile Name"
-
-    pi <- passwordInput def
+    newPass <- passwordInput def
 
     let
-      usernameEvent = _textInput_input ti
-      passwordEvent = _passwordInput_input pi
+      usernameEvent = _textInput_input newAccount
+      passwordEvent = _passwordInput_input newPass
 
     click <- primaryButton "Sign Up"
     link (FrontendRoute_Login :/ ()) "Already have an account?"
@@ -360,23 +357,6 @@ frontendBody = do
             (_loginFailed, loginSuccess) <- fmap fanEither . requestingIdentity . ffor credentials $ \(user, pw) ->
               ApiRequest_Public $ PublicRequest_SignUp user pw
             pure (fmap Just loginSuccess)
-          {- redirectIfAuthenticated mAuthCookie $ do
-          username <- el "div" . el "label" $ do
-            text "Email"
-            fmap value $ inputElement def
-          password <- el "div" . el "label" $ do
-            text "Password"
-            fmap value . inputElement $
-              def & inputElementConfig_elementConfig
-                  . elementConfig_initialAttributes
-                  .~ (AttributeName Nothing "type" =: "password")
-          signupSubmit <- el "div" . el "label" $ do
-            text "\160"
-            signupClick <- button "Sign Up"
-            return $ tag (current (zipDyn username password)) signupClick
-          (_signupFailed, signupSuccess) <- fmap fanEither . requestingIdentity . ffor signupSubmit $ \(user, pw) ->
-            ApiRequest_Public $ PublicRequest_SignUp user pw
-          pure (fmap Just signupSuccess)-}
         FrontendRoute_Login -> mdo
           credentials <- logIn loginError
           (loginError, cookie) <- redirectIfAuthenticated mAuthCookie $ do
@@ -384,23 +364,6 @@ frontendBody = do
               ApiRequest_Public $ PublicRequest_Login user pw
             pure (fmap Just loginFailed, fmap Just loginSuccess)
           pure cookie
-          {- redirectIfAuthenticated mAuthCookie $ do
-          username <- el "div" . el "label" $ do
-            text "Email"
-            fmap value $ inputElement def
-          password <- el "div" . el "label" $ do
-            text "Password"
-            fmap value . inputElement $
-              def & inputElementConfig_elementConfig
-                  . elementConfig_initialAttributes
-                  .~ (AttributeName Nothing "type" =: "password")
-          loginSubmit <- el "div" . el "label" $ do
-            text "\160"
-            loginClick <- button "Log In"
-            return $ tag (current (zipDyn username password)) loginClick
-          (_loginFailed, loginSuccess) <- fmap fanEither . requestingIdentity . ffor loginSubmit $ \(user, pw) ->
-            ApiRequest_Public $ PublicRequest_Login user pw
-          pure (fmap Just loginSuccess)-}
         FrontendRoute_Main -> do
           el "h1" $ text "Welcome to Obelisk!"
           el "p" $ text $ T.pack commonStuff

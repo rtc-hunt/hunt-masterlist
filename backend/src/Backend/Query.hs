@@ -1,4 +1,4 @@
-module Backend.Query 
+module Backend.Query
   ( module X
   )
   where
