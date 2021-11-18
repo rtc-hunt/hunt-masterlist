@@ -58,12 +58,9 @@ import Frontend.Templates.Helpers.Authentication
 import Frontend.Templates.Partials.Switch
 import Frontend.Templates.Partials.TextInput
 import Frontend.Templates.Partials.PasswordInput
-import Frontend.Templates.Partials.SegmentedButton
 import Frontend.Templates.Partials.ChannelList
 import Frontend.Templates.Partials.Buttons
 import Frontend.Templates.Partials.Headers
-import Frontend.Templates.Partials.Lists
-import Frontend.Templates.Partials.Searchbar
 
 type ExampleCredential = Signed (AuthToken Identity)
 type ExampleWidget = RhyoliteWidget
@@ -170,74 +167,6 @@ signUp = elClass "div" "w-screen h-screen bg-background" $ do
     credentials <- zipDyn <$> holdDyn "" usernameEvent <*> holdDyn "" passwordEvent
     pure $ W.filter testCredentials $ tagPromptlyDyn credentials click
 
-channelSearch :: (MonadHold t m, PostBuild t m, DomBuilder t m, MonadFix m) => m ()
-channelSearch = elClass "div" "w-screen h-screen bg-background flex flex-col" $ do
-  header True
-  elClass "div" "p-4 bg-raised flex flex-row items-center border-b border-metaline" $ do
-    secondaryIconButton "" "arrow_back"
-    elClass "div" "ml-4 flex flex-col" $ do
-      elClass "div" "font-karla font-bold text-h2 text-copy leading-none" $ text "Message Search"
-      elClass "div" "mt-1 leading-none font-facit text-label text-light" $ do
-        text "#Channel Name"
-  elClass "div" "p-4" $ do
-    searchbar "Search messages in #Channel Name"
-    elClass "div" "flex flex-row mb-4" $ segmentedButton $ def
-      & segmentedButtonConfig_segments .~ ["New", "Old", "Relevant"]
-      & segmentedButtonConfig_classes .~ "mt-4"
-
-    replicateM_ 4 messageFullWidth
-
-channelMembers
-  :: ( DomBuilder t m
-     , PostBuild t m
-     )
-  => m ()
-channelMembers = elClass "div" "w-screen h-screen bg-background flex flex-col" $ do
-  header True
-  elClass "div" "p-4 bg-raised flex flex-row items-center border-b border-metaline mb-8" $ do
-    secondaryIconButton "" "arrow_back"
-    elClass "div" "ml-4 flex flex-col" $ do
-      elClass "div" "font-karla font-bold text-h2 text-copy leading-none" $ text "Members"
-      elClass "div" "mt-1 leading-none font-facit text-label text-light" $ do
-        text "#Channel Name"
-
-  channelMembersWidget
-
-channelMembersWidget
-  :: ( DomBuilder t m
-     , PostBuild t m
-     )
-  => m ()
-channelMembersWidget = do
-  elClass "div" "p-4" $ do
-    elClass "div" "font-facit text-h2 text-copy" $ text "Online"
-    replicateM_ 4 $ listItem def "Yasuke"
-
-    elClass "div" "font-facit text-h2 text-copy mt-6" $ text "Offline"
-    replicateM_ 4 $ listItem def "Yasuke"
-
-settings :: forall t m. (DomBuilder t m, PostBuild t m, MonadHold t m) => m ()
-settings = elClass "div" "w-screen h-screen bg-background flex flex-col" $ do
-  header True
-  elClass "div" "p-4 bg-raised flex flex-row items-center border-b border-metaline" $ do
-    secondaryIconButton "" "arrow_back"
-    elClass "div" "ml-4 flex flex-col" $ do
-      elClass "div" "font-karla font-bold text-h2 text-copy leading-none" $ text "Settings"
-
-  elClass "div" "flex flex-col flex-grow p-4" $ do
-    elClass "div" "flex justify-center items-center" $ elClass "div" "mt-8 w-32 h-32 rounded-full bg-black" blank
-
-    textInput $ def & textInputConfig_label .~ "Account Name"
-    textInput $ def & textInputConfig_label .~ "Email"
-
-    switchButton $ (def :: SwitchConfig t)
-      & switchConfig_label .~ "Enable Push Notifications"
-      & switchConfig_icon .~ Just "notifications_none"
-      & switchConfig_classes .~ "mt-8"
-      & switchConfig_disabled .~ pure True
-
-    void $ secondaryButton "mt-8" "Reset your password"
-
 messageFullWidth :: DomBuilder t m => m ()
 messageFullWidth = do
   elClass "div" "font-facit text-copy flex flex-col mt-4" $ do
@@ -283,8 +212,6 @@ channel = elClass "div" "w-screen h-screen bg-background flex flex-col" $ do
     click <- elClass "div" "flex-shrink-0 w-1/4 h-full flex-col bg-sunken hidden md:flex border-r border-metaline" $
       channelList $ def & channelListConfig_useH2 .~ True
     channelInterior
-    elClass "div" "flex-shrink-0 w-1/5 bg-sunken hidden md:flex" $ do
-      channelMembersWidget
     pure click
 
 channelInterior
@@ -363,15 +290,6 @@ frontendBody = do
   -- (at least on GHC 8.6.5) the compiler cannot properly infer that
   -- this function has the proper higher rank type.
       authChange <- fmap switchDyn $ subRoute $ ((\case
-        FrontendRoute_Settings -> do
-          settings
-          pure never
-        FrontendRoute_ChannelSearch -> do
-          channelSearch
-          pure never
-        FrontendRoute_ChannelMembers -> do
-          channelMembers
-          pure never
         FrontendRoute_Channels -> authenticateWithToken mAuthCookie $ do
           appPage $ channelList $ def
             & channelListConfig_headerClasses .~ "mt-6"

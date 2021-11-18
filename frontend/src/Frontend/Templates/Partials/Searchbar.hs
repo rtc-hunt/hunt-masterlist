@@ -9,12 +9,6 @@ import qualified Data.Text as T
 
 import Reflex.Dom.Core
 
-import Frontend.Utils
-
-import Common.Route
-import Obelisk.Route.Frontend
-
-
 data SearchbarOutput t = SearchbarOutput
   { _searchbarOutput_query :: Dynamic t Text
   }
