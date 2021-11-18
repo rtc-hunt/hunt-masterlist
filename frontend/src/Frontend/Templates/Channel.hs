@@ -1,20 +1,29 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Frontend.Templates.Channel where
 
+import Prelude hiding ((.), id)
+import Control.Category
 import Control.Monad.Fix
 import Data.Bool
+import Data.Semigroup
 import Data.Vessel
-import Reflex.Dom.Core hiding (Request)
-import Reflex
+import Data.Vessel.Map
+import Data.Vessel.Vessel
+import Database.Id.Class
 import Obelisk.Route.Frontend
+import Reflex
+import Reflex.Dom.Core hiding (Request)
 import Rhyolite.Api hiding (Request)
+import Rhyolite.Frontend.App
 
 import Common.Api
 import Common.Route
+import Common.Schema
 import Common.View
 
 import Frontend.Templates.Partials.Buttons
@@ -36,13 +45,14 @@ channel
      , Prerender js t m
      , Requester t m, Response m ~ Identity, Request m ~ ApiRequest () PublicRequest PrivateRequest
      )
-  => m (Event t ())
-channel = elClass "div" "w-screen h-screen bg-background flex flex-col" $ do
+  => Dynamic t (Id Chatroom)
+  -> m (Event t ())
+channel cid = elClass "div" "w-screen h-screen bg-background flex flex-col" $ do
   header True
   elClass "div" "w-full flex flex-row flex-grow" $ do
     click <- elClass "div" "flex-shrink-0 w-1/4 h-full flex-col bg-sunken hidden md:flex border-r border-metaline" $
       channelList $ def & channelListConfig_useH2 .~ True
-    channelInterior
+    channelInterior cid
     pure click
 
 channelInterior
@@ -54,14 +64,17 @@ channelInterior
      , SetRoute t (R FrontendRoute) m
      , RouteToUrl (R FrontendRoute) m
      , Prerender js t m
+     , MonadQuery t (Vessel V (Const SelectedCount)) m
      )
-  => m ()
-channelInterior = elClass "div" "w-full flex flex-col" $ do
+  => Dynamic t (Id Chatroom)
+  -> m ()
+channelInterior cid = elClass "div" "w-full flex flex-col" $ do
+  mName <- watchView $ fmap (\c -> vessel V_Chatroom . mapVMorphism c) cid
   elClass "div" "p-4 bg-raised flex flex-row justify-between items-center border-b border-metaline relative" $ do
     elClass "div" "flex flex-col" $ do
-      elClass "div" "font-karla font-bold text-h2 md:text-h1 text-copy leading-none" $ text "#Channel Name"
-      elClass "div" "mt-1 leading-none font-facit text-label text-light" $ do
-        text "543 members \x00b7 13 online"
+      elClass "div" "font-karla font-bold text-h2 md:text-h1 text-copy leading-none" $ dynText $ ffor mName $ \case
+        Nothing -> "Channel"
+        Just (First name) -> name
 
     elClass "div" "flex flex-row items-center" $ do
       secondaryIconButton "" "search"

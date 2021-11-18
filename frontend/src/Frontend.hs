@@ -174,7 +174,8 @@ frontendBody = do
             & channelListConfig_headerClasses .~ "mt-6"
           pure never
         FrontendRoute_Channel -> authenticateWithToken mAuthCookie $ do
-          click <- channel
+          cid <- askRoute
+          click <- channel cid
           setRoute $ FrontendRoute_Login :/ () <$ click
           pure $ Nothing <$ click
         FrontendRoute_SignUp -> do
