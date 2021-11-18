@@ -9,9 +9,6 @@ import Rhyolite.Sign
 
 import Common.Schema
 
-commonStuff :: String
-commonStuff = "Here is a string defined in Common.Api"
-
 data PrivateRequest a where
   PrivateRequest_SendMessage :: Id Chatroom -> Text -> PrivateRequest (Either Text ())
   PrivateRequest_CreateChatroom :: Text -> PrivateRequest (Either Text (Id Chatroom))

@@ -11,10 +11,8 @@ module Frontend where
 
 import Prelude hiding (id, (.))
 import Control.Category
-import Control.Monad
 import Control.Monad.Fix
 import qualified Data.Aeson as A
-import Data.Bool (bool)
 import Data.Functor.Const
 import Data.Functor.Identity
 import qualified Data.List as L
@@ -23,11 +21,8 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Data.Vessel.Class
-import Data.Vessel.Map
-import Data.Vessel.Vessel
 import Data.Witherable as W
 import GHCJS.DOM (currentDocumentUnchecked)
-import Language.Javascript.JSaddle (eval, liftJSM)
 import Obelisk.Frontend
 import Obelisk.Configs
 import Obelisk.Route
@@ -53,14 +48,13 @@ import Common.Api
 import Common.Route
 import Common.View
 
-import Frontend.Utils
 import Frontend.Templates.Helpers.Authentication
-import Frontend.Templates.Partials.Switch
 import Frontend.Templates.Partials.TextInput
 import Frontend.Templates.Partials.PasswordInput
 import Frontend.Templates.Partials.ChannelList
 import Frontend.Templates.Partials.Buttons
 import Frontend.Templates.Partials.Headers
+import Frontend.Templates.Channel
 
 type ExampleCredential = Signed (AuthToken Identity)
 type ExampleWidget = RhyoliteWidget
@@ -86,17 +80,6 @@ frontend = Frontend
       elAttr "meta" ("name"=:"viewport" <> "content" =: "width=device-width, initial-scale=1") blank
   , _frontend_body = runExampleWidget frontendBody
   }
-
-header :: DomBuilder t m => Bool -> m ()
-header showMenu = do
-  elClass "div" classes $ do
-    elClass "div" "" $ text "RhyoliteExample"
-    when showMenu $ secondaryIconButton "" "menu" >> pure ()
-  where
-    classes =
-      classList [ "font-karla font-bold text-copy bg-white shadow-header flex flex-row justify-between items-center z-10"
-                , bool "px-4 py-5" "px-4 py-2" showMenu
-                ]
 
 link :: (DomBuilder t m, RouteToUrl route m, SetRoute t route m, Prerender js t m) => route -> T.Text -> m ()
 link route label = do
@@ -167,110 +150,6 @@ signUp = elClass "div" "w-screen h-screen bg-background" $ do
     credentials <- zipDyn <$> holdDyn "" usernameEvent <*> holdDyn "" passwordEvent
     pure $ W.filter testCredentials $ tagPromptlyDyn credentials click
 
-messageFullWidth :: DomBuilder t m => m ()
-messageFullWidth = do
-  elClass "div" "font-facit text-copy flex flex-col mt-4" $ do
-    elClass "div" "flex flex-row items-baseline justify-between" $ do
-      elClass "div" "text-label" $ text "Tanko"
-      elClass "div" "font-bold text-label text-light" $ text "2:00am"
-    elClass "div" "p-4 rounded border border-metaline bg-white" $ text "What is good?"
-
-data MessageConfig t = MessageConfig
-   { _messageConfig_viewer :: Dynamic t Bool
-   }
-
-message :: (PostBuild t m, DomBuilder t m) => MessageConfig t -> m ()
-message (MessageConfig dViewer) = do
-  elDynClass "div" (mkClasses <$> dViewer) $ do
-    elClass "div" "flex flex-row items-baseline justify-between" $ do
-      elClass "div" "text-label md:mr-4" $ text "Tanko"
-      elClass "div" "font-bold text-label text-light" $ text "2:00am"
-    elClass "div" "p-4 rounded border border-metaline bg-white w-auto" $ text "What is good?"
-
-  where
-    mkClasses b =
-      classList [ "font-facit text-copy flex flex-col mb-6"
-                , bool "mr-16 md:mr-0 md:items-start" "ml-16 md:ml-0 md:items-end" b
-                ]
-
-channel
-  :: forall t m js.
-     ( PostBuild t m
-     , DomBuilder t m
-     , MonadQuery t (Vessel V (Const SelectedCount)) m
-     , MonadHold t m
-     , MonadFix m
-     , SetRoute t (R FrontendRoute) m
-     , RouteToUrl (R FrontendRoute) m
-     , Prerender js t m
-     , Requester t m, Response m ~ Identity, Request m ~ ApiRequest () PublicRequest PrivateRequest
-     )
-  => m (Event t ())
-channel = elClass "div" "w-screen h-screen bg-background flex flex-col" $ do
-  header True
-  elClass "div" "w-full flex flex-row flex-grow" $ do
-    click <- elClass "div" "flex-shrink-0 w-1/4 h-full flex-col bg-sunken hidden md:flex border-r border-metaline" $
-      channelList $ def & channelListConfig_useH2 .~ True
-    channelInterior
-    pure click
-
-channelInterior
-  :: forall t m js.
-     (PostBuild t m
-     , DomBuilder t m
-     , MonadHold t m
-     , MonadFix m
-     , SetRoute t (R FrontendRoute) m
-     , RouteToUrl (R FrontendRoute) m
-     , Prerender js t m
-     )
-  => m ()
-channelInterior = elClass "div" "w-full flex flex-col" $ do
-  elClass "div" "p-4 bg-raised flex flex-row justify-between items-center border-b border-metaline relative" $ do
-    elClass "div" "flex flex-col" $ do
-      elClass "div" "font-karla font-bold text-h2 md:text-h1 text-copy leading-none" $ text "#Channel Name"
-      elClass "div" "mt-1 leading-none font-facit text-label text-light" $ do
-        text "543 members \x00b7 13 online"
-
-    elClass "div" "flex flex-row items-center" $ do
-      secondaryIconButton "" "search"
-      elClass "div" "" $ do
-        eClickMore <- secondaryIconButton "ml-2 md:hidden" "more_horiz"
-
-        dMoreOpen <- foldDyn ($) False $ not <$ eClickMore
-        let
-          mkMenuClasses b =
-            classList [ "absolute left-0 right-0 top-full p-4 md:hidden"
-                      , "tranform transition-all duration-150"
-                      , bool "pointer-events-none opacity-0" "pointer-events-auto opacity-100" b
-                      ]
-
-        elDynClass "div" (mkMenuClasses <$> dMoreOpen) $ do
-          elClass "div" "bg-white rounded p-4 shadow-button z-10" $ do
-            switchButton $ (def :: SwitchConfig t)
-              & switchConfig_label .~ "Notifications"
-              & switchConfig_icon .~ Just "notifications_none"
-              & switchConfig_disabled .~ pure True
-
-            elClass "div" "flex flex-row items-center mt-4" $ do
-              elClass "div" "font-icon leading-none text-icon text-copy mr-1 " $ text "person_outline"
-              elClass "div" "font-facit text-body text-copy" $ text "Members"
-
-  elClass "div" "flex-grow flex flex-col p-4" $ do
-    message $ MessageConfig $ pure False
-    message $ MessageConfig $ pure False
-    message $ MessageConfig $ pure True
-
-  elClass "div" "p-1 bg-white flex flex-row justify-center border-t border-metaline" $ do
-    secondaryIconButton "" "add"
-    _ <- inputElement $ def
-      & initialAttributes .~ ( "class" =: "focus:outline-none mx-1 font-facit font-label text-label placeholder-light px-3.5 bg-inset rounded shadow-input flex-grow"
-                               <> "placeholder" =: "Type your message"
-                               <> "type" =: "text"
-                             )
-    iconButton "send"
-    pure ()
-
 -- Surrounds view with header in a screen sized div, default for most pages
 appPage :: DomBuilder t m => m a -> m a
 appPage action = elClass "div" "w-screen h-screen bg-background flex flex-col" $ do
@@ -312,30 +191,9 @@ frontendBody = do
             pure (fmap Just loginFailed, fmap Just loginSuccess)
           pure cookie
         FrontendRoute_Main -> do
-          el "h1" $ text "Welcome to Obelisk!"
-          el "p" $ text $ T.pack commonStuff
-          -- `prerender` and `prerender_` let you choose a widget to run on the server
-          -- during prerendering and a different widget to run on the client with
-          -- JavaScript. The following will generate a `blank` widget on the server and
-          -- print "Hello, World!" on the client.
-          prerender_ blank $ liftJSM $ void $ eval ("console.log('Hello, World!')" :: T.Text)
-
-          el "div" $ do
-            exampleConfig <- getConfig "common/example"
-            case exampleConfig of
-              Nothing -> text "No config file found in config/common/example"
-              Just s -> text $ T.decodeUtf8 s
-          el "div" $ do
-            el "h1" $ text "The contents of this section depend on your authentication state"
-            pb <- getPostBuild
-            authenticateWithToken mAuthCookie $ do
-              el "p" $ text $ "You are authenticated."
-              logoutClick <- button "Log Out"
-              mRooms <- (maybeDyn =<<) $ watchView $ pure $ vessel V_Chatrooms . mapVMorphism (ChatroomQuery "")
-              _ <- dyn $ ffor mRooms $ \case
-                Nothing -> text "Getting rooms"
-                Just rooms -> dynText $ fmap (T.pack . show) rooms
-              pure $ Nothing <$ logoutClick
+          pb <- getPostBuild
+          setRoute $ FrontendRoute_Login :/ () <$ pb
+          pure never
         ) :: forall a. FrontendRoute a -> RoutedT t a (ExampleWidget t m) (Event t (Maybe (Signed (AuthToken Identity)))))
   -- Handle setting the cookies on auth change if we're running in the browser
   prerender_ (pure ()) $ do
