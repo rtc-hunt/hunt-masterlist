@@ -32,6 +32,9 @@ backend :: Backend BackendRoute FrontendRoute
 backend = Backend
   { _backend_run = \serve -> do
     csk <- CS.getKey "config/backend/clientSessionKey"
+    let checkToken t = do
+          let x = readSignedWithKey @(AuthToken Identity) csk t
+          pure x
     withDb "db" $ \db -> do
       runNoLoggingT $ runDb (Identity db) $ do
         tables <- getTableAnalysis
@@ -41,8 +44,8 @@ backend = Backend
       (listen, _) <- liftIO $ serveDbOverWebsockets
         (coerce db)
         (requestHandler db csk)
-        (\nm q -> fmap (fromMaybe emptyV) $ mapDecomposedV (handleAuthMapQuery (pure . (readSignedWithKey @(AuthToken Identity) csk)) (notifyHandler db nm)) q)
-        (QueryHandler $ \q -> fromMaybe emptyV <$> mapDecomposedV (handleAuthMapQuery (pure . (readSignedWithKey @(AuthToken Identity) csk)) (privateQueryHandler db)) q)
+        (\nm q -> fmap (fromMaybe emptyV) $ mapDecomposedV (handleAuthMapQuery checkToken (notifyHandler db nm)) q)
+        (QueryHandler $ \q -> fromMaybe emptyV <$> mapDecomposedV (handleAuthMapQuery checkToken (privateQueryHandler db)) q)
         vesselFromWire
         vesselPipeline
       serve $ \case
