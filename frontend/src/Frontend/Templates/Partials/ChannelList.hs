@@ -60,17 +60,17 @@ channelList (ChannelListConfig headerClasses useH2) = do
       header $ def
         & headerConfig_header .~ "Channels"
       iconButton "add"
-    channelSearch <- searchbar "Search for a channel"
+    channelSearch <- searchbar "Search for a channel, or create a new one"
     mRooms <- (maybeDyn . fmap (completeMapOf =<<) =<<) $ watchView $ fmap (\q -> vessel V_Chatrooms . mapVMorphism (ChatroomQuery q)) $
       _searchbarOutput_query channelSearch
 
-    elClass "div" "mt-8 font-facit text-h2 text-copy" $ text "Recent channels"
+    elClass "div" "mt-8 font-facit text-h2 text-copy" $ text "Search results"
 
     channelClick <- (switchHold never =<<) $ dyn $ ffor mRooms $ \case
       Nothing -> pure never
       Just rooms -> switchDyn . fmap mergeMap <$> list rooms channelItem
 
-    fmap fanEither . requestingIdentity . ffor (tag (current (_searchbarOutput_query channelSearch)) createClick) $ \newName ->
+    _ <- fmap fanEither . requestingIdentity . ffor (tag (current (_searchbarOutput_query channelSearch)) createClick) $ \newName ->
       ApiRequest_Private () $ PrivateRequest_CreateChatroom newName
 
     setRoute $ fforMaybe channelClick $ \clicks -> ffor (Map.minViewWithKey clicks) $ \((k,_),_) ->
@@ -86,7 +86,6 @@ channelList (ChannelListConfig headerClasses useH2) = do
         elClass "div" "text-copy" $ text "Sky"
         elClass "div" "text-light" $ text "soquinn@obsidian.systems"
 
-      secondaryIconButton "" "settings"
     secondaryButton "mt-4" "Logout"
   where
     header = bool h1 h2 useH2
