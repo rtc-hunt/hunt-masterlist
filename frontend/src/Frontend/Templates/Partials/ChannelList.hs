@@ -61,11 +61,11 @@ channelList (ChannelListConfig headerClasses useH2) = do
         & headerConfig_header .~ "Channels"
       iconButton "add"
     channelSearch <- searchbar "Search for a channel, or create a new one"
-    mRooms <- (maybeDyn . fmap (completeMapOf =<<) =<<) $ watchView $ fmap (\q -> vessel V_Chatrooms . mapVMorphism (ChatroomQuery q)) $
-      _searchbarOutput_query channelSearch
 
     elClass "div" "mt-8 font-facit text-h2 text-copy" $ text "Search results"
 
+    mRooms <- (maybeDyn . fmap (completeMapOf =<<) =<<) $ watchView $ fmap (\q -> vessel V_Chatrooms . mapVMorphism (ChatroomQuery q)) $
+      _searchbarOutput_query channelSearch
     channelClick <- (switchHold never =<<) $ dyn $ ffor mRooms $ \case
       Nothing -> pure never
       Just rooms -> switchDyn . fmap mergeMap <$> list rooms channelItem

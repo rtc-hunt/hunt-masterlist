@@ -67,9 +67,9 @@ notifyHandler db nm v = case _dbNotification_message nm of
     runNoLoggingT $ do
       let messageId = mid
       msgs :: [(Id Chatroom, UTCTime, Text, Text)] <- runDb (Identity db) $ [queryQ|
-        select m.chatroom, m.timestamp at time zone 'utc', a.email, m.text
-        from Message m
-        join Account a on m.account = a.id
+        select m.chatroom, m.timestamp at time zone 'utc', a.account_email, m.text
+        from "Message" m
+        join "Account" a on m.account = a.id
         where m.id = ?messageId
       |]
       case msgs of
@@ -77,8 +77,8 @@ notifyHandler db nm v = case _dbNotification_message nm of
         (cid, time, acc, txt):_ -> buildV v $ \case
           V_Messages -> \(MapV cs) -> do
             if Map.member cid cs
-            then pure $ MapV $ Map.singleton cid $ pure $ SemiMap_Partial $ Map.singleton time $ First $ Just $
-              [MsgView { _msgView_handle = acc , _msgView_text = txt }]
+            then pure $ MapV $ Map.singleton cid $ pure $ SemiMap_Partial $ Map.singleton (time, mid) $ First $ Just $
+              (MsgView { _msgView_handle = acc , _msgView_text = txt })
             else pure emptyV
           V_Chatroom -> const $ pure emptyV
           V_Chatrooms -> const $ pure emptyV

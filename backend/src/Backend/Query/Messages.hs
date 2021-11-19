@@ -13,15 +13,19 @@ import Rhyolite.SemiMap
 import Common.Schema
 import Common.View
 
-getMessages :: Db m => Set (Id Chatroom) -> m (MonoidalMap (Id Chatroom) (SemiMap UTCTime [MsgView]))
+getMessages :: Db m => Set (Id Chatroom) -> m (MonoidalMap (Id Chatroom) (SemiMap (UTCTime, Id Message) MsgView))
 getMessages cs = do
   let chatrooms = In $ Set.toList cs
-  results :: [(Id Chatroom, UTCTime, Text, Text)] <- [queryQ|
-    select m.chatroom, m.timestamp, m.text, a.email
+  results :: [(Id Chatroom, UTCTime, Id Message, Text, Text)] <- [queryQ|
+    select m.chatroom, m.timestamp at time zone 'utc', m.id, m.text, a.account_email
     from "Message" m
     join "Account" a on a.id = m.account
     where m.chatroom in ?chatrooms
   |]
-  pure $ fmap SemiMap_Complete $ Map.unionsWith (<>) $
-    flip fmap results $ \(cid, t, m, e) ->
-      Map.singleton cid $ Map.singleton t [MsgView m e]
+  -- The `unionWith const` is safe because `mid` is a primary key
+  pure $ fmap SemiMap_Complete $ Map.unionsWith (Map.unionWith const) $
+    flip fmap results $ \(cid, t, mid, messageBody, senderHandle) ->
+      Map.singleton cid $ Map.singleton (t, mid) $ MsgView
+        { _msgView_handle = senderHandle
+        , _msgView_text = messageBody
+        }

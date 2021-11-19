@@ -45,7 +45,7 @@ instance FromJSONKey ChatroomQuery
 data V a where
   V_Chatrooms :: V (MapV ChatroomQuery (SemiMap (Id Chatroom) Text))
   V_Chatroom :: V (MapV (Id Chatroom) (First Text))
-  V_Messages :: V (MapV (Id Chatroom) (SemiMap UTCTime [MsgView]))
+  V_Messages :: V (MapV (Id Chatroom) (SemiMap (UTCTime, Id Message) MsgView))
 
 deriveArgDict ''V
 deriveJSONGADT ''V

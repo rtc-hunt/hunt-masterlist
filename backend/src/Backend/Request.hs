@@ -67,4 +67,3 @@ requestHandler db csk = RequestHandler $ \case
       Left err -> pure $ Left err
       Right aid ->
         Right <$> signWithKey csk aid
- where
