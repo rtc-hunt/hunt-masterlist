@@ -21,6 +21,7 @@ library
                , lens
   exposed-modules:
     Frontend
+    Frontend.JS.Window
     Frontend.Templates.Helpers.Authentication
     Frontend.Templates.Partials.Common
     Frontend.Templates.Partials.Header

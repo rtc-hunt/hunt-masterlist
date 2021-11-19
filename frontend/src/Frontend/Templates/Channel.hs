@@ -30,6 +30,7 @@ import Common.Route
 import Common.Schema
 import Common.View
 
+import Frontend.JS.Window
 import Frontend.Templates.Partials.Buttons
 import Frontend.Templates.Partials.ChannelList
 import Frontend.Templates.Partials.Headers
@@ -106,13 +107,18 @@ channelInterior cid = elClass "div" "w-full flex flex-col" $ do
               elClass "div" "font-icon leading-none text-icon text-copy mr-1 " $ text "person_outline"
               elClass "div" "font-facit text-body text-copy" $ text "Members"
 
+  -- Not the appropriate place for it but this is just an example after all :)
+  myWindowSize <- fmap join $ prerender (pure (pure (4000,4000))) $ do
+    window <- askDomWindow
+    windowSize window
+
   mMessages <- (maybeDyn . fmap (completeMapOf =<<) =<<) $ watchView $ fmap (\c -> vessel V_Messages . mapVMorphism c) cid
   elClass "div" "flex-grow flex flex-col p-4" $ dyn $ ffor mMessages $ \case
     Nothing -> pure ()
     Just ms -> do
       let messageViewConfig = MessageViewConfig
             { _messageViewConfig_minimumItemHeight = 60
-            , _messageViewConfig_windowSize = pure (800, 600)
+            , _messageViewConfig_windowSize = myWindowSize
             , _messageViewConfig_messages = ms
             }
       -- Stubbing out the design which distinguishes between the current user's messages and
