@@ -123,10 +123,12 @@ channelInterior cid = elClass "div" "w-full flex flex-col" $ do
                                  )
           & inputElementConfig_setValue .~ ("" <$ sendMessage)
         sendClick <- iconButton "send"
-        let sendEnter = fmapMaybe (\w -> guard (w==13) >> pure ()) $ domEvent Keypress (_inputElement_element inputBox)
-            sendMessage = leftmost [sendClick, sendEnter]
-    let newMessage = value inputBox
-    _ <- fmap fanEither . requestingIdentity . ffor (tag (current ((,) <$> cid <*> newMessage)) sendMessage) $ \(c, payload) ->
+        let newMessage = value inputBox
+            sendEnter = fmapMaybe (\w -> guard (w==13) >> pure ()) $
+              domEvent Keypress (_inputElement_element inputBox)
+            sendMessage = fmapMaybe (\r@(_, m) -> guard (not (T.null m)) >> pure r) $
+              tag (current ((,) <$> cid <*> newMessage)) $ leftmost [sendClick, sendEnter]
+    _ <- fmap fanEither . requestingIdentity $ ffor sendMessage $ \(c, payload) ->
       ApiRequest_Private () $ PrivateRequest_SendMessage c payload
     pure ()
 
