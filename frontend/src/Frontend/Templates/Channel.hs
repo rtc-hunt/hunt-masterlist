@@ -33,6 +33,7 @@ import Common.View
 import Frontend.Templates.Partials.Buttons
 import Frontend.Templates.Partials.ChannelList
 import Frontend.Templates.Partials.Headers
+import Frontend.Templates.Partials.MessageView
 import Frontend.Templates.Partials.Switch
 
 import Frontend.Utils
@@ -109,9 +110,14 @@ channelInterior cid = elClass "div" "w-full flex flex-col" $ do
   elClass "div" "flex-grow flex flex-col p-4" $ dyn $ ffor mMessages $ \case
     Nothing -> pure ()
     Just ms -> do
+      let messageViewConfig = MessageViewConfig
+            { _messageViewConfig_minimumItemHeight = 60
+            , _messageViewConfig_windowSize = pure (800, 600)
+            , _messageViewConfig_messages = ms
+            }
       -- Stubbing out the design which distinguishes between the current user's messages and
       -- messages from other people.
-      listWithKey ms (message (MessageConfig { _messageConfig_viewer = pure True }))
+      _ <- messageView messageViewConfig (message (MessageConfig { _messageConfig_viewer = pure True }))
       pure ()
 
   elClass "div" "p-1 bg-white flex flex-row justify-center border-t border-metaline" $ do
@@ -151,7 +157,7 @@ message
   -> Dynamic t MsgView
   -> m ()
 message (MessageConfig dViewer) (sendTime, _) mView = do
-  elDynClass "div" (mkClasses <$> dViewer) $ do
+  elDynClass "li" (mkClasses <$> dViewer) $ do
     elClass "div" "flex flex-row items-baseline justify-between" $ do
       elClass "div" "text-label md:mr-4" $ dynText (fmap _msgView_handle mView)
       elClass "div" "font-bold text-label text-light" $ text $ T.pack $

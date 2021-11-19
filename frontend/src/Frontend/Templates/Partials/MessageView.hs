@@ -12,13 +12,14 @@ import GHCJS.DOM.Types (MonadJSM, JSM, uncheckedCastTo, HTMLElement(..))
 import Language.Javascript.JSaddle (eval, call, makeArgs, toJSVal)
 import Reflex.Dom.Core
 
-data MessageViewConfig t k = MessageViewConfig
+data MessageViewConfig t k a = MessageViewConfig
   { _messageViewConfig_minimumItemHeight :: Int
   -- ^ In pixels; used to estimate number of visible messages
   , _messageViewConfig_windowSize :: Dynamic t (Int, Int)
   -- ^ Width and height in pixels, used as an overestimate of the size
   -- of the visible client area of the message list since we don't
   -- have a binding to the ResizeObserver API.
+  , _messageViewConfig_messages :: Dynamic t (Map k a)
   }
 
 -- | Only used in the Client view of the message list
@@ -28,10 +29,8 @@ data MessageViewState t m = MessageViewState
   -- needs to be managed.
   }
 
-data MessageViewOutput t k a = MessageViewOutput
-  { _messageViewOutput_messageOutputs :: Dynamic t (Map k a)
-  -- ^ The states of the message outputs in the current list.
-  , _messageViewOutput_viewportEstimate :: Dynamic t Int
+data MessageViewOutput t = MessageViewOutput
+  { _messageViewOutput_viewportEstimate :: Dynamic t Int
   -- ^ In # of messages. Tries to be an overestimate of how many messages can fit in the visible client area.
   , _messageViewOutput_scrollNearTop :: Event t ()
   -- ^ Fires when the user has scrolled close to the top of the total content in the message list.
@@ -40,28 +39,27 @@ data MessageViewOutput t k a = MessageViewOutput
   }
 
 emptyMessageViewOutput
-  :: (Reflex t, Ord k)
-  => MessageViewOutput t k a
+  :: (Reflex t)
+  => MessageViewOutput t
 emptyMessageViewOutput = MessageViewOutput
-  { _messageViewOutput_messageOutputs = pure mempty
-  , _messageViewOutput_viewportEstimate = pure 24 -- Sure, why not.
+  { _messageViewOutput_viewportEstimate = pure 24 -- Sure, why not.
   , _messageViewOutput_scrollNearTop = never
   , _messageViewOutput_jumpToBottom = never
   }
 
 messageView
   :: (DomBuilder t m, Prerender js t m, Ord k)
-  => MessageViewConfig t k
-  -> (k -> v -> Event t v -> Client m a)
-  -> m (MessageViewOutput t k a)
+  => MessageViewConfig t k v
+  -> (k -> Dynamic t v -> Client m ())
+  -> m (MessageViewOutput t)
 messageView cfg messageWidget = do
   let listAttrs = Map.fromList
         [ ("class", {- TODO -} "")
         , ("style", "overflow-anchor: none") -- We want to manage the scroll behavior ourselves
         ]
-  dOut <- elClass "div" {- TODO -} "" $ prerender (pure emptyMessageViewOutput) $ do
-    (listEl, m) <- elAttr' "ul" listAttrs $ do
-      listWithKeyShallowDiff mempty never {- TODO -} $ messageWidget
+  dOut <- elClass "div" "flex-grow flex flex-col p-4" $ prerender (pure emptyMessageViewOutput) $ do
+    (listEl, _) <- elAttr' "ul" listAttrs $ do
+      listWithKey (_messageViewConfig_messages cfg) $ messageWidget
     let st = MessageViewState
                { _messageViewState_listEl = listEl
                }
@@ -70,22 +68,20 @@ messageView cfg messageWidget = do
     messageViewResizeHelper cfg st
     scrollNearTop <- messageViewScrollHelper cfg st
     pure $ MessageViewOutput
-      { _messageViewOutput_messageOutputs = m
-      , _messageViewOutput_viewportEstimate = ffor windowHeight $ \wh ->
+      { _messageViewOutput_viewportEstimate = ffor windowHeight $ \wh ->
         (wh `quot` (_messageViewConfig_minimumItemHeight cfg) * 2) + 1
       , _messageViewOutput_scrollNearTop = scrollNearTop
       , _messageViewOutput_jumpToBottom = jumpToBottom
       }
   pure $ MessageViewOutput
-    { _messageViewOutput_messageOutputs = join $ fmap _messageViewOutput_messageOutputs dOut
-    , _messageViewOutput_viewportEstimate = join $ fmap _messageViewOutput_viewportEstimate dOut
+    { _messageViewOutput_viewportEstimate = join $ fmap _messageViewOutput_viewportEstimate dOut
     , _messageViewOutput_scrollNearTop = switchDyn $ fmap _messageViewOutput_scrollNearTop dOut
     , _messageViewOutput_jumpToBottom = switchDyn $ fmap _messageViewOutput_jumpToBottom dOut
     }
 
 messageViewScrollHelper
   :: (Reflex t, Monad m)
-  => MessageViewConfig t k
+  => MessageViewConfig t k a
   -> MessageViewState t (Client m)
   -> m (Event t ())
 messageViewScrollHelper cfg st = do
@@ -110,7 +106,7 @@ messageViewJumpToBottomHelper state jumpE = do
 
 messageViewResizeHelper
   :: (Reflex t, MonadFix m, MonadJSM (Performable m), PerformEvent t m, MonadHold t m, DomBuilderSpace m ~ GhcjsDomSpace)
-  => MessageViewConfig t k
+  => MessageViewConfig t k a
   -> MessageViewState t m
   -> m ()
 messageViewResizeHelper cfg state = do
