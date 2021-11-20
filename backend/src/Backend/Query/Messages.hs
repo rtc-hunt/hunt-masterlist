@@ -22,10 +22,18 @@ getMessages cs = do
     join "Account" a on a.id = m.account
     where m.chatroom in ?chatrooms
   |]
-  -- The `unionWith const` is safe because `mid` is a primary key
-  pure $ fmap SemiMap_Complete $ Map.unionsWith (Map.unionWith const) $
-    flip fmap results $ \(cid, t, mid, messageBody, senderHandle) ->
-      Map.singleton cid $ Map.singleton (t, mid) $ MsgView
-        { _msgView_handle = senderHandle
-        , _msgView_text = messageBody
-        }
+  let responseTemplate = Map.fromSet (const (SemiMap_Complete Map.empty)) cs
+      responseValues = fmap SemiMap_Complete $
+        -- The `unionWith const` is safe because `mid` is a primary key
+        Map.unionsWith (Map.unionWith const) $
+          flip fmap results $ \(cid, t, mid, messageBody, senderHandle) ->
+            Map.singleton cid $ Map.singleton (t, mid) $ MsgView
+              { _msgView_handle = senderHandle
+              , _msgView_text = messageBody
+              }
+  pure $
+    -- The sql query will not return results for empty channels. We ensure that
+    -- queries for the contents of those channels also receive a response
+    -- letting them know that the channel is empty (i.e., by sending
+    -- 'SemiMap_Complete Map.empty')
+    Map.unionWith const responseValues responseTemplate
