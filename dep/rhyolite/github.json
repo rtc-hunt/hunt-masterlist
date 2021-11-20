@@ -1,8 +1,8 @@
 {
   "owner": "obsidiansystems",
   "repo": "rhyolite",
-  "branch": "mh/fix-handle-auth",
+  "branch": "release/2021-11-18",
   "private": false,
-  "rev": "dbffc918ef5137c4cad2a962c66b4122537674c9",
+  "rev": "d7cf8bc600b2ef150a7c32dfa84b2651d70d6903",
   "sha256": "0zimsf1ghkb24a6265r6slyyf6yhp59lla8ip4brfjhv82p8p0c3"
 }
