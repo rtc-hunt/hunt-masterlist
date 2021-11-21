@@ -53,9 +53,9 @@ channel
      )
   => Dynamic t (Id Chatroom)
   -> m (Event t ())
-channel cid = elClass "div" "w-screen h-screen bg-background flex flex-col" $ do
+channel cid = elClass "div" "w-screen h-screen bg-background flex flex-col overflow-hidden" $ do
   header True
-  elClass "div" "w-full flex flex-row flex-grow" $ do
+  elClass "div" "w-full flex flex-row flex-grow h-0" $ do
     click <- elClass "div" "flex-shrink-0 w-1/4 h-full flex-col bg-sunken hidden md:flex border-r border-metaline" $
       channelList $ def & channelListConfig_useH2 .~ True
     channelInterior cid
@@ -113,7 +113,7 @@ channelInterior cid = elClass "div" "w-full flex flex-col" $ do
     windowSize window
 
   mMessages <- (maybeDyn . fmap (completeMapOf =<<) =<<) $ watchView $ fmap (\c -> vessel V_Messages . mapVMorphism c) cid
-  elClass "div" "flex-grow flex flex-col p-4" $ dyn $ ffor mMessages $ \case
+  elClass "div" "flex-grow flex flex-col p-4 overflow-y-auto" $ dyn $ ffor mMessages $ \case
     Nothing -> pure ()
     Just ms -> do
       let messageViewConfig = MessageViewConfig
