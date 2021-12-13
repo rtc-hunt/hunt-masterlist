@@ -66,19 +66,27 @@ notifyHandler db nm v = case _dbNotification_message nm of
   Notify_Message :/ mid -> do
     runNoLoggingT $ do
       let messageId = mid
-      msgs :: [(Id Chatroom, UTCTime, Text, Text)] <- runDb (Identity db) $ [queryQ|
-        select m.chatroom, m.timestamp at time zone 'utc', a.account_email, m.text
-        from "Message" m
+      msgs :: [(Id Chatroom, Int, UTCTime, Text, Text)] <- runDb (Identity db) $ [queryQ|
+        select m.chatroom, m.mseq, m.timestamp at time zone 'utc', a.account_email, m.text
+        from (select *, row_number() over (partition by m.chatroom) as mseq from "Message" m) as m
         join "Account" a on m.account = a.id
         where m.id = ?messageId
       |]
       case msgs of
         [] -> pure emptyV
-        (cid, time, acc, txt):_ -> buildV v $ \case
-          V_Messages -> \(MapV cs) -> do
-            if Map.member cid cs
-            then pure $ MapV $ Map.singleton cid $ pure $ SemiMap_Partial $ Map.singleton (time, mid) $ First $ Just $
-              (MsgView { _msgView_handle = acc , _msgView_text = txt })
-            else pure emptyV
+        (cid, mseq, time, acc, txt):_ -> buildV v $ \case
+          V_Messages -> \sv ->
+            let msg = Identity . SemiMap_Partial . Map.singleton (time, mid) . First . Just $
+                  MsgView
+                    { _msgView_sequence = mseq
+                    , _msgView_handle = acc
+                    , _msgView_text = txt }
+            in case lookupSubVessel cid sv of
+              Nothing -> pure emptyV
+              Just (MapV reqs) -> pure . singletonSubVessel cid . MapV $
+                flip Map.mapMaybeWithKey reqs $ \ri _ ->
+                  if inRequestInterval ri mseq
+                    then Just msg
+                    else Nothing
           V_Chatroom -> const $ pure emptyV
           V_Chatrooms -> const $ pure emptyV

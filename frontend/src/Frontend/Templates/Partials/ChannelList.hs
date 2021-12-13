@@ -57,7 +57,7 @@ channelList
 channelList (ChannelListConfig headerClasses useH2) = do
   elClass "div" "flex-grow p-4" $ do
     createClick <- elClass "div" (classList ["w-full flex flex-row items-center justify-between", headerClasses]) $ do
-      header $ def
+      header' $ def
         & headerConfig_header .~ "Channels"
       iconButton "add"
     channelSearch <- searchbar "Search for a channel, or create a new one"
@@ -88,7 +88,7 @@ channelList (ChannelListConfig headerClasses useH2) = do
 
     secondaryButton "mt-4" "Logout"
   where
-    header = bool h1 h2 useH2
+    header' = bool h1 h2 useH2
 
 channelItem
   :: ( DomBuilder t m

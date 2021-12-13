@@ -12,6 +12,7 @@ import Common.Schema
 data PrivateRequest a where
   PrivateRequest_SendMessage :: Id Chatroom -> Text -> PrivateRequest (Either Text ())
   PrivateRequest_CreateChatroom :: Text -> PrivateRequest (Either Text (Id Chatroom))
+  PrivateRequest_LatestMessage :: Id Chatroom -> PrivateRequest (Either Text (Id Chatroom, Int))
 
 data PublicRequest a where
   PublicRequest_Login :: Text -> Text -> PublicRequest (Either Text (Signed (AuthToken Identity)))

@@ -170,7 +170,7 @@ frontendBody = do
   -- this function has the proper higher rank type.
       authChange <- fmap switchDyn $ subRoute $ ((\case
         FrontendRoute_Channels -> authenticateWithToken mAuthCookie $ do
-          appPage $ channelList $ def
+          _ <- appPage $ channelList $ def
             & channelListConfig_headerClasses .~ "mt-6"
           pure never
         FrontendRoute_Channel -> authenticateWithToken mAuthCookie $ do

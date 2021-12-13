@@ -5,6 +5,7 @@ import Data.Functor.Identity
 import qualified Data.Map.Monoidal as Map
 import Data.Pool
 import Data.Vessel
+import Data.Vessel.SubVessel
 import Database.PostgreSQL.Simple
 import Rhyolite.Backend.DB
 
@@ -21,5 +22,7 @@ privateQueryHandler db q = buildV q $ \case
     pure $ MapV $ pure <$> chatrooms
   V_Chatroom -> \(MapV cs) -> do
     MapV . fmap pure <$> runNoLoggingT (runDb (Identity db) $ getChatrooms $ Map.keysSet cs)
-  V_Messages -> \(MapV cs) -> do
-    MapV . fmap pure <$> runNoLoggingT (runDb (Identity db) $ getMessages $ Map.keysSet cs)
+  V_Messages -> \sv -> do
+    rs <- runNoLoggingT $ runDb (Identity db) $
+      getMessages . fmap (Map.keysSet . unMapV) . getSubVessel $ sv
+    pure $ mkSubVessel . fmap (MapV . fmap Identity) $ rs

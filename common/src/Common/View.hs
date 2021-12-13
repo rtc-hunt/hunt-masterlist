@@ -18,13 +18,14 @@ import Data.Time
 import Data.Vessel
 import Rhyolite.SemiMap
 import Data.GADT.Compare.TH
-import GHC.Generics
+import GHC.Generics hiding (from)
 import Data.Semigroup
 
 import Common.Schema
 
 data MsgView = MsgView
-  { _msgView_handle :: Text
+  { _msgView_sequence :: Int
+  , _msgView_handle :: Text
   , _msgView_text :: Text
   }
   deriving (Show, Generic, Eq)
@@ -42,10 +43,24 @@ instance FromJSON ChatroomQuery
 instance ToJSONKey ChatroomQuery
 instance FromJSONKey ChatroomQuery
 
+data RequestInterval = RequestInterval { _requestInterval_point :: Int
+                                       , _requestInterval_before :: Int
+                                       , _requestInterval_after :: Int
+                                       }
+  deriving (Show, Read, Eq, Ord, Generic)
+
+instance ToJSON RequestInterval
+instance ToJSONKey RequestInterval
+instance FromJSON RequestInterval
+instance FromJSONKey RequestInterval
+
+inRequestInterval :: RequestInterval -> Int -> Bool
+inRequestInterval (RequestInterval point before after) n = point - before <= n && n <= point + after
+
 data V a where
   V_Chatrooms :: V (MapV ChatroomQuery (SemiMap (Id Chatroom) Text))
   V_Chatroom :: V (MapV (Id Chatroom) (First Text))
-  V_Messages :: V (MapV (Id Chatroom) (SemiMap (UTCTime, Id Message) MsgView))
+  V_Messages :: V (SubVessel (Id Chatroom) (MapV RequestInterval (SemiMap (UTCTime, Id Message) MsgView)))
 
 deriveArgDict ''V
 deriveJSONGADT ''V

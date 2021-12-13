@@ -9,6 +9,7 @@ import Rhyolite.Api
 import Rhyolite.Backend.Account (login, ensureAccountExists, setAccountPassword)
 import Rhyolite.Backend.App
 import Rhyolite.Backend.DB
+import Rhyolite.Backend.DB.PsqlSimple
 import Rhyolite.Backend.Listen
 import Rhyolite.Backend.Sign
 import Rhyolite.Sign
@@ -48,6 +49,12 @@ requestHandler db csk = RequestHandler $ \case
           { _chatroom_title = newName
           }
         pure $ Right cId
+      PrivateRequest_LatestMessage cid -> auth $ \_ -> runNoLoggingT $ runDb (Identity db) $ do
+        res <- [queryQ| select count(*) from "Message" m where m.chatroom = ?cid |]
+        case res of
+          [Only n] -> pure . Right $ (cid, n)
+          _ -> pure . Left $ "PrivateRequest_LatestMessage: got more than one row"
+
   ApiRequest_Public (PublicRequest_Login user pass) -> do
     loginResult <- runNoLoggingT $ runDb (Identity db) $ login pure user pass
     case loginResult of
