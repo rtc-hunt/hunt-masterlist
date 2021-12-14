@@ -21,6 +21,12 @@ library
                -- Views
                , rhyolite-datastructures
                , vessel
+               -- Auth
+               , constraints
+               , some
+               , reflex
+               , witherable
+               , patch
   exposed-modules:
     Common.Api
     Common.Route

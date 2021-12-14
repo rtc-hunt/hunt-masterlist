@@ -46,8 +46,8 @@ instance HasNotification Notify Message where
 notifyHandler
   :: Pool Connection
   -> DbNotification Notify
-  -> ChatV Proxy
-  -> IO (ChatV Identity)
+  -> PrivateChatV Proxy
+  -> IO (PrivateChatV Identity)
 notifyHandler db nm v = case _dbNotification_message nm of
   Notify_Account :/ _ -> pure emptyV
   Notify_Chatroom :/ cid -> buildV v $ \case
@@ -55,11 +55,11 @@ notifyHandler db nm v = case _dbNotification_message nm of
       results :: Map.MonoidalMap ChatroomQuery (SemiMap (Id Chatroom) Text) <- runNoLoggingT $ runDb (Identity db) $ searchForChatroom $ Map.keysSet queries
       pure $ if Map.null results
         then emptyV
-        else MapV $ Identity <$> results
+        else MapV $ pure <$> results
     V_Chatroom -> \(MapV cs) -> if Map.member cid cs
       then runNoLoggingT $ runDb (Identity db) (get $ fromId cid) >>= pure . \case
         Nothing -> emptyV
-        Just c -> MapV $ Map.singleton cid $ Identity (First (_chatroom_title c))
+        Just c -> MapV $ Map.singleton cid $ pure (First (_chatroom_title c))
       else pure emptyV
     V_Messages -> const $ pure emptyV
   Notify_Message :/ mid -> do
@@ -76,7 +76,7 @@ notifyHandler db nm v = case _dbNotification_message nm of
         (cid, time, acc, txt):_ -> buildV v $ \case
           V_Messages -> \(MapV cs) -> do
             if Map.member cid cs
-            then pure $ MapV $ Map.singleton cid $ Identity $ SemiMap_Partial $ Map.singleton time $ First $ Just $
+            then pure $ MapV $ Map.singleton cid $ pure $ SemiMap_Partial $ Map.singleton time $ First $ Just $
               [MsgView { _msgView_handle = acc , _msgView_text = txt }]
             else pure emptyV
           V_Chatroom -> const $ pure emptyV

@@ -17,14 +17,9 @@ data PrivateRequest a where
 
 data PublicRequest a where
   PublicRequest_Login :: Text -> Text -> PublicRequest (Either Text (Signed (AuthToken Identity)))
-
-data Request token a where
-  Request_Private :: token -> PrivateRequest a -> Request token a
-  Request_Public :: PublicRequest a -> Request token a
+  PublicRequest_SignUp :: Text -> Text -> PublicRequest (Either Text (Signed (AuthToken Identity)))
 
 deriveArgDict ''PrivateRequest
 deriveJSONGADT ''PrivateRequest
 deriveArgDict ''PublicRequest
 deriveJSONGADT ''PublicRequest
-deriveArgDict ''Request
-deriveJSONGADT ''Request

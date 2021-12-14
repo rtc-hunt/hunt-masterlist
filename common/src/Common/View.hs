@@ -1,3 +1,13 @@
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE QuantifiedConstraints #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TypeApplications #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module Common.View where
 
 import Data.Aeson
@@ -37,9 +47,14 @@ data V a where
   V_Chatroom :: V (MapV (Id Chatroom) (First Text))
   V_Messages :: V (MapV (Id Chatroom) (SemiMap UTCTime [MsgView]))
 
-type ChatV a = Vessel V a
-
 deriveArgDict ''V
 deriveJSONGADT ''V
 deriveGEq ''V
 deriveGCompare ''V
+
+type PrivateChatV = Vessel V
+
+{-
+-- TODO ORPHAN
+instance Additive (g (f x)) => Additive (Compose g f x)
+-}

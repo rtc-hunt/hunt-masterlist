@@ -10,7 +10,9 @@ library
                , obelisk-frontend
                , obelisk-route
                , jsaddle
+               , ghcjs-dom
                , reflex-dom-core
+               , rhyolite-frontend
                , obelisk-executable-config-lookup
                , obelisk-generated-static
                , text
