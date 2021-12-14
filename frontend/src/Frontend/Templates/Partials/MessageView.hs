@@ -68,7 +68,7 @@ messageView
   -> m (MessageViewOutput t)
 messageView cfg messageWidget = do
   let listAttrs = Map.fromList
-        [ ("class", "flex-grow flex flex-col overflow-y-scroll")
+        [ ("class", "p-4 flex-grow flex flex-col overflow-y-scroll")
         -- , ("style", "overflow-anchor: none") -- We want to manage the scroll behavior ourselves
         ]
   dOut <- prerender (pure emptyMessageViewOutput) $ do
