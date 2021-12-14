@@ -117,7 +117,7 @@ channelInterior cid = elClass "div" "w-full flex flex-col" $ do
         windowSize window
 
       mMessages <- (maybeDyn . fmap (completeMapOf =<<) =<<) . watchView . constDyn $ vessel V_Messages . subVessel cid' . mapVMorphism (RequestInterval latest 100 100)
-      elClass "div" "flex-grow flex flex-col p-4 overflow-y-auto" $ dyn $ ffor mMessages $ \case
+      dyn $ ffor mMessages $ \case
         Nothing -> pure ()
         Just ms -> do
           let messageViewConfig = MessageViewConfig

@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecursiveDo #-}
 module Frontend.Templates.Partials.MessageView where
 
 import Control.Monad
@@ -9,7 +10,7 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified GHCJS.DOM.Element as El
 import GHCJS.DOM.Types (MonadJSM, JSM, uncheckedCastTo, HTMLElement(..))
-import Language.Javascript.JSaddle (eval, call, makeArgs, toJSVal)
+import Language.Javascript.JSaddle (eval, call, makeArgs, toJSVal, liftJSM)
 import Reflex.Dom.Core
 
 data MessageViewConfig t k a = MessageViewConfig
@@ -47,6 +48,19 @@ emptyMessageViewOutput = MessageViewOutput
   , _messageViewOutput_jumpToBottom = never
   }
 
+scrollRenderHook :: (MonadJSM m, El.IsElement (RawElement d)) => Element er d t -> m a -> m a
+scrollRenderHook container domAction = do
+  let e = _element_raw container
+  h0 <- El.getScrollHeight e
+  t0 <- El.getScrollTop e
+  liftJSM . eval $ "console.log(\"" <> show (h0, t0) <> "\")"
+  result <- domAction
+  h <- El.getScrollHeight e
+  El.setScrollTop e h
+  t1 <- El.getScrollTop e
+  liftJSM . eval $ "console.log(\"" <> show (h, t1) <> "\")"
+  return result
+
 messageView
   :: (DomBuilder t m, Prerender js t m, Ord k)
   => MessageViewConfig t k v
@@ -54,12 +68,12 @@ messageView
   -> m (MessageViewOutput t)
 messageView cfg messageWidget = do
   let listAttrs = Map.fromList
-        [ ("class", {- TODO -} "")
-        , ("style", "overflow-anchor: none") -- We want to manage the scroll behavior ourselves
+        [ ("class", "flex-grow flex flex-col overflow-y-scroll")
+        -- , ("style", "overflow-anchor: none") -- We want to manage the scroll behavior ourselves
         ]
-  dOut <- elClass "div" "flex-grow flex flex-col p-4" $ prerender (pure emptyMessageViewOutput) $ do
-    (listEl, _) <- elAttr' "ul" listAttrs $ do
-      listWithKey (_messageViewConfig_messages cfg) $ messageWidget
+  dOut <- prerender (pure emptyMessageViewOutput) $ do
+    rec (listEl, _) <- elAttr' "ul" listAttrs . withRenderHook (scrollRenderHook listEl) $ do
+          listWithKey (_messageViewConfig_messages cfg) $ messageWidget
     let st = MessageViewState
                { _messageViewState_listEl = listEl
                }
