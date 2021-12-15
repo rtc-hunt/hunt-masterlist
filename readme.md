@@ -2,7 +2,7 @@
 
 ## Getting Started
 
-Make sure that Obelisk [https://github.com/obsidiansystems/obelisk] is installed on your machine.
+Make sure that [Obelisk](https://github.com/obsidiansystems/obelisk) is installed on your machine.
 
 You should be able to `ob run` from the root directory of the project, which should start a webserver
 accessible from `http://localhost:8000/` in Chrome.
