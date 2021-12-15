@@ -10,7 +10,7 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified GHCJS.DOM.Element as El
 import GHCJS.DOM.Types (MonadJSM, JSM, uncheckedCastTo, HTMLElement(..))
-import Language.Javascript.JSaddle (eval, call, makeArgs, toJSVal, liftJSM)
+import Language.Javascript.JSaddle (eval, call, makeArgs, toJSVal)
 import Reflex.Dom.Core
 
 data MessageViewConfig t k a = MessageViewConfig
@@ -51,14 +51,9 @@ emptyMessageViewOutput = MessageViewOutput
 scrollRenderHook :: (MonadJSM m, El.IsElement (RawElement d)) => Element er d t -> m a -> m a
 scrollRenderHook container domAction = do
   let e = _element_raw container
-  h0 <- El.getScrollHeight e
-  t0 <- El.getScrollTop e
-  liftJSM . eval $ "console.log(\"" <> show (h0, t0) <> "\")"
   result <- domAction
   h <- El.getScrollHeight e
   El.setScrollTop e h
-  t1 <- El.getScrollTop e
-  liftJSM . eval $ "console.log(\"" <> show (h, t1) <> "\")"
   return result
 
 messageView

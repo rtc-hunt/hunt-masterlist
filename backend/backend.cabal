@@ -36,9 +36,8 @@ library
     Backend
     Backend.Listen
     Backend.Request
-    Backend.Query
-    Backend.Query.Chatroom
-    Backend.Query.Messages
+    Backend.View.Chatroom
+    Backend.View.Messages
     Backend.Schema
     Backend.View
   ghc-options: -Wall -Wredundant-constraints -Wincomplete-uni-patterns -Wincomplete-record-updates -O -fno-show-valid-hole-fits

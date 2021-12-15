@@ -26,7 +26,7 @@ import Reflex.Dom.Core hiding (Request)
 import Rhyolite.Api hiding (Request)
 import Rhyolite.Frontend.App
 
-import Common.Api
+import Common.Request
 import Common.Route
 import Common.Schema
 import Common.View
@@ -117,7 +117,7 @@ channelInterior cid = elClass "div" "w-full flex flex-col" $ do
         windowSize window
 
       mMessages <- (maybeDyn . fmap (completeMapOf =<<) =<<) . watchView . constDyn $ vessel V_Messages . subVessel cid' . mapVMorphism (RequestInterval latest 100 100)
-      dyn $ ffor mMessages $ \case
+      dyn_ $ ffor mMessages $ \case
         Nothing -> pure ()
         Just ms -> do
           let messageViewConfig = MessageViewConfig

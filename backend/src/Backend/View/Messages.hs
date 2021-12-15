@@ -1,4 +1,4 @@
-module Backend.Query.Messages where
+module Backend.View.Messages where
 
 import qualified Data.Map.Monoidal as Map
 import Data.Map.Monoidal (MonoidalMap)

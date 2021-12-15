@@ -26,8 +26,7 @@ windowHasFocus w = do
   b <- wrapDomEvent w (`DOM.on` DOMEvents.blur) $ return False
   holdDyn True $ leftmost [f, b] --TODO: Get the initial value properly
 
-windowResizeEvent :: ( Reflex t
-                     , TriggerEvent t m
+windowResizeEvent :: ( TriggerEvent t m
                      , MonadJSM m )
                   => DOM.Window
                   -> m (Event t (Int, Int))
@@ -40,10 +39,8 @@ windowResizeEvent w = do
 getWindowSize :: DOM.Window -> DOM.JSM (Int, Int)
 getWindowSize w = liftM2 (,) (DOM.getInnerWidth w) (DOM.getInnerHeight w)
 
-windowSize :: ( Reflex t
-              , TriggerEvent t m
+windowSize :: ( TriggerEvent t m
               , MonadFix m
-              , PostBuild t m
               , MonadJSM (Performable m)
               , PerformEvent t m
               , MonadHold t m

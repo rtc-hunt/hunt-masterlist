@@ -1,157 +1,176 @@
-# rhyolite-example devlog
+# rhyolite-example
 
-## Setting up the obelisk project (585a2ec8)
-Start by running `ob init --branch develop` to set up an obelisk application.
+## Getting Started
 
-You can now `ob run` to run the skeleton obelisk application.
+Make sure that Obelisk [https://github.com/obsidiansystems/obelisk] is installed on your machine.
 
-## Adding the rhyolite dependency (6a86dd14)
+You should be able to `ob run` from the root directory of the project, which should start a webserver
+accessible from `http://localhost:8000/` in Chrome.
 
-Create a directory `dep` at the root of the obelisk project.
+## Architecture
 
-In the `dep` directory, run `nix-thunk create git@github.com:obsidiansystems/rhyolite`.
+This describes the overall structure of the project and what you can expect to find in various files.
 
-In the obelisk application's `default.nix`, make the following modifications:
+### ./common
 
-```diff
-diff --git a/default.nix b/default.nix
-index 7afba95..3df728b 100644
---- a/default.nix
-+++ b/default.nix
-@@ -15,9 +15,14 @@
-   }
- }:
- with obelisk;
--project ./. ({ ... }: {
--  android.applicationId = "systems.obsidian.obelisk.examples.minimal";
--  android.displayName = "Obelisk Minimal Example";
--  ios.bundleIdentifier = "systems.obsidian.obelisk.examples.minimal";
--  ios.bundleName = "Obelisk Minimal Example";
-+project ./. ({ pkgs, hackGet, ... }@args: {
-+  overrides = pkgs.lib.composeExtensions
-+    (pkgs.callPackage (hackGet ./dep/rhyolite) args).haskellOverrides
-+      (self: super: with pkgs.haskell.lib; {
-+        # Your custom overrides go here.
-+      });
-+  android.applicationId = "systems.obsidian.obelisk.examples.rhyolite";
-+  android.displayName = "Rhyolite Example App";
-+  ios.bundleIdentifier = "systems.obsidian.obelisk.examples.rhyolite";
-+  ios.bundleName = "Rhyolite Example App";
- })
-```
+This directory contains code that both the backend and frontend depend on, and generally contains definitions
+of data structures that are used to communicate between them.
 
-The important part here is importing the rhyolite dependency and extending the haskell package set with the packages provided by rhyolite.
+#### ./common/src/Common/Request.hs
 
-Running `ob run` at this point probably won't do much different, since we're not actually using any of these new packages, but it will help us verify that the `default.nix` file is still valid.
+This file defines the types used to make requests from the frontend to the backend. The requests here will
+almost always be triggered by user actions in some way. We make a distinction between public requests,
+which don't require a user to be logged in (they don't need an AuthToken) and private requests, which do.
 
-## Generating a schema with groundhog
+The `PublicRequest` and `PrivateRequest` data types are both GADTs. The index type of the GADTs tells the
+backend which type of response it needs to produce, and the frontend which type of response to expect.
 
-### Defining the schema (4086ceb1)
+You'll notice that we use the Template Haskell functions `deriveArgDict` and `deriveJSONGADT` for both of these
+types. `deriveArgDict` gives us the ability to do things like insist that all the index types on a GADT belong
+to a particular class (e.g. `ToJSON` and `FromJSON` since we'll need to be able to serialise the responses).
+`deriveJSONGADT` gives us `ToJSON` and `FromJSON` instances related to the GADTs themselves.
 
-Defining the schema is pretty straightforward. We create a couple of Haskell datatypes in `Common.Schema`, and a foreign key constraint between them (messages belong to chatrooms). We need to add `database-id-class` to the common dependencies, since we'll need to be able to refer to database identifiers on both the frontend and backend (hence the `HasId` instances).
+The requests and responses here are one part of Rhyolite's communication protocol that goes over its websocket,
+along with the views and viewselectors.
 
-On the backend, we use some template haskell (from groundhog via `Rhyolite.Backend.Schema.TH`) to generate the schema migration functionality. With `groundhog` we use some quasiquoted YAML to annotate the datatypes we defined in `Common.Schema` to define the actual database schema.
+#### ./common/src/Common/View.hs
 
-### Spinning up the database (ae19e331)
+This file contains the view/viewselector type(s) for the app, and related types involved in their construction.
+Recall that viewselectors identify data that the frontend could be interested in displaying, and views are
+the corresponding responses to requests for that data.
 
-Actually starting up a database is pretty straightforward: just add `gargoyle-postgresql-connect` to the backend dependencies and call `withDb` in the backend startup code. In the previous step, we generated the migration function (`migrateSchema`) and now we've just got to run it.
+In this project, we're using vessel-style functor parametric containers to describe both our viewselector type
+and view type simultaneously, distinguished by a choice of functor that the types involved have been
+parameterised over. `PrivateChatV` is the main container, and you can see that it's defined as a `Vessel`
+keyed by values of type `V`, which is a GADT whose index types describe which type of functor-parametric
+container to associate with each possible key. In this case, we have
+* `V_Chatrooms` which is a key containing searches for chatrooms (by name, at least for now). The associated
+ container here is a `MapV` from the queries to a `SemiMap` from `Id Chatroom` to `Text`. The `MapV`
+ lets us only provide keys in the viewselector, and the `SemiMap`s will only exist in the view. Here,
+ `SemiMap` is a type that lets us distinguish between complete key/value pairings, that is, complete
+ responses for what we requested, and partial ones, used to patch up the mapping as the backend will want to
+ notify the frontend about new individual channels that are being added which match the query.
+* `V_Chatroom` is a key containing requests for information about individual chat rooms, based on their `Id`,
+ (which is simply a number internally). As the example grows, we might put other details about the chatroom
+ in the response here, e.g. a topic message, but right now it's just the name of the room.
+* `V_Messages` is a key containing requests for messages in a particular chat room. It's a `SubVessel`, which
+ is a type that lets us associate a functor-parametric container of the same type with each key of type
+ `Id Chatroom` here. So for each `Id Chatroom` we might want to obtain messages for, we have a `MapV`
+ from `RequestInterval` to a `SemiMap` that will contain the actual messages being requested (keyed on
+ timestamp and the `Id` of the message).
 
-`withDb` gives us a connection pool, and we can use `runDb` from `Rhyolite.Backend.Db` to actually run a transaction using a connection. There's a logging constraint that needs to be satisfied, so we'll need `monad-logger` as well.
+`RequestInterval` is a type that describes which range of messages from a channel we want to obtain.
+It's generally important for the sake of performance not to have requests for completely unbounded portions
+of the database. So this type lets us request the nth message in the channel, and a specified number of
+messages before and after that. We'll eventually use this to implement infinite scrolling: when the user
+nears the top of their scrollback, we can add an additional `RequestInterval` back from whatever message is
+at the top of their view, and as they scroll around, we'll also be able to delete any that are far from where
+they're looking, as a performance improvement.
 
-To run the schema migration, we first analyze the current state of the database using `getTableAnalysis` and then use groundhog's `runMigration` function to execute the migration we generated previously. Note that `getTableAnalysis` only exists in our fork of groundhog.
+#### ./common/src/Common/Route.hs
 
-After an `ob run`, you should see the following in psql:
+This file contains GADTs that are abstract representations of the HTTP routes that the backend serves, i.e. the
+part of the URL from the first `/` and including any `?` parameters, but not including `#` parameters. It also
+contains the `Encoder` that converts back and forth between the abstract data type and the actual bunch of path
+components and queries (`PageName`).
 
-```
-postgres=# \d
-               List of relations
- Schema |      Name       |   Type   |  Owner
---------+-----------------+----------+----------
- public | Chatroom        | table    | postgres
- public | Chatroom_id_seq | sequence | postgres
- public | Message         | table    | postgres
- public | Message_id_seq  | sequence | postgres
-(4 rows)
+The index types of these GADTs is typically what type of data is associated with the particular route, if any.
+For example, you'll notice that `FrontendRoute_Channel` will also be accompanied with an `Id Chatroom` because
+we (at least presently) have URLs like "http://localhost:8000/channel/16" which will be a link that brings up
+that particular channel in the frontend.
 
+`FullRoute` is a type from the Obelisk routes package that combines our `BackendRoute` and `FrontendRoute` types
+and mixes in a few additional routes that Obelisk needs. The `R p` type is basically like `DSum p Identity` --
+it just pairs up the main part of the route with whatever data is meant to be associated with that path, that
+often, but not always, will get encoded toward the end of the route.
 
-postgres=# \d "Chatroom";
-                               Table "public.Chatroom"
- Column |       Type        |                        Modifiers
---------+-------------------+---------------------------------------------------------
- id     | bigint            | not null default nextval('"Chatroom_id_seq"'::regclass)
- title  | character varying | not null
-Indexes:
-    "Chatroom_pkey" PRIMARY KEY, btree (id)
-Referenced by:
-    TABLE ""Message"" CONSTRAINT "Message_chatroom_fkey" FOREIGN KEY (chatroom) REFERENCES "Chatroom"(id)
+#### ./common/src/Common/Schema.hs
 
-postgres=# \d "Message";
-                                      Table "public.Message"
-  Column   |            Type             |                       Modifiers
------------+-----------------------------+--------------------------------------------------------
- id        | bigint                      | not null default nextval('"Message_id_seq"'::regclass)
- chatroom  | bigint                      | not null
- text      | character varying           | not null
- timestamp | timestamp without time zone | not null
-Indexes:
-    "Message_pkey" PRIMARY KEY, btree (id)
-Foreign-key constraints:
-    "Message_chatroom_fkey" FOREIGN KEY (chatroom) REFERENCES "Chatroom"(id)
-```
+This file contains datatypes that will be involved in the frontend's view of data, but which also correspond
+directly with the contents of tables in our application's database.
 
-### Adding the Rhyolite Account schema (48a87612)
+### ./backend
 
-Rhyolite provides a type `Account`, a database schema for that type, and some common account operations (password verification, reset, etc). By importing `Rhyolite.Account` we can add a foreign key constraint on `Account` to one of our tables. On the backend, we need to run the `migrateAccount` function along with our other schema migration to actually create the right tables.
+This directory contains code that does not ship as part of any frontend. It's the program that actually runs
+on the servers and handles HTTP requests, and websocket connections.
 
-## Communicating with the frontend
+#### ./backend/Backend.hs
 
-Now comes the tricky part.  Our goal here is to be able to call the function `serveDbOverWebsockets` from `Rhyolite.Backend.App`.  This function needs to be told how to respond to API requests, how to respond to notifications from the database indicating that some change has occurred, and how to compute Views of data that connected users are interested in.  It's an important function.  Some of its complexity comes from an attempt to avoid certain performance pitfalls.  For example, part of what this function does under the hood is take the View Selectors provided by connected users and aggregating them to make View computation cheaper.
+More or less the main entry point of the Obelisk backend.
 
-`serveDbOverWebsockets` takes a bunch of arguments. The first is the database pool, which we already have access to via `withDb`.
+We get the key used to encrypt user tokens, do any database migration that's required, set up the websocket
+listener, and then start up the webserver, and provide specific handlers for our BackendRoutes
+(see Common.Route). We also plug in the route encoder that was specified in Common.Route here.
 
-### Adding a route for websockets communication (19a55394)
+#### ./backend/Request.hs
 
-First, we add an endpoint to the list of backend routes in Common.Route and we'll add a stub handler for that route to the backend.  The actual websocket connection handler is going to be produced by `serveDbOverWebsockets`.
+This contains the handler for both public and private requests (see Common.Request above).
 
-### Defining an API (772d6da1)
+Essentially all changes to the database will be triggered by these request handlers, aside from migrations.
 
-The second argument of `serveDbOverWebsockets` is a `RequestHandler`, which describes how API requests ought to be handled.
+After each change to the database, we'll also want to notify all running backends (there can be multiple
+copies of this program running on many servers if needed) of our change, so that they can respond and adjust
+the views that the frontends are seeing. Hence, you'll see some usage of `insertAndNotify`. This uses
+the NOTIFY/LISTEN mechanism in PostgreSQL to notify all running backends of the change, which will be picked up
+by the code in `Backend.Listen` that will calculate patches to connected users' views.
 
-In `Common.Api` we define a couple of GADTs representing our public (unauthenticated) and private (authenticated) request types, and then we define a GADT that includes both types of requests (aptly named `Request`). In `Backend.Request` we define the actual request handler that receives and processes API requests. For our login API, we can use the handler functions defined in `Rhyolite.Backend.Account`.
+There can be fancier and more general forms of notification if we needed to notify about updates or deletions
+of data, or for larger bulk changes of data, but our example app doesn't do any of that yet.
 
-### Defining View Selector and View types (c11a5578)
+#### ./backend/View.hs
 
-The request/response API that we set up will be useful for certain kinds of transactions, especially writes, but we still need a way to read data from the backend and *keep that data up-to-date* without polling.
+This file contains handlers that take viewselectors, and produce views, which are run when frontends update
+their viewselectors, and need to get their initial view.
 
-We do this buy defining a datatype that lets users indicate their interest in some data. The frontend sends this interest set to the backend, which immediately sends the data that the user is interested in, and keeps track of the fact that the user is interested. The backend will look out for changes to the database relevant to each user's interest set and send updates when those changes occur.
+In this case, there's just the top level `privateQueryHandler`, and most of the work of
+obtaining individual things has been split out into other modules. This top level function iterates over the
+keys in the overall view selector, and handles the queries contained under each one (if any), mostly just
+doing the combinatorics of unpacking the query a bit and re-packing the results into a view.
 
-The workflow looks like this:
+#### ./backend/View/
 
-```
-User declares interest/sets View Selector
-  -> Backend receives View Selector
-    -> Backend sends back a View (the data corresponding to the declared interest)
-      -> Things that write to the db issue notifications that they're changing certain tables and rows
-        -> Backend reads these notifications and checks if they're relevant to any View Selectors
-          -> Backend computes a patch of information to get all relevant clients up-to-date and sends its out
-```
+This directory contains modules with functions for actually doing database queries related to
+`privateQueryHandler`. Generally the functions have types that are a bit simplified from the full actual
+view/selector datatypes.
 
-A few important properties that must be preserved: It must be possible to combine all the View Selectors declared by a client (and ultimately, all the View Selectors declared by all clients) - we don't want to process everything individually for each client, or ask for the same data twice.  It must also be possible for users to declare that they're no longer interested in something, and it must be possible to remove things from the View that are no longer relevant.
+#### ./backend/Listen.hs
 
-We'll use the `vessel` library to define our View Selector and View.
+When our backend receives a notification from the PostgreSQL server that data has been changed, we want to
+notify any clients of the impact to their view, based on their viewselector. This module defines both the
+`Notify` data type that the backend uses to describe these messages to itself, which is again a GADT whose
+index describes a payload (usually the database ID that changed, sometimes additional data about what changed).
 
-#### The View (c11a5578)
+An important consideration is that postgres limits the length of NOTIFY messages to 4096 bytes, and so if the
+notification messages get too long, they might be silently truncated. So, take care not to put anything
+of an arbitrary length in a notification. So far, we just have database `Id` values in our notifications in
+this app, which are actually just Int64 values.
 
-In `Common.View` we define a GADT that represents both our view selector and view types.  We're using the `vessel` library to facilitate this: it contains data structures that can have both the "empty" (view selectors) and "full" (views) versions.
+The `notifyHandler` takes the message received from the database, along with an aggregate viewselector that
+accounts for what every connected client is interested in. Its job is then to produce a partial view of just
+the new or changed data with respect to those queries, which will then be further divided up into the bits
+that individual clients are interested in before sending out messages over the websocket.
 
-#### Notifications (c11a5578)
+It will generally do this by looking up the data whose `Id` it received a notification about, and observing
+the viewselector to determine which parts matched.
 
-In `Backend.Listen` we define another GADT. This one describes the types of database change notifications our application will produce and handle.  These notifications are sent over a postgres [NOTIFY](https://www.postgresql.org/docs/current/sql-notify.html) channel, and every backend connected to the database will receive them.  Notifications are sent over the channel using the `notify` function from `Rhyolite.Backend.Listen` or one of the various specialized insert, delete, or update functions in that module (e.g., `insertAndNotify`).
+It is vitally important that this function be reasonably quick, because it runs on a thread which is shared
+between all connected clients of the backend, so if this process gets hung up, the app potentially becomes
+unresponsive for many users. Anything which takes a substantial amount of time (e.g. has linear or greater
+complexity) should not be done here, and moved off into an asynchronous thread, which can perhaps send further
+notifications when any heavier work is done. But mostly, this function doesn't need to do all that much work
+anyway, so long as the database has relevant indices to quickly determine whether things match.
 
-The third argument to `serveDbOverWebsockets` is a handler for these notifications. We define the `notifyHandler` function to check notifications against the aggregated view selectors and return patches.
+#### ./backend/Schema.hs
 
-#### Handling View Selector Queries (0daac908)
+This module contains a specification of the database schema used by the backend, and exports a function
+`migrateSchema` that can migrate the database (or at least determine what migration needs to occur in cases
+where this may be destructive) should the schema of a running database instance differ from what the backend
+expects. It's very important in general that running database schemas always exactly match what the backends
+expect, so some degree of automatic checking on backend startup is vital (and automatic migration is obviously
+convenient whenever it suffices).
 
-We're already handling notifications that patch the View, but we haven't added the `QueryHandler` code that builds the View in the first instance. Note that it the order that we're doing this isn't particularly significant, we're just following the argument order of `serveDbOverWebsockets`, which takes a `QueryHandler` as its fourth argument.
+### ./frontend
 
-The query handler is straightforward to write: we're just grabbing all the data responsive to a particular query.  You'll notice here (as in the notification handler) we use `mapDecomposedV` to transform the aggregated queries before processing them.  The reason for that is that the queries are annotated with other information that's not relevant to us, but will be needed by the backend later (when, e.g., dispersing the query results).  We just want the queries themselves, and this function will give us those and then re-annotate the data afterward.
+This directory contains the frontend. Perhaps surprisingly, this code in its entirety will also be part of the
+backend, used to pre-render any frontend routes, so that when they're delivered, they look approximately
+correct even before all the javascript loads.

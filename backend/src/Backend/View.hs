@@ -9,7 +9,9 @@ import Data.Vessel.SubVessel
 import Database.PostgreSQL.Simple
 import Rhyolite.Backend.DB
 
-import Backend.Query
+import Backend.View.Chatroom
+import Backend.View.Messages
+
 import Common.View
 
 privateQueryHandler

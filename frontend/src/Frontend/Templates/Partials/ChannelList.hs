@@ -25,7 +25,7 @@ import Rhyolite.Frontend.App
 import Data.Vessel.Map
 import Data.Vessel.Vessel
 
-import Common.Api
+import Common.Request
 import Common.Route
 import Common.View
 

@@ -22,7 +22,7 @@ import Rhyolite.Backend.DB.PsqlSimple
 import Rhyolite.Backend.Listen
 import Rhyolite.SemiMap
 
-import Backend.Query
+import Backend.View.Chatroom (searchForChatroom)
 import Backend.Schema ()
 import Common.Schema
 import Common.View

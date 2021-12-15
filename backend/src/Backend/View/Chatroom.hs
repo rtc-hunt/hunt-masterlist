@@ -1,4 +1,4 @@
-module Backend.Query.Chatroom where
+module Backend.View.Chatroom where
 
 import Control.Monad
 import qualified Data.Map.Monoidal as Map

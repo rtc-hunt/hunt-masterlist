@@ -7,7 +7,6 @@ import Control.Lens
 import Control.Monad
 import Data.Bool
 import Data.Text (Text)
-import qualified Data.Text as T
 import Data.Default
 import Reflex.Dom.Core
 

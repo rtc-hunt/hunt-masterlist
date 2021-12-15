@@ -4,7 +4,6 @@ module Frontend.Templates.Partials.Lists where
 
 import Data.Default
 import Data.Text (Text)
-import qualified Data.Text as T
 import Reflex.Dom.Core
 
 import Frontend.Utils

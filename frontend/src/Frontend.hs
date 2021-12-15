@@ -44,7 +44,7 @@ import Rhyolite.Sign
 import Rhyolite.Vessel.ErrorV
 import Rhyolite.Vessel.AuthMapV
 
-import Common.Api
+import Common.Request
 import Common.Route
 import Common.View
 
