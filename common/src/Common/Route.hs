@@ -11,16 +11,16 @@
 {-# LANGUAGE TypeFamilies #-}
 module Common.Route where
 
-{- -- You will probably want these imports for composing Encoders.
 import Prelude hiding (id, (.))
 import Control.Category
--}
-
 import Data.Text (Text)
 import Data.Functor.Identity
-
+import Database.Id.Class
 import Obelisk.Route
 import Obelisk.Route.TH
+import Rhyolite.Schema
+
+import Common.Schema
 
 data BackendRoute :: * -> * where
   -- | Used to handle unparseable routes.
@@ -33,6 +33,8 @@ data FrontendRoute :: * -> * where
   FrontendRoute_Main :: FrontendRoute ()
   FrontendRoute_Login :: FrontendRoute ()
   FrontendRoute_SignUp :: FrontendRoute ()
+  FrontendRoute_Channels :: FrontendRoute ()
+  FrontendRoute_Channel :: FrontendRoute (Id Chatroom)
   -- This type is used to define frontend routes, i.e. ones for which the backend will serve the frontend.
 
 fullRouteEncoder
@@ -47,6 +49,8 @@ fullRouteEncoder = mkFullRouteEncoder
       FrontendRoute_Login -> PathSegment "login" $ unitEncoder mempty
       FrontendRoute_SignUp -> PathSegment "signup" $ unitEncoder mempty
       FrontendRoute_Main -> PathEnd $ unitEncoder mempty
+      FrontendRoute_Channels -> PathSegment "channels" $ unitEncoder mempty
+      FrontendRoute_Channel -> PathSegment "channel" $ singlePathSegmentEncoder . idEncoder
   )
 
 checkedFullRouteEncoder :: Encoder Identity Identity (R (FullRoute BackendRoute FrontendRoute)) PageName

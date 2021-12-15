@@ -1,0 +1,11 @@
+{
+  "name": "styles",
+  "version": "0.0.0",
+  "author": "Obsidian Systems, LLC",
+  "dependencies": {
+    "autoprefixer": "^10.4.0",
+    "postcss": "^8.3.11",
+    "postcss-cli": "^9.0.1",
+    "tailwindcss": "^2.2.19"
+  }
+}

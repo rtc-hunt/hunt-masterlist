@@ -28,7 +28,7 @@ library
                , witherable
                , patch
   exposed-modules:
-    Common.Api
+    Common.Request
     Common.Route
     Common.Schema
     Common.View
