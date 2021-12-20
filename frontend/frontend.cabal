@@ -19,6 +19,8 @@ library
                , text
                , data-default
                , lens
+
+               , dependent-monoidal-map
   exposed-modules:
     Frontend
     Frontend.JS.Window
@@ -29,6 +31,8 @@ library
     Frontend.Templates.Partials.MessageView
     Frontend.Templates.Channel
     Frontend.Templates.Signup
+
+    Data.Vessel.Path
   ghc-options: -Wall -Wredundant-constraints -Wincomplete-uni-patterns -Wincomplete-record-updates -O -fno-show-valid-hole-fits
 
 executable frontend

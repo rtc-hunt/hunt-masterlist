@@ -18,13 +18,9 @@ with obelisk;
 project ./. ({ pkgs, hackGet, ... }@args: {
   overrides = pkgs.lib.composeExtensions
     (pkgs.callPackage (hackGet ./dep/rhyolite) args).haskellOverrides
-      (self: super: with pkgs.haskell.lib; {
-        # Your custom overrides go here.
-        vessel = self.callCabal2nix "vessel" (hackGet ./dep/vessel) {};
-      });
-  #packages = {
-  #  vessel = hackGet ./dep/vessel;
-  #};
+    (self: super: with pkgs.haskell.lib; {
+      # Your custom overrides go here.
+    });
   staticFiles = import ./static {inherit pkgs; };
   android.applicationId = "systems.obsidian.obelisk.examples.rhyolite";
   android.displayName = "Rhyolite Example App";
