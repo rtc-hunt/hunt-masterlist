@@ -5,6 +5,11 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecursiveDo #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE FlexibleInstances #-}
+
 module Frontend.Templates.Channel where
 
 import Prelude hiding ((.), id)
@@ -18,7 +23,6 @@ import Data.Time
 import Data.Vessel
 import Data.Vessel.Map
 import Data.Vessel.Vessel
-import Data.Vessel.SubVessel
 import Database.Id.Class
 import Obelisk.Route.Frontend
 import Reflex
@@ -40,6 +44,9 @@ import Frontend.Templates.Partials.Switch
 
 import Frontend.Utils
 
+import qualified Data.Set as Set
+import Data.Vessel.Path
+
 channel
   :: forall t m js.
      ( PostBuild t m
@@ -60,6 +67,7 @@ channel cid = elClass "div" "w-screen h-screen bg-background flex flex-col overf
       channelList $ def & channelListConfig_useH2 .~ True
     channelInterior cid
     pure click
+
 
 channelInterior
   :: forall t m js.
@@ -116,8 +124,15 @@ channelInterior cid = elClass "div" "w-full flex flex-col" $ do
         window <- askDomWindow
         windowSize window
 
-      mMessages <- (maybeDyn . fmap (completeMapOf =<<) =<<) . watchView . constDyn $ vessel V_Messages . subVessel cid' . mapVMorphism (RequestInterval latest 100 100)
-      dyn_ $ ffor mMessages $ \case
+      --mMessages <- (maybeDyn . fmap (completeMapOf =<<) =<<) . watchView . constDyn $ vessel V_Messages . subVessel cid' . mapVMorphism (RequestInterval latest 100 100)
+      -- let riDyn = FullPath (key V_Messages ~> key cid' ~> keys (Set.singleton (RequestInterval latest 100 100)) ~> semiMapP)
+      mMessages <- watch . constDyn $
+           key V_Messages
+        ~> key cid'
+        ~> keys (Set.singleton (RequestInterval latest 100 100))
+        ~> semiMapsP
+
+      dyn_ $ ffor undefined $ \case
         Nothing -> pure ()
         Just ms -> do
           let messageViewConfig = MessageViewConfig
