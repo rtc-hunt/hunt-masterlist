@@ -5,8 +5,8 @@ module Backend.Schema where
 import Common.Schema
 import Database.Groundhog.TH
 import Database.Id.Groundhog.TH
-import Rhyolite.Backend.Account ()
-import Rhyolite.Backend.Schema.TH
+import Rhyolite.Account.Groundhog ()
+import Rhyolite.DB.Groundhog.TH
 
 mkRhyolitePersist (Just "migrateSchema") [groundhog|
   - entity: Chatroom

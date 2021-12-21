@@ -7,7 +7,9 @@ import Data.Pool
 import Data.Vessel
 import Data.Vessel.SubVessel
 import Database.PostgreSQL.Simple
-import Rhyolite.Backend.DB
+
+import Rhyolite.DB.Groundhog
+
 
 import Backend.View.Chatroom
 import Backend.View.Messages

@@ -13,13 +13,15 @@ library
                , rhyolite-common
                , dependent-sum-template
                -- Schema
+               , rhyolite-groundhog-legacy-types
+               , signed-data
                , database-id-class
                -- Api
                , aeson
                , aeson-gadt-th
                , constraints-extras
                -- Views
-               , rhyolite-datastructures
+               , semimap
                , vessel
                -- Auth
                , constraints

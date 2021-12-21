@@ -6,13 +6,13 @@ import Database.PostgreSQL.Simple
 import Data.Pool
 import Data.Text (Text)
 import Rhyolite.Api
-import Rhyolite.Backend.Account (login, ensureAccountExists, setAccountPassword)
 import Rhyolite.Backend.App
-import Rhyolite.Backend.DB
-import Rhyolite.Backend.DB.PsqlSimple
-import Rhyolite.Backend.Listen
-import Rhyolite.Backend.Sign
-import Rhyolite.Sign
+import Database.PostgreSQL.Simple.Class
+import Data.Signed
+import Data.Signed.ClientSession
+import Rhyolite.DB.Groundhog
+import Rhyolite.DB.NotifyListen.Groundhog
+import Rhyolite.Account.Groundhog
 import Web.ClientSession as CS
 
 import Backend.Listen
@@ -50,7 +50,7 @@ requestHandler db csk = RequestHandler $ \case
           }
         pure $ Right cId
       PrivateRequest_LatestMessage cid -> auth $ \_ -> runNoLoggingT $ runDb (Identity db) $ do
-        res <- [queryQ| select count(*) from "Message" m where m.chatroom = ?cid |]
+        res <- [iquery| select count(*) from "Message" m where m.chatroom = ${cid} |]
         case res of
           [Only n] -> pure . Right $ (cid, n)
           _ -> pure . Left $ "PrivateRequest_LatestMessage: got more than one row"
@@ -72,5 +72,6 @@ requestHandler db csk = RequestHandler $ \case
           pure $ Right aid
     case res of
       Left err -> pure $ Left err
-      Right aid ->
-        Right <$> signWithKey csk aid
+      Right aid -> do
+        x <- signWithKey csk (AuthToken (Identity aid))
+        pure (Right x)

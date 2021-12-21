@@ -5,7 +5,7 @@ import Data.Aeson.GADT.TH
 import Data.Constraint.Extras.TH
 import Data.Functor.Identity
 import Data.Text
-import Rhyolite.Sign
+import Data.Signed
 
 import Common.Schema
 

@@ -40,7 +40,7 @@ import Rhyolite.Account
 import Rhyolite.Api (ApiRequest(..))
 import Rhyolite.Frontend.App
 import Rhyolite.Frontend.Cookie
-import Rhyolite.Sign
+import Data.Signed (Signed)
 import Rhyolite.Vessel.ErrorV
 import Rhyolite.Vessel.AuthMapV
 

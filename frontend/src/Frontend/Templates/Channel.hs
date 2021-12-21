@@ -17,6 +17,7 @@ import Control.Category
 import Control.Monad
 import Control.Monad.Fix
 import Data.Bool
+import qualified Data.Map as Map
 import Data.Semigroup
 import qualified Data.Text as T
 import Data.Time
@@ -126,19 +127,19 @@ channelInterior cid = elClass "div" "w-full flex flex-col" $ do
 
       --mMessages <- (maybeDyn . fmap (completeMapOf =<<) =<<) . watchView . constDyn $ vessel V_Messages . subVessel cid' . mapVMorphism (RequestInterval latest 100 100)
       -- let riDyn = FullPath (key V_Messages ~> key cid' ~> keys (Set.singleton (RequestInterval latest 100 100)) ~> semiMapP)
-      mMessages <- watch . constDyn $
+      mMessages <- maybeDyn <=< watch . constDyn $
            key V_Messages
         ~> key cid'
         ~> keys (Set.singleton (RequestInterval latest 100 100))
         ~> semiMapsP
 
-      dyn_ $ ffor undefined $ \case
+      dyn_ $ ffor mMessages $ \case
         Nothing -> pure ()
         Just ms -> do
           let messageViewConfig = MessageViewConfig
                 { _messageViewConfig_minimumItemHeight = 60
                 , _messageViewConfig_windowSize = myWindowSize
-                , _messageViewConfig_messages = ms
+                , _messageViewConfig_messages = fmap Map.unions ms
                 }
           -- Stubbing out the design which distinguishes between the current user's messages and
           -- messages from other people.

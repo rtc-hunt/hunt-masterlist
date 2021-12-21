@@ -17,9 +17,11 @@ import Database.Groundhog
 import Database.Id.Groundhog
 import Database.PostgreSQL.Simple (Connection)
 import Obelisk.Route
-import Rhyolite.Backend.DB
-import Rhyolite.Backend.DB.PsqlSimple
-import Rhyolite.Backend.Listen
+import Database.PostgreSQL.Simple.Class
+import Rhyolite.DB.Groundhog
+import Rhyolite.DB.NotifyListen
+import Rhyolite.DB.NotifyListen.Groundhog
+
 import Rhyolite.SemiMap
 
 import Backend.View.Chatroom (searchForChatroom)
@@ -65,12 +67,11 @@ notifyHandler db nm v = case _dbNotification_message nm of
     V_Messages -> const $ pure emptyV
   Notify_Message :/ mid -> do
     runNoLoggingT $ do
-      let messageId = mid
-      msgs :: [(Id Chatroom, Int, UTCTime, Text, Text)] <- runDb (Identity db) $ [queryQ|
+      msgs :: [(Id Chatroom, Int, UTCTime, Text, Text)] <- runDb (Identity db) $ [iquery|
         select m.chatroom, m.mseq, m.timestamp at time zone 'utc', a.account_email, m.text
         from (select *, row_number() over (partition by m.chatroom) as mseq from "Message" m) as m
         join "Account" a on m.account = a.id
-        where m.id = ?messageId
+        where m.id = ${mid}
       |]
       case msgs of
         [] -> pure emptyV

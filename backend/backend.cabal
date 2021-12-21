@@ -17,6 +17,7 @@ library
                , monoidal-containers
                , obelisk-backend
                , obelisk-route
+               , signed-data-clientsession
                -- Logging
                , monad-logger
                -- Database
@@ -27,8 +28,11 @@ library
                , groundhog-postgresql
                , groundhog-th
                , postgresql-simple
+               , postgresql-simple-interpolate
                , resource-pool
-               , rhyolite-backend-db
+               , rhyolite-notify-listen
+               , rhyolite-groundhog-legacy
+               , psql-simple-class
                -- Accounts
                , rhyolite-backend
                , clientsession

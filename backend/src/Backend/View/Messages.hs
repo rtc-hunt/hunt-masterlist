@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wno-unused-matches -Wno-unused-local-binds #-}
+
 module Backend.View.Messages where
 
 import qualified Data.Map.Monoidal as Map
@@ -6,14 +8,15 @@ import qualified Data.Set as Set
 import Data.Set (Set)
 import Data.Text (Text)
 import Data.Time
-import Rhyolite.Backend.DB
-import Rhyolite.Backend.DB.PsqlSimple
+import Rhyolite.DB.Groundhog ()
 import Rhyolite.SemiMap
+import Database.PostgreSQL.Simple.Types
+import Database.PostgreSQL.Simple.Class
 
 import Common.Schema
 import Common.View
 
-getMessages :: Db m
+getMessages :: Psql m
             => MonoidalMap (Id Chatroom) (Set RequestInterval)
             -> m (MonoidalMap (Id Chatroom) (MonoidalMap RequestInterval (SemiMap (UTCTime, Id Message) MsgView)))
 getMessages reqs = do
@@ -21,12 +24,12 @@ getMessages reqs = do
         (cid, ris) <- Map.toList reqs
         RequestInterval mid before after <- Set.toList ris
         pure (cid, mid, before, after)
-  results :: [(Id Chatroom, Int, Int, Int, Int, UTCTime, Id Message, Text, Text)] <- [queryQ|
+  results :: [(Id Chatroom, Int, Int, Int, Int, UTCTime, Id Message, Text, Text)] <- [iquery|
     select r.cid, r.seq, r.before, r.after,
            m.seq, m.timestamp at time zone 'utc', m.id, m.text, a.account_email
     from (select m.*, row_number() over (partition by m.chatroom) as seq from "Message" m) as m
     join "Account" a on a.id = m.account
-    join ?requestValues as r (cid,seq,before,after)
+    join ${requestValues} as r (cid,seq,before,after)
       on r.cid = m.chatroom
       and (r.seq - r.before <= m.seq)
       and (m.seq <= r.seq + r.after)
