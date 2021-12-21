@@ -9,21 +9,22 @@
 
 module Frontend.Templates.Partials.ChannelList where
 
-import Prelude hiding ((.), id)
 import Control.Category
 import Control.Lens
+import Control.Monad
 import Control.Monad.Fix
 import Data.Bool
 import Data.Default
 import qualified Data.Map as Map
-import Data.Text (Text)
 import qualified Data.Text as T
+import Data.Text (Text)
+import Data.Vessel.Map
+import Data.Vessel.Vessel
 import Obelisk.Route.Frontend
+import Prelude hiding ((.), id)
 import Reflex.Dom.Core
 import Rhyolite.Api hiding (Request)
 import Rhyolite.Frontend.App
-import Data.Vessel.Map
-import Data.Vessel.Vessel
 
 import Common.Request
 import Common.Route
@@ -34,6 +35,9 @@ import Frontend.Templates.Partials.Headers
 import Frontend.Templates.Partials.Buttons
 import Frontend.Templates.Partials.Lists
 import Frontend.Utils
+
+import Rhyolite.Vessel.Path
+
 
 data ChannelListConfig t = ChannelListConfig
   { _channelListConfig_headerClasses :: T.Text
@@ -64,8 +68,8 @@ channelList (ChannelListConfig headerClasses useH2) = do
 
     elClass "div" "mt-8 font-facit text-h2 text-copy" $ text "Search results"
 
-    mRooms <- (maybeDyn . fmap (completeMapOf =<<) =<<) $ watchView $ fmap (\q -> vessel V_Chatrooms . mapVMorphism (ChatroomQuery q)) $
-      _searchbarOutput_query channelSearch
+    mRooms <- maybeDyn <=< watch . ffor (_searchbarOutput_query channelSearch) $ \q ->
+      key V_Chatrooms ~> key (ChatroomQuery q) ~> semiMapP
     channelClick <- (switchHold never =<<) $ dyn $ ffor mRooms $ \case
       Nothing -> pure never
       Just rooms -> switchDyn . fmap mergeMap <$> list rooms channelItem

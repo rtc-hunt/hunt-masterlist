@@ -18,7 +18,6 @@ import Control.Monad.Fix
 import Data.Bool
 import qualified Data.Map as Map
 import Data.Map (Map)
-import qualified Data.Set as Set
 import Data.Set (Set)
 import qualified Data.Sequence as Seq
 import Data.Sequence (ViewR (..))
@@ -26,15 +25,12 @@ import Data.Semigroup
 import qualified Data.Text as T
 import Data.Time
 import Data.Vessel
-import Data.Vessel.Map
-import qualified Data.Vessel.Vessel as VM
 import Database.Id.Class
 import Obelisk.Route.Frontend
 import Prelude hiding ((.), id)
 import Reflex
 import Reflex.Dom.Core hiding (Request)
 import Rhyolite.Api hiding (Request)
-import Rhyolite.Frontend.App
 import Rhyolite.Vessel.Path
 import Control.Monad.IO.Class
 
@@ -100,7 +96,7 @@ channelInterior cid = elClass "div" "w-full flex flex-col" $ do
   void . widgetHold blank . ffor latestD $ \case
     Left e -> text e
     Right (cid', latestOnLoad) -> do
-      mName <- watchView $ constDyn (VM.vessel V_Chatroom . mapVMorphism cid')
+      mName <- watch $ constDyn (key V_Chatroom ~> key cid')
       elClass "div" "p-4 bg-raised flex flex-row justify-between items-center border-b border-metaline relative" $ do
         elClass "div" "flex flex-col" $ do
           elClass "div" "font-karla font-bold text-h2 md:text-h1 text-copy leading-none" $ dynText $ ffor mName $ \case
@@ -148,7 +144,7 @@ channelInterior cid = elClass "div" "w-full flex flex-col" $ do
                   guard (nearToEnd k m)
                   return $ Set.insert (RequestInterval m 0 requestCount)
           intervals <- foldDyn ($) (Set.singleton (RequestInterval latestOnLoad requestCount requestCount)) intervalE
-          mMessagesE <- fmap ((\(_ :> x) -> x) . Seq.viewr) <$> batchOccurrences 1 (updated mMessages')
+          mMessagesE <- fmapMaybe ((\case (_ :> x) -> Just x; _ -> Nothing) . Seq.viewr) <$> batchOccurrences 1 (updated mMessages')
           mMessages' :: Dynamic t (Maybe (Map RequestInterval (Map Int MsgView))) <- watch . ffor intervals $ \ris ->
                key V_Messages
             ~> key cid'

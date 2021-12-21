@@ -2,7 +2,9 @@
 {-# Language FunctionalDependencies #-}
 {-# Language RankNTypes #-}
 {-# Language GADTs #-}
-module Rhyolite.Vessel.Path where
+module Rhyolite.Vessel.Path
+  (semiMapP, semiMapsP, FullPath, watch, module Data.Vessel.Path)
+  where
 
 import Control.Monad.Fix
 import Data.Map (Map)
