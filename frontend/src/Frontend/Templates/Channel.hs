@@ -144,12 +144,6 @@ message mView = do
         formatTime defaultTimeLocale "%R" (_msgView_timestamp mv)
     elClass "div" "p-4 rounded border border-metaline bg-white w-auto" $ dynText (fmap _msgView_text mView)
 
--- TODO move this
-firstP :: Traversable f => Path x x (f (First v)) (f v)
-firstP = postMap (traverse (Just . getFirst))
-emptyPath :: Monoid m => Path a m m' a'
-emptyPath = Path (const mempty) (const Nothing)
-
 data ChannelView t = ChannelView
   { _channelView_name :: Dynamic t (Maybe Text)
   , _channelView_messages :: Dynamic t (Maybe (Dynamic t (Map Int MsgView)))

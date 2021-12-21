@@ -3,13 +3,14 @@
 {-# Language RankNTypes #-}
 {-# Language GADTs #-}
 module Rhyolite.Vessel.Path
-  (semiMapP, semiMapsP, FullPath, watch, module Data.Vessel.Path)
+  (module Rhyolite.Vessel.Path, module Data.Vessel.Path)
   where
 
 import Control.Monad.Fix
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Map.Monoidal
+import Data.Semigroup
 import Data.Vessel
 import Data.Vessel.Path
 import Reflex
@@ -23,6 +24,12 @@ semiMapP = postMap (traverse (fmap getMonoidalMap . getComplete))
 
 semiMapsP :: (Traversable f) => Path x x (f (Map k (SemiMap k' v))) (f (Map k (Map k' v)))
 semiMapsP = postMap (traverse (Just . Map.mapMaybe (fmap getMonoidalMap . getComplete)))
+
+firstP :: Traversable f => Path x x (f (First v)) (f v)
+firstP = postMap (traverse (Just . getFirst))
+
+emptyPath :: Monoid m => Path a m m' a'
+emptyPath = Path (const mempty) (const Nothing)
 
 -- merely a formality at this point
 type FullPath a v b = Path (Const SelectedCount a) (v (Const SelectedCount)) (v Identity) (Identity b)
