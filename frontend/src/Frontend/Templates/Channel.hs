@@ -12,7 +12,6 @@
 
 module Frontend.Templates.Channel where
 
-import Prelude hiding ((.), id)
 import Control.Category
 import Control.Monad
 import Control.Monad.Fix
@@ -23,13 +22,15 @@ import qualified Data.Text as T
 import Data.Time
 import Data.Vessel
 import Data.Vessel.Map
-import Data.Vessel.Vessel
+import qualified Data.Vessel.Vessel as VM
 import Database.Id.Class
 import Obelisk.Route.Frontend
+import Prelude hiding ((.), id)
 import Reflex
 import Reflex.Dom.Core hiding (Request)
 import Rhyolite.Api hiding (Request)
 import Rhyolite.Frontend.App
+import Rhyolite.Vessel.Path
 
 import Common.Request
 import Common.Route
@@ -46,7 +47,6 @@ import Frontend.Templates.Partials.Switch
 import Frontend.Utils
 
 import qualified Data.Set as Set
-import Data.Vessel.Path
 
 channel
   :: forall t m js.
@@ -89,7 +89,7 @@ channelInterior cid = elClass "div" "w-full flex flex-col" $ do
   void . widgetHold blank . ffor latestD $ \case
     Left e -> text e
     Right (cid', latest) -> do
-      mName <- watchView $ constDyn (vessel V_Chatroom . mapVMorphism cid')
+      mName <- watchView $ constDyn (VM.vessel V_Chatroom . mapVMorphism cid')
       elClass "div" "p-4 bg-raised flex flex-row justify-between items-center border-b border-metaline relative" $ do
         elClass "div" "flex flex-col" $ do
           elClass "div" "font-karla font-bold text-h2 md:text-h1 text-copy leading-none" $ dynText $ ffor mName $ \case
@@ -195,4 +195,3 @@ message (MessageConfig dViewer) (sendTime, _) mView = do
       classList [ "font-facit text-copy flex flex-col mb-6"
                 , bool "mr-16 md:mr-0 md:items-start" "ml-16 md:ml-0 md:items-end" b
                 ]
-
