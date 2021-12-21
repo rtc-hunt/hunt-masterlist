@@ -2,13 +2,12 @@
 
 module Frontend.Templates.Partials.Buttons where
 
+import Data.Text (Text)
 import Reflex.Dom.Core
-import qualified Data.Text as T
 
 import Frontend.Utils
 
--- TODO(skylar): Should this become a config
-iconButton :: DomBuilder t m => T.Text -> m (Event t ())
+iconButton :: DomBuilder t m => Text -> m (Event t ())
 iconButton icon = do
   (e, _) <- elClass' "button" classes $ text icon
   pure $ domEvent Click e
@@ -18,7 +17,7 @@ iconButton icon = do
                 , "p-2.5 font-icon text-icon text-white leading-none shadow-button"
                 ]
 
-primaryButton :: DomBuilder t m => T.Text -> m (Event t ())
+primaryButton :: DomBuilder t m => Text -> m (Event t ())
 primaryButton buttonText = do
   (e, _) <- elClass' "button" classes $ text buttonText
   pure $ domEvent Click e
@@ -30,7 +29,7 @@ primaryButton buttonText = do
                 , "focus:ring-4 ring-primary ring-opacity-50"
                 ]
 
-secondaryIconButton :: DomBuilder t m => T.Text -> T.Text -> m (Event t ())
+secondaryIconButton :: DomBuilder t m => Text -> Text -> m (Event t ())
 secondaryIconButton cs icon = do
   (e, _) <- elClass' "button" classes $
     elClass "div" "font-icon leading-none text-icon text-primary-dark" $ text icon
@@ -44,7 +43,7 @@ secondaryIconButton cs icon = do
                 ]
 
 
-secondaryButton :: DomBuilder t m => T.Text -> T.Text -> m (Event t ())
+secondaryButton :: DomBuilder t m => Text -> Text -> m (Event t ())
 secondaryButton cs label = do
   (e, _) <- elClass' "button" classes $
     text label

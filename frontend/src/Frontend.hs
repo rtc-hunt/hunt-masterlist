@@ -16,7 +16,7 @@ import qualified Data.Aeson as A
 import Data.Functor.Const
 import Data.Functor.Identity
 import qualified Data.List as L
-import Data.Maybe (isNothing)
+import Data.Maybe (isNothing, fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
@@ -152,7 +152,7 @@ signUp = elClass "div" "w-screen h-screen bg-background" $ do
 
 -- Surrounds view with header in a screen sized div, default for most pages
 appPage :: DomBuilder t m => m a -> m a
-appPage action = elClass "div" "w-screen h-screen bg-background flex flex-col" $ do
+appPage action = elClass "div" "w-screen h-screen bg-background flex flex-col overflow-hidden" $ do
   header True
   action
 
@@ -173,11 +173,29 @@ frontendBody = do
           _ <- appPage $ channelList $ def
             & channelListConfig_headerClasses .~ "mt-6"
           pure never
-        FrontendRoute_Channel -> authenticateWithToken mAuthCookie $ do
+        FrontendRoute_Channel -> authenticateWithToken mAuthCookie $ appPage $ do
           cid <- askRoute
-          click <- channel cid
-          setRoute $ FrontendRoute_Login :/ () <$ click
-          pure $ Nothing <$ click
+          channelView <- channelBuilder cid
+          logout <- fmap (switch . current) $ prerender (pure never) $ do
+            rec (ChannelOut input send scrollEl, logout) <- channelPage $ ChannelConfig
+                  { _channelConfig_name = fromMaybe "" <$> _channelView_name channelView
+                  , _channelConfig_clearInput = clickOrEnter
+                  , _channelConfig_messagesConfig = MessagesConfig $ do
+                      dyn_ $ ffor (_channelView_messages channelView) $ \case
+                        Nothing -> text "loading..."
+                        Just msgs -> messagesHelper scrollEl msgs
+                  }
+                let newMessage = current $ value input
+                    enter = keypress Enter $ _inputElement_element input
+                    clickOrEnter = leftmost [send, enter]
+                    sendMessage = gate (not . T.null . T.strip <$> newMessage) clickOrEnter
+                _ <- requestingIdentity $ attachWith
+                  (\(c, m) _ -> ApiRequest_Private () $ PrivateRequest_SendMessage c m)
+                  ((,) <$> current cid <*> newMessage)
+                  sendMessage
+            pure logout
+          setRoute $ FrontendRoute_Login :/ () <$ logout
+          pure $ Nothing <$ logout
         FrontendRoute_SignUp -> do
           credentials <- signUp
           redirectIfAuthenticated mAuthCookie $ do

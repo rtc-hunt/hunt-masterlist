@@ -1,12 +1,3 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
-
--- | This is kind of a hefty widget, not just the channel list but your access to settings and what not
-
 module Frontend.Templates.Partials.ChannelList where
 
 import Control.Category
@@ -18,25 +9,22 @@ import Data.Default
 import qualified Data.Map as Map
 import qualified Data.Text as T
 import Data.Text (Text)
-import Data.Vessel.Map
 import Data.Vessel.Vessel
 import Obelisk.Route.Frontend
 import Prelude hiding ((.), id)
 import Reflex.Dom.Core
 import Rhyolite.Api hiding (Request)
-import Rhyolite.Frontend.App
+import Rhyolite.Vessel.Path
 
 import Common.Request
 import Common.Route
 import Common.View
 
-import Frontend.Templates.Partials.Searchbar
-import Frontend.Templates.Partials.Headers
 import Frontend.Templates.Partials.Buttons
+import Frontend.Templates.Partials.Headers
 import Frontend.Templates.Partials.Lists
+import Frontend.Templates.Partials.Searchbar
 import Frontend.Utils
-
-import Rhyolite.Vessel.Path
 
 
 data ChannelListConfig t = ChannelListConfig

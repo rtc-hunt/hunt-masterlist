@@ -1,215 +1,208 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE RecursiveDo #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE FlexibleInstances #-}
-
 module Frontend.Templates.Channel where
 
 import Control.Category
-import Control.Monad
-import Control.Monad.Fix
 import Data.Bool
-import qualified Data.Map as Map
-import Data.Map (Map)
 import Data.Set (Set)
 import qualified Data.Sequence as Seq
 import Data.Sequence (ViewR (..))
 import Data.Semigroup
+import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time
 import Data.Vessel
+import Data.Vessel.Path
 import Database.Id.Class
 import Obelisk.Route.Frontend
 import Prelude hiding ((.), id)
 import Reflex
-import Reflex.Dom.Core hiding (Request)
+import Reflex.Dom.Core hiding (Request, El)
 import Rhyolite.Api hiding (Request)
 import Rhyolite.Vessel.Path
 import Control.Monad.IO.Class
+
+import Control.Monad
+import Control.Monad.Fix
+import Data.Map (Map)
+import qualified Data.Map as Map
+import qualified GHCJS.DOM.Element as JS
+import GHCJS.DOM.Types (MonadJSM)
 
 import Common.Request
 import Common.Route
 import Common.Schema
 import Common.View
 
-import Frontend.JS.Window
 import Frontend.Templates.Partials.Buttons
 import Frontend.Templates.Partials.ChannelList
-import Frontend.Templates.Partials.Headers
-import Frontend.Templates.Partials.MessageView
-import Frontend.Templates.Partials.Switch
-
-import Frontend.Utils
 
 import qualified Data.Set as Set
 
-channel
-  :: forall t m js.
-     ( PostBuild t m
-     , DomBuilder t m
-     , MonadQuery t (Vessel V (Const SelectedCount)) m
-     , MonadHold t m
-     , MonadFix m
-     , SetRoute t (R FrontendRoute) m
-     , Prerender js t m
-     , PerformEvent t m
-     , TriggerEvent t m
-     , MonadIO (Performable m)
-     , Requester t m, Response m ~ Identity, Request m ~ ApiRequest () PublicRequest PrivateRequest
-     )
-  => Dynamic t (Id Chatroom)
-  -> m (Event t ())
-channel cid = elClass "div" "w-screen h-screen bg-background flex flex-col overflow-hidden" $ do
-  header True
-  elClass "div" "w-full flex flex-row flex-grow h-0" $ do
-    click <- elClass "div" "flex-shrink-0 w-1/4 h-full flex-col bg-sunken hidden md:flex border-r border-metaline" $
-      channelList $ def & channelListConfig_useH2 .~ True
-    channelInterior cid
-    pure click
+channelPage :: 
+  ( PostBuild t m
+  , DomBuilder t m
+  , MonadQuery t (Vessel V (Const SelectedCount)) m
+  , MonadHold t m
+  , MonadFix m
+  , SetRoute t (R FrontendRoute) m
+  , Requester t m, Response m ~ Identity, Request m ~ ApiRequest () PublicRequest PrivateRequest
+  )
+  => ChannelConfig t m
+  -> m (ChannelOut t m, Event t ())
+channelPage cfg = elClass "div" "w-full flex flex-row flex-grow h-0" $ do
+  click <- elClass "div" "flex-shrink-0 w-1/4 h-full flex-col bg-sunken hidden md:flex border-r border-metaline" $ do
+    channelList $ def & channelListConfig_useH2 .~ True
+  cout <- channel cfg
+  pure (cout, click)
 
-channelInterior
-  :: forall t m js.
-     ( PostBuild t m
-     , DomBuilder t m
-     , MonadHold t m
-     , MonadFix m
-     , Prerender js t m
-     , MonadQuery t (Vessel V (Const SelectedCount)) m
-     , PerformEvent t m
-     , TriggerEvent t m
-     , MonadIO (Performable m)
-     , Requester t m, Response m ~ Identity, Request m ~ ApiRequest () PublicRequest PrivateRequest
-     )
-  => Dynamic t (Id Chatroom)
+type Template t m = (DomBuilder t m, PostBuild t m)
+
+type InputEl t m = InputElement EventResult (DomBuilderSpace m) t
+
+data ChannelConfig t m = ChannelConfig
+  { _channelConfig_name :: Dynamic t Text
+  , _channelConfig_clearInput :: Event t ()
+  , _channelConfig_messagesConfig :: MessagesConfig m
+  }
+
+data ChannelOut t m = ChannelOut
+  { _channelOut_messageInput :: InputEl t m
+  , _channelOut_send :: Event t ()
+  , _channelOut_scrollingContainer :: El t m
+  }
+
+channel :: Template t m => ChannelConfig t m -> m (ChannelOut t m)
+channel cfg = elClass "div" "w-full flex flex-col" $ do
+  elClass "div" "p-4 bg-raised flex flex-row justify-between items-center border-b border-metaline relative" $ do
+    elClass "div" "flex flex-col" $ do
+      elClass "div" "font-karla font-bold text-h2 md:text-h1 text-copy leading-none" $
+        dynText $ _channelConfig_name cfg
+  mout <- messages $ _channelConfig_messagesConfig cfg
+  elClass "div" "p-1 bg-white flex flex-row justify-center border-t border-metaline" $ do
+    input <- messageInput $ _channelConfig_clearInput cfg
+    send <- sendButton
+    pure $ ChannelOut
+      { _channelOut_messageInput = input
+      , _channelOut_send = send
+      , _channelOut_scrollingContainer = _messagesOut_container mout
+      }
+
+messageInput :: DomBuilder t m => Event t () -> m (InputEl t m)
+messageInput clearEvent = inputElement $ def
+  & initialAttributes .~
+    ( "class" =: "focus:outline-none mx-1 font-facit font-label text-label placeholder-light px-3.5 bg-inset rounded shadow-input flex-grow"
+      <> "placeholder" =: "Type your message"
+      <> "type" =: "text"
+    )
+  & inputElementConfig_setValue .~ ("" <$ clearEvent)
+
+sendButton :: DomBuilder t m => m (Event t ())
+sendButton = iconButton "send"
+
+data MessagesConfig m = MessagesConfig
+  { _messagesConfig_messageList :: m ()
+  }
+
+type El t m = Element EventResult (DomBuilderSpace m) t
+
+data MessagesOut t m = MessagesOut
+  { _messagesOut_container :: El t m
+  }
+
+messages :: Template t m => MessagesConfig m -> m (MessagesOut t m)
+messages cfg = do
+  (e, _) <- elAttr' "ul" ("class" =: "p-4 flex-grow flex flex-col overflow-y-scroll") $ do
+    _messagesConfig_messageList cfg
+  pure $ MessagesOut
+    { _messagesOut_container = e
+    }
+
+messagesHelper
+  :: (DomBuilder t m, PostBuild t m, MonadFix m, MonadHold t m, DomRenderHook t m, JS.IsElement (RawElement (DomBuilderSpace m)))
+  => El t m
+  -> Dynamic t (Map Int MsgView)
   -> m ()
-channelInterior cid = elClass "div" "w-full flex flex-col" $ do
-  pb <- getPostBuild
-  let getLatestMessage = ApiRequest_Private () . PrivateRequest_LatestMessage <$> leftmost [tag (current cid) pb, updated cid]
-  latestD <- requestingIdentity getLatestMessage
-  void . widgetHold blank . ffor latestD $ \case
-    Left e -> text e
-    Right (cid', latestOnLoad) -> do
-      mName <- watch $ constDyn (key V_Chatroom ~> key cid')
-      elClass "div" "p-4 bg-raised flex flex-row justify-between items-center border-b border-metaline relative" $ do
-        elClass "div" "flex flex-col" $ do
-          elClass "div" "font-karla font-bold text-h2 md:text-h1 text-copy leading-none" $ dynText $ ffor mName $ \case
-            Nothing -> "Channel"
-            Just (First name) -> name
+messagesHelper scrollEl msgs =
+  withRenderHook (scrollRenderHook scrollEl) $ void $ listWithKey msgs $ \_ -> message
 
-        elClass "div" "flex flex-row items-center" $ do
-          secondaryIconButton "" "search"
-          elClass "div" "" $ do
-            eClickMore <- secondaryIconButton "ml-2 md:hidden" "more_horiz"
-
-            dMoreOpen <- foldDyn ($) False $ not <$ eClickMore
-            let
-              mkMenuClasses b =
-                classList [ "absolute left-0 right-0 top-full p-4 md:hidden"
-                          , "tranform transition-all duration-150"
-                          , bool "pointer-events-none opacity-0" "pointer-events-auto opacity-100" b
-                          ]
-
-            elDynClass "div" (mkMenuClasses <$> dMoreOpen) $ do
-              elClass "div" "bg-white rounded p-4 shadow-button z-10" $ do
-                switchButton $ (def :: SwitchConfig t)
-                  & switchConfig_label .~ "Notifications"
-                  & switchConfig_icon .~ Just "notifications_none"
-                  & switchConfig_disabled .~ pure True
-
-                elClass "div" "flex flex-row items-center mt-4" $ do
-                  elClass "div" "font-icon leading-none text-icon text-copy mr-1 " $ text "person_outline"
-                  elClass "div" "font-facit text-body text-copy" $ text "Members"
-
-      -- Not the appropriate place for it but this is just an example after all :)
-      myWindowSize <- fmap join $ prerender (pure (pure (4000,4000))) $ do
-        window <- askDomWindow
-        windowSize window
-
-      rec let requestCount = 100
-              nearToEnd :: Int -> Int -> Bool
-              nearToEnd lastMessage maxAllowed = lastMessage + 20 >= maxAllowed
-              intervalE :: Event t (Set RequestInterval -> Set RequestInterval) =
-                fforMaybe (mMessagesE) $ \msgs -> do
-                  ms :: Map RequestInterval (Map Int MsgView) <- msgs
-                  (ri, ms') <- Map.lookupMax ms
-                  (k, _) <- Map.lookupMax ms'
-                  let m = requestIntervalMax ri
-                  guard (nearToEnd k m)
-                  return $ Set.insert (RequestInterval m 0 requestCount)
-          intervals <- foldDyn ($) (Set.singleton (RequestInterval latestOnLoad requestCount requestCount)) intervalE
-          mMessagesE <- fmapMaybe ((\case (_ :> x) -> Just x; _ -> Nothing) . Seq.viewr) <$> batchOccurrences 1 (updated mMessages')
-          mMessages' :: Dynamic t (Maybe (Map RequestInterval (Map Int MsgView))) <- watch . ffor intervals $ \ris ->
-               key V_Messages
-            ~> key cid'
-            ~> keys ris
-            ~> semiMapsP
-      mMessages <- maybeDyn mMessages'
-      dyn_ $ ffor (mMessages :: Dynamic t (Maybe (Dynamic t (Map RequestInterval (Map Int MsgView))))) $ \case
-        Nothing -> pure ()
-        Just ms -> do
-          let messageViewConfig = MessageViewConfig
-                { _messageViewConfig_minimumItemHeight = 60
-                , _messageViewConfig_windowSize = myWindowSize
-                , _messageViewConfig_messages = fmap Map.unions ms
-                }
-          -- Stubbing out the design which distinguishes between the current user's messages and
-          -- messages from other people.
-          _ <- messageView messageViewConfig (message (MessageConfig { _messageConfig_viewer = pure True }))
-          pure ()
-
-      elClass "div" "p-1 bg-white flex flex-row justify-center border-t border-metaline" $ do
-        secondaryIconButton "" "add"
-        rec inputBox <- inputElement $ def
-              & initialAttributes .~ ( "class" =: "focus:outline-none mx-1 font-facit font-label text-label placeholder-light px-3.5 bg-inset rounded shadow-input flex-grow"
-                                       <> "placeholder" =: "Type your message"
-                                       <> "type" =: "text"
-                                     )
-              & inputElementConfig_setValue .~ ("" <$ sendMessage)
-            sendClick <- iconButton "send"
-            let newMessage = value inputBox
-                sendEnter = fmapMaybe (\w -> guard (w==13) >> pure ()) $
-                  domEvent Keypress (_inputElement_element inputBox)
-                sendMessage = fmapMaybe (\r@(_, m) -> guard (not (T.null m)) >> pure r) $
-                  tag (current ((,) <$> cid <*> newMessage)) $ leftmost [sendClick, sendEnter]
-        _ <- fmap fanEither . requestingIdentity $ ffor sendMessage $ \(c, payload) ->
-          ApiRequest_Private () $ PrivateRequest_SendMessage c payload
-        pure ()
-
-messageFullWidth :: DomBuilder t m => m ()
-messageFullWidth = do
-  elClass "div" "font-facit text-copy flex flex-col mt-4" $ do
-    elClass "div" "flex flex-row items-baseline justify-between" $ do
-      elClass "div" "text-label" $ text "Tanko"
-      elClass "div" "font-bold text-label text-light" $ text "2:00am"
-    elClass "div" "p-4 rounded border border-metaline bg-white" $ text "What is good?"
-
-data MessageConfig t = MessageConfig
-   { _messageConfig_viewer :: Dynamic t Bool
-   }
+scrollRenderHook :: (MonadJSM m, JS.IsElement (RawElement d)) => Element er d t -> m a -> m a
+scrollRenderHook container domAction = do
+  let e = _element_raw container
+  result <- domAction
+  h <- JS.getScrollHeight e
+  JS.setScrollTop e h
+  return result
 
 message
   :: (PostBuild t m, DomBuilder t m)
-  => MessageConfig t
-  -> Int
-  -> Dynamic t MsgView
+  => Dynamic t MsgView
   -> m ()
-message (MessageConfig dViewer) _ mView = do
-  elDynClass "li" (mkClasses <$> dViewer) $ do
+message mView = do
+  elClass "li" "font-facit text-copy flex flex-col mb-6 ml-16 md:ml-0 md:items-end" $ do
     elClass "div" "flex flex-row items-baseline justify-between" $ do
       elClass "div" "text-label md:mr-4" $ dynText (fmap _msgView_handle mView)
       elClass "div" "font-bold text-label text-light" $ dynText . ffor mView $ \mv -> T.pack $
         formatTime defaultTimeLocale "%R" (_msgView_timestamp mv)
     elClass "div" "p-4 rounded border border-metaline bg-white w-auto" $ dynText (fmap _msgView_text mView)
 
-  where
-    mkClasses b =
-      classList [ "font-facit text-copy flex flex-col mb-6"
-                , bool "mr-16 md:mr-0 md:items-start" "ml-16 md:ml-0 md:items-end" b
-                ]
+-- TODO move this
+firstP :: Traversable f => Path x x (f (First v)) (f v)
+firstP = postMap (traverse (Just . getFirst))
+emptyPath :: Monoid m => Path a m m' a'
+emptyPath = Path (const mempty) (const Nothing)
+
+data ChannelView t = ChannelView
+  { _channelView_name :: Dynamic t (Maybe Text)
+  , _channelView_messages :: Dynamic t (Maybe (Dynamic t (Map Int MsgView)))
+  }
+
+-- TODO move to reflex-dom-core and maybe explain why/when this is necessary
+onRender :: (Prerender js t m, Monad m) => m (Event t ())
+onRender = fmap updated (prerender blank blank)
+
+channelBuilder
+  :: forall t m js.
+     ( PostBuild t m
+     , DomBuilder t m
+     , MonadHold t m
+     , MonadFix m
+     , Prerender js t m
+     , MonadQuery t (Vessel V (Const SelectedCount)) m
+     , PerformEvent t m
+     , TriggerEvent t m
+     , MonadIO (Performable m)
+     , Requester t m, Response m ~ Identity, Request m ~ ApiRequest () PublicRequest PrivateRequest
+     )
+  => Dynamic t (Id Chatroom)
+  -> m (ChannelView t)
+channelBuilder cid = do
+  pb <- onRender
+  let cidE = leftmost
+        [ tag (current cid) pb
+        , updated cid
+        ]
+  (errors, channelInfo) <- fmap fanEither $ requestingIdentity $ ffor cidE $ \c ->
+    ApiRequest_Private () $ PrivateRequest_LatestMessage c
+  (name, msgs) <- fmap splitDynPure $ widgetHold (pure mempty) $ ffor channelInfo $ \(c, n) -> do
+    name <- watch $ pure $ key V_Chatroom ~> key c ~> firstP
+    rec let requestCount = 100
+            nearToEnd :: Int -> Int -> Bool
+            nearToEnd lastMessage maxAllowed = lastMessage + 20 >= maxAllowed
+            interval0 = Set.singleton (RequestInterval n requestCount requestCount)
+            loadBottom :: Event t (Set RequestInterval -> Set RequestInterval)
+            loadBottom = fforMaybe (mMessagesE) $ \msgs -> do
+                ms :: Map RequestInterval (Map Int MsgView) <- msgs
+                (ri, ms') <- Map.lookupMax ms
+                (k, _) <- Map.lookupMax ms'
+                let m = requestIntervalMax ri
+                guard (nearToEnd k m)
+                return $ Set.insert (RequestInterval m 0 requestCount)
+        intervals <- foldDyn ($) interval0 loadBottom
+        mMessagesE <- fmapMaybe ((\case (_ :> x) -> Just x; _ -> Nothing) . Seq.viewr) <$> batchOccurrences 1 (updated mMessages')
+        mMessages' :: Dynamic t (Maybe (Map RequestInterval (Map Int MsgView))) <- watch . ffor intervals $ \ris ->
+          key V_Messages ~> key c ~> keys ris ~> semiMapsP
+    messages <- maybeDyn $ fmap (fmap Map.unions) mMessages'
+    pure (name, messages)
+  pure $ ChannelView
+    { _channelView_name = join name
+    , _channelView_messages = join msgs
+    }
