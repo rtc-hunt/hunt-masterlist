@@ -18,6 +18,11 @@ import Control.Monad
 import Control.Monad.Fix
 import Data.Bool
 import qualified Data.Map as Map
+import Data.Map (Map)
+import qualified Data.Set as Set
+import Data.Set (Set)
+import qualified Data.Sequence as Seq
+import Data.Sequence (ViewR (..))
 import Data.Semigroup
 import qualified Data.Text as T
 import Data.Time
@@ -30,6 +35,7 @@ import Reflex
 import Reflex.Dom.Core hiding (Request)
 import Rhyolite.Api hiding (Request)
 import Rhyolite.Frontend.App
+import Control.Monad.IO.Class
 
 import Common.Request
 import Common.Route
@@ -45,7 +51,6 @@ import Frontend.Templates.Partials.Switch
 
 import Frontend.Utils
 
-import qualified Data.Set as Set
 import Data.Vessel.Path
 
 channel
@@ -57,6 +62,9 @@ channel
      , MonadFix m
      , SetRoute t (R FrontendRoute) m
      , Prerender js t m
+     , PerformEvent t m
+     , TriggerEvent t m
+     , MonadIO (Performable m)
      , Requester t m, Response m ~ Identity, Request m ~ ApiRequest () PublicRequest PrivateRequest
      )
   => Dynamic t (Id Chatroom)
@@ -69,7 +77,6 @@ channel cid = elClass "div" "w-screen h-screen bg-background flex flex-col overf
     channelInterior cid
     pure click
 
-
 channelInterior
   :: forall t m js.
      ( PostBuild t m
@@ -78,6 +85,9 @@ channelInterior
      , MonadFix m
      , Prerender js t m
      , MonadQuery t (Vessel V (Const SelectedCount)) m
+     , PerformEvent t m
+     , TriggerEvent t m
+     , MonadIO (Performable m)
      , Requester t m, Response m ~ Identity, Request m ~ ApiRequest () PublicRequest PrivateRequest
      )
   => Dynamic t (Id Chatroom)
@@ -88,7 +98,7 @@ channelInterior cid = elClass "div" "w-full flex flex-col" $ do
   latestD <- requestingIdentity getLatestMessage
   void . widgetHold blank . ffor latestD $ \case
     Left e -> text e
-    Right (cid', latest) -> do
+    Right (cid', latestOnLoad) -> do
       mName <- watchView $ constDyn (vessel V_Chatroom . mapVMorphism cid')
       elClass "div" "p-4 bg-raised flex flex-row justify-between items-center border-b border-metaline relative" $ do
         elClass "div" "flex flex-col" $ do
@@ -125,15 +135,26 @@ channelInterior cid = elClass "div" "w-full flex flex-col" $ do
         window <- askDomWindow
         windowSize window
 
-      --mMessages <- (maybeDyn . fmap (completeMapOf =<<) =<<) . watchView . constDyn $ vessel V_Messages . subVessel cid' . mapVMorphism (RequestInterval latest 100 100)
-      -- let riDyn = FullPath (key V_Messages ~> key cid' ~> keys (Set.singleton (RequestInterval latest 100 100)) ~> semiMapP)
-      mMessages <- maybeDyn <=< watch . constDyn $
-           key V_Messages
-        ~> key cid'
-        ~> keys (Set.singleton (RequestInterval latest 100 100))
-        ~> semiMapsP
-
-      dyn_ $ ffor mMessages $ \case
+      rec let requestCount = 100
+              nearToEnd :: Int -> Int -> Bool
+              nearToEnd lastMessage maxAllowed = lastMessage + 20 >= maxAllowed
+              intervalE :: Event t (Set RequestInterval -> Set RequestInterval) =
+                fforMaybe (mMessagesE) $ \msgs -> do
+                  ms :: Map RequestInterval (Map Int MsgView) <- msgs
+                  (ri, ms') <- Map.lookupMax ms
+                  (k, _) <- Map.lookupMax ms'
+                  let m = requestIntervalMax ri
+                  guard (nearToEnd k m)
+                  return $ Set.insert (RequestInterval m 0 requestCount)
+          intervals <- foldDyn ($) (Set.singleton (RequestInterval latestOnLoad requestCount requestCount)) intervalE
+          mMessagesE <- fmap ((\(_ :> x) -> x) . Seq.viewr) <$> batchOccurrences 1 (updated mMessages')
+          mMessages' :: Dynamic t (Maybe (Map RequestInterval (Map Int MsgView))) <- watch . ffor intervals $ \ris ->
+               key V_Messages
+            ~> key cid'
+            ~> keys ris
+            ~> semiMapsP
+      mMessages <- maybeDyn mMessages'
+      dyn_ $ ffor (mMessages :: Dynamic t (Maybe (Dynamic t (Map RequestInterval (Map Int MsgView))))) $ \case
         Nothing -> pure ()
         Just ms -> do
           let messageViewConfig = MessageViewConfig
@@ -179,15 +200,15 @@ data MessageConfig t = MessageConfig
 message
   :: (PostBuild t m, DomBuilder t m)
   => MessageConfig t
-  -> (UTCTime, Id Message)
+  -> Int
   -> Dynamic t MsgView
   -> m ()
-message (MessageConfig dViewer) (sendTime, _) mView = do
+message (MessageConfig dViewer) _ mView = do
   elDynClass "li" (mkClasses <$> dViewer) $ do
     elClass "div" "flex flex-row items-baseline justify-between" $ do
       elClass "div" "text-label md:mr-4" $ dynText (fmap _msgView_handle mView)
-      elClass "div" "font-bold text-label text-light" $ text $ T.pack $
-        formatTime defaultTimeLocale "%R" sendTime
+      elClass "div" "font-bold text-label text-light" $ dynText . ffor mView $ \mv -> T.pack $
+        formatTime defaultTimeLocale "%R" (_msgView_timestamp mv)
     elClass "div" "p-4 rounded border border-metaline bg-white w-auto" $ dynText (fmap _msgView_text mView)
 
   where

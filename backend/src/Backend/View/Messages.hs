@@ -18,7 +18,7 @@ import Common.View
 
 getMessages :: Psql m
             => MonoidalMap (Id Chatroom) (Set RequestInterval)
-            -> m (MonoidalMap (Id Chatroom) (MonoidalMap RequestInterval (SemiMap (UTCTime, Id Message) MsgView)))
+            -> m (MonoidalMap (Id Chatroom) (MonoidalMap RequestInterval (SemiMap Int MsgView)))
 getMessages reqs = do
   let requestValues = Values ["int4", "int4", "int4", "int4"] $ do
         (cid, ris) <- Map.toList reqs
@@ -27,7 +27,7 @@ getMessages reqs = do
   results :: [(Id Chatroom, Int, Int, Int, Int, UTCTime, Id Message, Text, Text)] <- [iquery|
     select r.cid, r.seq, r.before, r.after,
            m.seq, m.timestamp at time zone 'utc', m.id, m.text, a.account_email
-    from (select m.*, row_number() over (partition by m.chatroom) as seq from "Message" m) as m
+    from (select m.*, row_number() over (partition by m.chatroom order by timestamp) as seq from "Message" m) as m
     join "Account" a on a.id = m.account
     join ${requestValues} as r (cid,seq,before,after)
       on r.cid = m.chatroom
@@ -39,8 +39,9 @@ getMessages reqs = do
         -- The `unionWith const` is safe because `mid` is a primary key
         Map.unionsWith (Map.unionWith (Map.unionWith const)) $
           flip fmap results $ \(cid, rseq, before, after, mseq, t, mid, messageBody, senderHandle) ->
-            Map.singleton cid $ Map.singleton (RequestInterval rseq before after) $ Map.singleton (t, mid) $ MsgView
-              { _msgView_sequence = mseq
+            Map.singleton cid $ Map.singleton (RequestInterval rseq before after) $ Map.singleton mseq $ MsgView
+              { _msgView_id = mid
+              , _msgView_timestamp = t
               , _msgView_handle = senderHandle
               , _msgView_text = messageBody
               }
