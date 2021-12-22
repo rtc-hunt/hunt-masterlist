@@ -25,11 +25,9 @@ library
     Frontend
     Frontend.Authentication
     Frontend.Channel
-    Frontend.ChannelList
     Frontend.Types
     Frontend.Utils
     Templates
-    Templates.Partials.Common
     Templates.Partials.Header
     Templates.Partials.TextInput
     Templates.Channel
