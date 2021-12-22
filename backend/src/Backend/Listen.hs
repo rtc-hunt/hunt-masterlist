@@ -78,11 +78,11 @@ notifyHandler db nm v = case _dbNotification_message nm of
         (cid, mseq, time, acc, txt):_ -> buildV v $ \case
           V_Messages -> \sv ->
             let msg = Identity . SemiMap_Partial . Map.singleton mseq . First . Just $
-                  MsgView
-                    { _msgView_id = mid
-                    , _msgView_timestamp = time
-                    , _msgView_handle = acc
-                    , _msgView_text = txt }
+                  Msg
+                    { _msg_id = mid
+                    , _msg_timestamp = time
+                    , _msg_handle = acc
+                    , _msg_text = txt }
             in case lookupSubVessel cid sv of
               Nothing -> pure emptyV
               Just (MapV reqs) -> pure . singletonSubVessel cid . MapV $

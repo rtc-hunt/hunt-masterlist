@@ -13,14 +13,12 @@ import Prelude hiding (id, (.))
 import Control.Category
 import Control.Monad.Fix
 import qualified Data.Aeson as A
-import Data.Functor.Const
 import Data.Functor.Identity
 import qualified Data.List as L
-import Data.Maybe (isNothing, fromMaybe)
+import Data.Maybe (isNothing)
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
-import Data.Vessel.Class
 import Data.Witherable as W
 import GHCJS.DOM (currentDocumentUnchecked)
 import Obelisk.Frontend
@@ -41,27 +39,19 @@ import Rhyolite.Api (ApiRequest(..))
 import Rhyolite.Frontend.App
 import Rhyolite.Frontend.Cookie
 import Data.Signed (Signed)
-import Rhyolite.Vessel.ErrorV
-import Rhyolite.Vessel.AuthMapV
 
 import Common.Request
 import Common.Route
-import Common.View
 
 import Frontend.Authentication
+import Frontend.Channel (channel)
+import Frontend.Types
 
 import Templates.Partials.Containers
-import Templates.Partials.ChannelList
 import Templates.Partials.TextInput
 import Templates.Partials.PasswordInput
 import Templates.Partials.Buttons
-import Templates.Partials.Headers
-import Templates.Channel
-
-type ExampleCredential = Signed (AuthToken Identity)
-type ExampleWidget = RhyoliteWidget
-  (AuthMapV ExampleCredential PrivateChatV (Const SelectedCount))
-  (ApiRequest ExampleCredential PublicRequest PrivateRequest)
+import TemplateViewer
 
 authCookieName :: Text
 authCookieName = "auth"
@@ -148,15 +138,6 @@ signUp = screenContainer $ do
     credentials <- zipDyn <$> holdDyn "" usernameEvent <*> holdDyn "" passwordEvent
     pure $ W.filter testCredentials $ tagPromptlyDyn credentials click
 
--- Surrounds view with header in a screen sized div, default for most pages
-appPage :: (DomBuilder t m)
-  => m a
-  -> m (a, Event t Logout)
-appPage action = screenContainer $ do
-  logout <- header
-  a <- action
-  pure (a, logout)
-
 -- | Handle setting the user's cookie to the given auth token (if any)
 manageAuthCookie :: (DomBuilder t m, Prerender js t m)
   => Event t (Maybe (Signed (AuthToken Identity)))
@@ -181,33 +162,9 @@ frontendBody = do
   -- (at least on GHC 8.6.5) the compiler cannot properly infer that
   -- this function has the proper higher rank type.
       authChange <- fmap switchDyn $ subRoute $ ((\case
+        FrontendRoute_Templates -> templateViewer >> return never
         FrontendRoute_Channel -> authenticateWithToken mAuthCookie $ do
-          (_, logout) <- appPage $ do
-            mcid <- maybeDyn =<< askRoute
-            dyn_ . ffor mcid $ \case
-              Nothing -> do
-                rec cl <- channelList (ChannelListConfig (channelSearchResults cl))
-                pure ()
-              Just cid -> do
-                channelView <- channelBuilder cid
-                prerender_ blank $ do
-                  rec ChannelOut input send scrollEl <- channelPage $ ChannelConfig
-                        { _channelConfig_name = fromMaybe "" <$> _channelView_name channelView
-                        , _channelConfig_clearInput = clickOrEnter
-                        , _channelConfig_messagesConfig = MessagesConfig $ do
-                            dyn_ $ ffor (_channelView_messages channelView) $ \case
-                              Nothing -> text "loading..."
-                              Just msgs -> messagesHelper scrollEl msgs
-                        }
-                      let newMessage = current $ value input
-                          enter = keypress Enter $ _inputElement_element input
-                          clickOrEnter = leftmost [send, enter]
-                          sendMessage = gate (not . T.null . T.strip <$> newMessage) clickOrEnter
-                      _ <- requestingIdentity $ attachWith
-                        (\(c, m) _ -> ApiRequest_Private () $ PrivateRequest_SendMessage c m)
-                        ((,) <$> current cid <*> newMessage)
-                        sendMessage
-                  pure ()
+          logout <- channel
           pure $ Nothing <$ logout
         FrontendRoute_SignUp -> do
           credentials <- signUp
@@ -263,12 +220,3 @@ runExampleWidget = fmap snd . runObeliskRhyoliteWidget
   "common/route"
   checkedFullRouteEncoder
   (BackendRoute_Listen :/ ())
-
-queryDynE
-  :: ( MonadQuery t (ErrorV e v (Const SelectedCount)) m
-     , Reflex t
-     , EmptyView v
-     )
-  => Dynamic t (ErrorV e v (Const SelectedCount))
-  -> m (Dynamic t (Either e (v Identity)))
-queryDynE = fmap (fmap observeErrorV) . queryDyn

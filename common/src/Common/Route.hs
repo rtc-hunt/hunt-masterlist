@@ -34,6 +34,7 @@ data FrontendRoute :: * -> * where
   FrontendRoute_Login :: FrontendRoute ()
   FrontendRoute_SignUp :: FrontendRoute ()
   FrontendRoute_Channel :: FrontendRoute (Maybe (Id Chatroom))
+  FrontendRoute_Templates :: FrontendRoute ()
   -- This type is used to define frontend routes, i.e. ones for which the backend will serve the frontend.
 
 fullRouteEncoder
@@ -49,6 +50,7 @@ fullRouteEncoder = mkFullRouteEncoder
       FrontendRoute_SignUp -> PathSegment "signup" $ unitEncoder mempty
       FrontendRoute_Main -> PathEnd $ unitEncoder mempty
       FrontendRoute_Channel -> PathSegment "channel" $ maybeEncoder (unitEncoder mempty) (singlePathSegmentEncoder . idEncoder)
+      FrontendRoute_Templates -> PathSegment "templates" $ unitEncoder mempty
   )
 
 checkedFullRouteEncoder :: Encoder Identity Identity (R (FullRoute BackendRoute FrontendRoute)) PageName

@@ -18,7 +18,7 @@ import Common.View
 
 getMessages :: Psql m
             => MonoidalMap (Id Chatroom) (Set RequestInterval)
-            -> m (MonoidalMap (Id Chatroom) (MonoidalMap RequestInterval (SemiMap Int MsgView)))
+            -> m (MonoidalMap (Id Chatroom) (MonoidalMap RequestInterval (SemiMap Int Msg)))
 getMessages reqs = do
   let requestValues = Values ["int4", "int4", "int4", "int4"] $ do
         (cid, ris) <- Map.toList reqs
@@ -39,11 +39,11 @@ getMessages reqs = do
         -- The `unionWith const` is safe because `mid` is a primary key
         Map.unionsWith (Map.unionWith (Map.unionWith const)) $
           flip fmap results $ \(cid, rseq, before, after, mseq, t, mid, messageBody, senderHandle) ->
-            Map.singleton cid $ Map.singleton (RequestInterval rseq before after) $ Map.singleton mseq $ MsgView
-              { _msgView_id = mid
-              , _msgView_timestamp = t
-              , _msgView_handle = senderHandle
-              , _msgView_text = messageBody
+            Map.singleton cid $ Map.singleton (RequestInterval rseq before after) $ Map.singleton mseq $ Msg
+              { _msg_id = mid
+              , _msg_timestamp = t
+              , _msg_handle = senderHandle
+              , _msg_text = messageBody
               }
   pure $
     -- The sql query will not return results for empty channels. We ensure that

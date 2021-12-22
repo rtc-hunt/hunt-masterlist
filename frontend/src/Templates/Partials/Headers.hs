@@ -1,25 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Templates.Partials.Headers where
+module Templates.Partials.Headers (header, h1, h2) where
 
-import Control.Lens
-import Data.Text (Text)
-import Data.Default
 import Reflex.Dom.Core
 
-import Frontend.Utils
+import Frontend.Types
 import Templates.Partials.Buttons
-
-data HeaderConfig t = HeaderConfig
-  { _headerConfig_header :: Text
-  , _headerConfig_classes :: Text
-  }
-
-instance Default (HeaderConfig t) where
-  def = HeaderConfig "H1" ""
-
-data Logout = Logout
 
 header :: DomBuilder t m => m (Event t Logout)
 header = do
@@ -30,10 +17,8 @@ header = do
 
 h1 :: DomBuilder t m => m () -> m ()
 h1 =
-  elClass "h1" (classList ["font-karla font-bold text-h1 text-copy"])
+  elClass "h1" "font-karla font-bold text-h1 text-copy"
 
 h2 :: DomBuilder t m => m () -> m ()
 h2 =
-  elClass "h2" (classList ["font-karla font-bold text-h2 text-copy"])
-
-makeLenses ''HeaderConfig
+  elClass "h2" "font-karla font-bold text-h2 text-copy"

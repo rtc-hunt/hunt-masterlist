@@ -55,3 +55,6 @@ secondaryButton cs label = do
                 , "focus:ring-4 ring-primary ring-opacity-50"
                 , cs
                 ]
+
+sendButton :: DomBuilder t m => m (Event t ())
+sendButton = iconButton "send"

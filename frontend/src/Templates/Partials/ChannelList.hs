@@ -4,7 +4,6 @@ import Control.Category
 import Control.Lens
 import Control.Monad
 import Control.Monad.Fix
-import Data.Bool
 import Data.Default
 import qualified Data.Map as Map
 import Data.Text (Text)

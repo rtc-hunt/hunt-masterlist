@@ -24,16 +24,16 @@ import Data.Semigroup
 
 import Common.Schema
 
-data MsgView = MsgView
-  { _msgView_id :: Id Message
-  , _msgView_timestamp :: UTCTime
-  , _msgView_handle :: Text
-  , _msgView_text :: Text
+data Msg = Msg
+  { _msg_id :: Id Message
+  , _msg_timestamp :: UTCTime
+  , _msg_handle :: Text
+  , _msg_text :: Text
   }
   deriving (Show, Generic, Eq)
 
-instance ToJSON MsgView
-instance FromJSON MsgView
+instance ToJSON Msg
+instance FromJSON Msg
 
 data ChatroomQuery = ChatroomQuery
   { _chatroomQuery_search :: Text
@@ -68,7 +68,7 @@ inRequestInterval (RequestInterval point before after) n = point - before <= n &
 data V a where
   V_Chatrooms :: V (MapV ChatroomQuery (SemiMap (Id Chatroom) Text))
   V_Chatroom :: V (MapV (Id Chatroom) (First Text))
-  V_Messages :: V (SubVessel (Id Chatroom) (MapV RequestInterval (SemiMap Int MsgView)))
+  V_Messages :: V (SubVessel (Id Chatroom) (MapV RequestInterval (SemiMap Int Msg)))
 
 deriving instance Show (V a)
 
