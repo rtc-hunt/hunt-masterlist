@@ -1,4 +1,4 @@
-module Frontend.Templates.Types where
+module Templates.Types where
 
 import Reflex.Dom.Core
 

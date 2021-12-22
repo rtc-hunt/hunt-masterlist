@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Frontend.Templates.Partials.Lists where
+module Templates.Partials.Lists where
 
 import Data.Default
 import Data.Text (Text)

@@ -48,14 +48,15 @@ import Common.Request
 import Common.Route
 import Common.View
 
-import Frontend.Templates.Containers
-import Frontend.Templates.Helpers.Authentication
-import Frontend.Templates.Partials.ChannelList
-import Frontend.Templates.Partials.TextInput
-import Frontend.Templates.Partials.PasswordInput
-import Frontend.Templates.Partials.Buttons
-import Frontend.Templates.Partials.Headers
-import Frontend.Templates.Channel
+import Frontend.Authentication
+
+import Templates.Partials.Containers
+import Templates.Partials.ChannelList
+import Templates.Partials.TextInput
+import Templates.Partials.PasswordInput
+import Templates.Partials.Buttons
+import Templates.Partials.Headers
+import Templates.Channel
 
 type ExampleCredential = Signed (AuthToken Identity)
 type ExampleWidget = RhyoliteWidget

@@ -1,4 +1,4 @@
-module Frontend.Templates.Channel where
+module Templates.Channel where
 
 import Control.Category
 import Data.Bool
@@ -31,9 +31,9 @@ import Common.Route
 import Common.Schema
 import Common.View
 
-import Frontend.Templates.Types
-import Frontend.Templates.Partials.Buttons
-import Frontend.Templates.Partials.ChannelList
+import Templates.Types
+import Templates.Partials.Buttons
+import Templates.Partials.ChannelList
 import Frontend.Utils
 
 import qualified Data.Set as Set
@@ -165,7 +165,7 @@ channelBuilder cid = do
         [ tag (current cid) pb
         , updated cid
         ]
-  (errors, channelInfo) <- fmap fanEither $ requestingIdentity $ ffor cidE $ \c ->
+  (_errors, channelInfo) <- fmap fanEither $ requestingIdentity $ ffor cidE $ \c ->
     ApiRequest_Private () $ PrivateRequest_LatestMessage c
   (name, msgs) <- fmap splitDynPure $ widgetHold (pure mempty) $ ffor channelInfo $ \(c, n) -> do
     name <- watch $ pure $ key V_Chatroom ~> key c ~> firstP
@@ -185,8 +185,8 @@ channelBuilder cid = do
         mMessagesE <- fmapMaybe ((\case (_ :> x) -> Just x; _ -> Nothing) . Seq.viewr) <$> batchOccurrences 1 (updated mMessages')
         mMessages' :: Dynamic t (Maybe (Map RequestInterval (Map Int MsgView))) <- watch . ffor intervals $ \ris ->
           key V_Messages ~> key c ~> keys ris ~> semiMapsP
-    messages <- maybeDyn $ fmap (fmap Map.unions) mMessages'
-    pure (name, messages)
+    channelMessages <- maybeDyn $ fmap (fmap Map.unions) mMessages'
+    pure (name, channelMessages)
   pure $ ChannelView
     { _channelView_name = join name
     , _channelView_messages = join msgs

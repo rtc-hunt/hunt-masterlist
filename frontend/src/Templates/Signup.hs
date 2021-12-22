@@ -1,14 +1,14 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Frontend.Templates.Signup where
+module Templates.Signup where
 
 import Reflex.Dom.Core hiding (textInput, link)
 import Obelisk.Route.Frontend
 
 import Common.Route
-import Frontend.Templates.Common
-import Frontend.Templates.Partials.Header
-import Frontend.Templates.Partials.TextInput
+import Templates.Common
+import Templates.Partials.Header
+import Templates.Partials.TextInput
 
 signUp
   :: ( DomBuilder t m

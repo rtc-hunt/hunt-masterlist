@@ -2,7 +2,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Frontend.Templates.Helpers.Authentication where
+module Frontend.Authentication where
 
 import Control.Monad.Fix
 import Data.Vessel

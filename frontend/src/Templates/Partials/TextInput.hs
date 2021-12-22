@@ -2,7 +2,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE LambdaCase #-}
 
-module Frontend.Templates.Partials.TextInput where
+module Templates.Partials.TextInput where
 
 
 import Frontend.Utils

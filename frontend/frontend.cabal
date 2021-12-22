@@ -23,12 +23,13 @@ library
                , dependent-monoidal-map
   exposed-modules:
     Frontend
-    Frontend.Templates.Helpers.Authentication
-    Frontend.Templates.Partials.Common
-    Frontend.Templates.Partials.Header
-    Frontend.Templates.Partials.TextInput
-    Frontend.Templates.Channel
-    Frontend.Templates.Signup
+    Frontend.Authentication
+    Templates
+    Templates.Partials.Common
+    Templates.Partials.Header
+    Templates.Partials.TextInput
+    Templates.Channel
+    Templates.Signup
     Rhyolite.Vessel.Path
 
   ghc-options: -Wall -Wredundant-constraints -Wincomplete-uni-patterns -Wincomplete-record-updates -O -fno-show-valid-hole-fits

@@ -1,4 +1,4 @@
-module Frontend.Templates.Containers where
+module Templates.Partials.Containers where
 
 import Reflex.Dom.Core
 

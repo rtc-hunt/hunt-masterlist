@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Frontend.Templates.Partials.Buttons where
+module Templates.Partials.Buttons where
 
 import Data.Text (Text)
 import Reflex.Dom.Core

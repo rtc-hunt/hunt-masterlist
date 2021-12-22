@@ -1,7 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Frontend.Templates.Partials.Switch where
+module Templates.Partials.Switch where
 
 import Data.Bool
 import Data.Default

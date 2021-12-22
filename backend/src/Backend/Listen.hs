@@ -29,8 +29,6 @@ import Backend.Schema ()
 import Common.Schema
 import Common.View
 
-import Control.Monad.IO.Class
-
 data Notify a where
   Notify_Account :: Notify (Id Account)
   Notify_Chatroom :: Notify (Id Chatroom)
@@ -68,7 +66,6 @@ notifyHandler db nm v = case _dbNotification_message nm of
       else pure emptyV
     V_Messages -> const $ pure emptyV
   Notify_Message :/ mid -> do
-    putStrLn $ "Got message notification: " <> show mid
     runNoLoggingT $ do
       msgs :: [(Id Chatroom, Int, UTCTime, Text, Text)] <- runDb (Identity db) $ [iquery|
         select m.chatroom, m.mseq, m.timestamp at time zone 'utc', a.account_email, m.text

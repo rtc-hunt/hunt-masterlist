@@ -1,17 +1,15 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Frontend.Templates.Partials.Headers where
+module Templates.Partials.Headers where
 
 import Control.Lens
-import Control.Monad
-import Data.Bool
 import Data.Text (Text)
 import Data.Default
 import Reflex.Dom.Core
 
 import Frontend.Utils
-import Frontend.Templates.Partials.Buttons
+import Templates.Partials.Buttons
 
 data HeaderConfig t = HeaderConfig
   { _headerConfig_header :: Text

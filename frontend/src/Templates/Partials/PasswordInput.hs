@@ -3,7 +3,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE LambdaCase #-}
 
-module Frontend.Templates.Partials.PasswordInput where
+module Templates.Partials.PasswordInput where
 
 import Frontend.Utils
 

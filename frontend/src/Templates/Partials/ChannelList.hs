@@ -1,4 +1,4 @@
-module Frontend.Templates.Partials.ChannelList where
+module Templates.Partials.ChannelList where
 
 import Control.Category
 import Control.Lens
@@ -19,11 +19,11 @@ import Common.Request
 import Common.Route
 import Common.View
 
-import Frontend.Templates.Types
-import Frontend.Templates.Partials.Buttons
-import Frontend.Templates.Partials.Headers
-import Frontend.Templates.Partials.Lists
-import Frontend.Templates.Partials.Searchbar
+import Templates.Types
+import Templates.Partials.Buttons
+import Templates.Partials.Headers
+import Templates.Partials.Lists
+import Templates.Partials.Searchbar
 import Frontend.Utils
 
 data ChannelListConfig m = ChannelListConfig
