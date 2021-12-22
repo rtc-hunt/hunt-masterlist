@@ -31,12 +31,23 @@ library
     Frontend.Channel
     Frontend.Types
     Frontend.Utils
-    Templates
-    Templates.Partials.Headers
-    Templates.Partials.TextInput
-    Templates.Channel
-    Templates.Signup
     Rhyolite.Vessel.Path
+    TemplateViewer
+    Templates
+    Templates.Channel
+    Templates.Partials.Buttons
+    Templates.Partials.ChannelList
+    Templates.Partials.Containers
+    Templates.Partials.Headers
+    Templates.Partials.Inputs
+    Templates.Partials.Lists
+    Templates.Partials.Message
+    Templates.Partials.PasswordInput
+    Templates.Partials.Searchbar
+    Templates.Partials.TextInput
+    Templates.Signup
+    Templates.Types
+
 
   ghc-options: -Wall -Wredundant-constraints -Wincomplete-uni-patterns -Wincomplete-record-updates -O -fno-show-valid-hole-fits
 
