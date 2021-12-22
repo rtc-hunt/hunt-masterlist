@@ -21,24 +21,21 @@ data HeaderConfig t = HeaderConfig
 instance Default (HeaderConfig t) where
   def = HeaderConfig "H1" ""
 
-header :: DomBuilder t m => Bool -> m ()
-header showMenu = do
-  elClass "div" classes $ do
-    elClass "div" "" $ text "RhyoliteExample"
-    when showMenu $ secondaryIconButton "" "menu" >> pure ()
-  where
-    classes =
-      classList [ "font-karla font-bold text-copy bg-white shadow-header flex flex-row justify-between items-center z-10"
-                , bool "px-4 py-5" "px-4 py-2" showMenu
-                ]
+data Logout = Logout
 
-h1 :: DomBuilder t m => HeaderConfig t -> m ()
-h1 (HeaderConfig label cs) =
-  elClass "h1" (classList ["font-karla font-bold text-h1 text-copy", cs]) $ text label
+header :: DomBuilder t m => m (Event t Logout)
+header = do
+  elClass "div" "font-karla font-bold text-copy bg-white shadow-header flex flex-row justify-between items-center z-10 px-4 py-5" $ do
+    el "div" $ text "RhyoliteExample"
+    logout <- iconButton "logout"
+    pure (Logout <$ logout)
 
--- NOTE(skylar): There are places we use text-h2 that aren't in h2s per-se, I don't know the best way of amalgamating that
-h2 :: DomBuilder t m => HeaderConfig t -> m ()
-h2 (HeaderConfig label cs) =
-  elClass "h2" (classList ["font-karla font-bold text-h2 text-copy", cs]) $ text label
+h1 :: DomBuilder t m => m () -> m ()
+h1 =
+  elClass "h1" (classList ["font-karla font-bold text-h1 text-copy"])
+
+h2 :: DomBuilder t m => m () -> m ()
+h2 =
+  elClass "h2" (classList ["font-karla font-bold text-h2 text-copy"])
 
 makeLenses ''HeaderConfig

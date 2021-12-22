@@ -48,10 +48,11 @@ import Common.Request
 import Common.Route
 import Common.View
 
+import Frontend.Templates.Containers
 import Frontend.Templates.Helpers.Authentication
+import Frontend.Templates.Partials.ChannelList
 import Frontend.Templates.Partials.TextInput
 import Frontend.Templates.Partials.PasswordInput
-import Frontend.Templates.Partials.ChannelList
 import Frontend.Templates.Partials.Buttons
 import Frontend.Templates.Partials.Headers
 import Frontend.Templates.Channel
@@ -89,12 +90,10 @@ logIn
   :: forall js t m. (PostBuild t m, MonadFix m, MonadHold t m, DomBuilder t m, RouteToUrl (R FrontendRoute) m, SetRoute t (R FrontendRoute) m, Prerender js t m)
   => Event t (Maybe Text)
   -> m (Event t (Text, Text))
-logIn serverError = elClass "div" "w-screen h-screen bg-background" $ do
-  header False
+logIn serverError = screenContainer $ do
   elClass "div" "p-4 mx-auto md:w-sm" $ mdo
-    h1 $ def
-      & headerConfig_header .~ "Log In"
-      & headerConfig_classes .~ "mt-12"
+    elClass "h1" "font-karla font-bold text-h1 text-copy mt-12" $
+      text "Log In"
 
     let
       usernameEvent = _textInput_input ti
@@ -128,12 +127,10 @@ testValidation t
   | otherwise = Nothing
 
 signUp :: forall js t m. (MonadFix m, MonadHold t m, PostBuild t m, DomBuilder t m, RouteToUrl (R FrontendRoute) m, SetRoute t (R FrontendRoute) m, Prerender js t m) => m (Event t (Text, Text))
-signUp = elClass "div" "w-screen h-screen bg-background" $ do
-  header False
+signUp = screenContainer $ do
   elClass "div" "p-4 mx-auto md:w-sm" $ do
-    h1 $ def
-      & headerConfig_header .~ "Sign Up"
-      & headerConfig_classes .~ "mt-12"
+    elClass "h1" "font-karla font-bold text-h1 text-copy mt-12" $
+      text "Sign Up"
 
     newAccount <- textInput $ def
       & textInputConfig_label .~ "Email"
@@ -151,10 +148,23 @@ signUp = elClass "div" "w-screen h-screen bg-background" $ do
     pure $ W.filter testCredentials $ tagPromptlyDyn credentials click
 
 -- Surrounds view with header in a screen sized div, default for most pages
-appPage :: DomBuilder t m => m a -> m a
-appPage action = elClass "div" "w-screen h-screen bg-background flex flex-col overflow-hidden" $ do
-  header True
+appPage :: (Prerender js t m, DomBuilder t m, SetRoute t (R FrontendRoute) m)
+  => m a -> m a
+appPage action = screenContainer $ do
+  logout <- header
+  done <- manageAuthCookie (Nothing <$ logout)
+  setRoute (FrontendRoute_Login :/ () <$ done)
   action
+
+-- | Handle setting the user's cookie to the given auth token (if any)
+manageAuthCookie :: (DomBuilder t m, Prerender js t m)
+  => Event t (Maybe (Signed (AuthToken Identity))) -> m (Event t ())
+manageAuthCookie authChange = do
+  fmap (switch . current) $ prerender (pure never) $ do
+    doc <- currentDocumentUnchecked
+    performEvent $ ffor authChange $ \newAuth -> do
+      cookie <- defaultCookieJson authCookieName newAuth
+      setPermanentCookie doc cookie
 
 frontendBody
   :: forall js t m.
@@ -169,33 +179,35 @@ frontendBody = do
   -- (at least on GHC 8.6.5) the compiler cannot properly infer that
   -- this function has the proper higher rank type.
       authChange <- fmap switchDyn $ subRoute $ ((\case
-        FrontendRoute_Channels -> authenticateWithToken mAuthCookie $ do
-          _ <- appPage $ channelList $ def
-            & channelListConfig_headerClasses .~ "mt-6"
-          pure never
         FrontendRoute_Channel -> authenticateWithToken mAuthCookie $ appPage $ do
-          cid <- askRoute
-          channelView <- channelBuilder cid
-          logout <- fmap (switch . current) $ prerender (pure never) $ do
-            rec (ChannelOut input send scrollEl, logout) <- channelPage $ ChannelConfig
-                  { _channelConfig_name = fromMaybe "" <$> _channelView_name channelView
-                  , _channelConfig_clearInput = clickOrEnter
-                  , _channelConfig_messagesConfig = MessagesConfig $ do
-                      dyn_ $ ffor (_channelView_messages channelView) $ \case
-                        Nothing -> text "loading..."
-                        Just msgs -> messagesHelper scrollEl msgs
-                  }
-                let newMessage = current $ value input
-                    enter = keypress Enter $ _inputElement_element input
-                    clickOrEnter = leftmost [send, enter]
-                    sendMessage = gate (not . T.null . T.strip <$> newMessage) clickOrEnter
-                _ <- requestingIdentity $ attachWith
-                  (\(c, m) _ -> ApiRequest_Private () $ PrivateRequest_SendMessage c m)
-                  ((,) <$> current cid <*> newMessage)
-                  sendMessage
-            pure logout
-          setRoute $ FrontendRoute_Login :/ () <$ logout
-          pure $ Nothing <$ logout
+          mcid <- maybeDyn =<< askRoute
+          dyn_ . ffor mcid $ \case
+            Nothing -> do
+              rec cl <- channelList (ChannelListConfig (channelSearchResults cl))
+              pure ()
+            Just cid -> do
+              channelView <- channelBuilder cid
+              prerender_ blank $ do
+                rec ChannelOut input send scrollEl <- channelPage $ ChannelConfig
+                      { _channelConfig_name = fromMaybe "" <$> _channelView_name channelView
+                      , _channelConfig_clearInput = clickOrEnter
+                      , _channelConfig_messagesConfig = MessagesConfig $ do
+                          dyn_ $ ffor (_channelView_messages channelView) $ \case
+                            Nothing -> text "loading..."
+                            Just msgs -> messagesHelper scrollEl msgs
+                      }
+                    let newMessage = current $ value input
+                        enter = keypress Enter $ _inputElement_element input
+                        clickOrEnter = leftmost [send, enter]
+                        sendMessage = gate (not . T.null . T.strip <$> newMessage) clickOrEnter
+                    _ <- requestingIdentity $ attachWith
+                      (\(c, m) _ -> ApiRequest_Private () $ PrivateRequest_SendMessage c m)
+                      ((,) <$> current cid <*> newMessage)
+                      sendMessage
+                pure ()
+              -- setRoute $ FrontendRoute_Login :/ () <$ logout
+              -- pure $ Nothing <$ logout
+          pure never
         FrontendRoute_SignUp -> do
           credentials <- signUp
           redirectIfAuthenticated mAuthCookie $ do
@@ -214,13 +226,7 @@ frontendBody = do
           setRoute $ FrontendRoute_Login :/ () <$ pb
           pure never
         ) :: forall a. FrontendRoute a -> RoutedT t a (ExampleWidget t m) (Event t (Maybe (Signed (AuthToken Identity)))))
-  -- Handle setting the cookies on auth change if we're running in the browser
-  prerender_ (pure ()) $ do
-    doc <- currentDocumentUnchecked
-    performEvent_ $ ffor authChange $ \newAuth -> do
-      cookie <- defaultCookieJson authCookieName newAuth
-      setPermanentCookie doc cookie
-    pure ()
+  manageAuthCookie authChange
   pure ()
 
 redirectIfAuthenticated
@@ -232,7 +238,7 @@ redirectIfAuthenticated
   -> m a
 redirectIfAuthenticated mAuthCookie w = do
   pb <- getPostBuild
-  setRoute $ FrontendRoute_Channels :/ () <$ catMaybes (leftmost [ tag (current mAuthCookie) pb, updated mAuthCookie ])
+  setRoute $ FrontendRoute_Channel :/ Nothing <$ catMaybes (leftmost [ tag (current mAuthCookie) pb, updated mAuthCookie ])
   w
 
 runExampleWidget

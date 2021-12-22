@@ -76,8 +76,6 @@ notifyHandler db nm v = case _dbNotification_message nm of
         join "Account" a on m.account = a.id
         where m.id = ${mid}
       |]
-      liftIO $ print msgs
-      liftIO $ print v
       case msgs of
         [] -> pure emptyV
         (cid, mseq, time, acc, txt):_ -> buildV v $ \case

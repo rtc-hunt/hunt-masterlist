@@ -10,7 +10,6 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time
 import Data.Vessel
-import Data.Vessel.Path
 import Database.Id.Class
 import Obelisk.Route.Frontend
 import Prelude hiding ((.), id)
@@ -32,12 +31,13 @@ import Common.Route
 import Common.Schema
 import Common.View
 
+import Frontend.Templates.Types
 import Frontend.Templates.Partials.Buttons
 import Frontend.Templates.Partials.ChannelList
 
 import qualified Data.Set as Set
 
-channelPage :: 
+channelPage ::
   ( PostBuild t m
   , DomBuilder t m
   , MonadQuery t (Vessel V (Const SelectedCount)) m
@@ -47,16 +47,12 @@ channelPage ::
   , Requester t m, Response m ~ Identity, Request m ~ ApiRequest () PublicRequest PrivateRequest
   )
   => ChannelConfig t m
-  -> m (ChannelOut t m, Event t ())
+  -> m (ChannelOut t m)
 channelPage cfg = elClass "div" "w-full flex flex-row flex-grow h-0" $ do
-  click <- elClass "div" "flex-shrink-0 w-1/4 h-full flex-col bg-sunken hidden md:flex border-r border-metaline" $ do
-    channelList $ def & channelListConfig_useH2 .~ True
+  rec cl <- channelList (ChannelListConfig (channelSearchResults cl))
   cout <- channel cfg
-  pure (cout, click)
+  pure cout
 
-type Template t m = (DomBuilder t m, PostBuild t m)
-
-type InputEl t m = InputElement EventResult (DomBuilderSpace m) t
 
 data ChannelConfig t m = ChannelConfig
   { _channelConfig_name :: Dynamic t Text
@@ -101,8 +97,6 @@ sendButton = iconButton "send"
 data MessagesConfig m = MessagesConfig
   { _messagesConfig_messageList :: m ()
   }
-
-type El t m = Element EventResult (DomBuilderSpace m) t
 
 data MessagesOut t m = MessagesOut
   { _messagesOut_container :: El t m

@@ -7,7 +7,6 @@ import Control.Monad.Fix
 import Data.Bool
 import Data.Default
 import qualified Data.Map as Map
-import qualified Data.Text as T
 import Data.Text (Text)
 import Data.Vessel.Vessel
 import Obelisk.Route.Frontend
@@ -20,22 +19,36 @@ import Common.Request
 import Common.Route
 import Common.View
 
+import Frontend.Templates.Types
 import Frontend.Templates.Partials.Buttons
 import Frontend.Templates.Partials.Headers
 import Frontend.Templates.Partials.Lists
 import Frontend.Templates.Partials.Searchbar
 import Frontend.Utils
 
-
-data ChannelListConfig t = ChannelListConfig
-  { _channelListConfig_headerClasses :: T.Text
-  , _channelListConfig_useH2 :: Bool
+data ChannelListConfig m = ChannelListConfig
+  { _channelListConfig_resultDisplay :: m ()
   }
 
-instance Default (ChannelListConfig t) where
-  def = ChannelListConfig "" False
+data ChannelList t m = ChannelList
+  { _channelList_input :: InputEl t m
+  , _channelList_add :: Event t ()
+  }
 
-channelList
+channelList :: (DomBuilder t m) => ChannelListConfig m -> m (ChannelList t m)
+channelList cfg = do
+  elClass "div" "flex-shrink-0 w-1/4 h-full flex-col bg-sunken hidden md:flex border-r border-metaline" $
+    elClass "div" "flex-grow p-4" $ do
+      addClick <- elClass "div" (classList ["w-full flex flex-row items-center justify-between mt-6"]) $ do
+        h2 $ text "Channels"
+        iconButton "add"
+      search <- searchbar "Search for a channel, or create a new one"
+
+      elClass "div" "mt-8 font-facit text-h2 text-copy" $ text "Search results"
+      _channelListConfig_resultDisplay cfg
+      return (ChannelList { _channelList_input = search, _channelList_add = addClick })
+
+channelSearchResults
   :: ( MonadFix m
      , MonadHold t m
      , MonadQuery t (Vessel V (Const SelectedCount)) m
@@ -44,43 +57,21 @@ channelList
      , PostBuild t m
      , Requester t m, Response m ~ Identity, Request m ~ ApiRequest () publicRequest PrivateRequest
      )
-  => ChannelListConfig t
-  -> m (Event t ())
-channelList (ChannelListConfig headerClasses useH2) = do
-  elClass "div" "flex-grow p-4" $ do
-    createClick <- elClass "div" (classList ["w-full flex flex-row items-center justify-between", headerClasses]) $ do
-      header' $ def
-        & headerConfig_header .~ "Channels"
-      iconButton "add"
-    channelSearch <- searchbar "Search for a channel, or create a new one"
-
-    elClass "div" "mt-8 font-facit text-h2 text-copy" $ text "Search results"
-
-    mRooms <- maybeDyn <=< watch . ffor (_searchbarOutput_query channelSearch) $ \q ->
+  => ChannelList t m
+  -> m ()
+channelSearchResults cs = do
+    mRooms <- maybeDyn <=< watch . ffor (value (_channelList_input cs)) $ \q ->
       key V_Chatrooms ~> key (ChatroomQuery q) ~> semiMapP
+
     channelClick <- (switchHold never =<<) $ dyn $ ffor mRooms $ \case
       Nothing -> pure never
       Just rooms -> switchDyn . fmap mergeMap <$> list rooms channelItem
 
-    _ <- fmap fanEither . requestingIdentity . ffor (tag (current (_searchbarOutput_query channelSearch)) createClick) $ \newName ->
+    _ <- fmap fanEither . requestingIdentity . ffor (tag (current (value (_channelList_input cs))) (_channelList_add cs)) $ \newName ->
       ApiRequest_Private () $ PrivateRequest_CreateChatroom newName
 
     setRoute $ fforMaybe channelClick $ \clicks -> ffor (Map.minViewWithKey clicks) $ \((k,_),_) ->
-      FrontendRoute_Channel :/ k
-
-    pure ()
-
-  -- TODO(skylar): This could be its own component but currently it always appears with the channel list
-  elClass "div" "w-full p-4 border-t border-metaline bg-white md:bg-less-sunken" $ do
-    elClass "div" "w-full flex flex-row items-center" $ do
-      elClass "div" "w-12 h-12 rounded-full bg-primary-darker mr-2 flex-shrink-0" blank
-      elClass "div" "flex flex-col font-facit text-label h-full flex-grow" $ do
-        elClass "div" "text-copy" $ text "Sky"
-        elClass "div" "text-light" $ text "soquinn@obsidian.systems"
-
-    secondaryButton "mt-4" "Logout"
-  where
-    header' = bool h1 h2 useH2
+      FrontendRoute_Channel :/ Just k
 
 channelItem
   :: ( DomBuilder t m
@@ -92,4 +83,11 @@ channelItem = listItem $ def
   { _listItemConfig_clickable = True
   }
 
-makeLenses ''ChannelListConfig
+userDisplay :: (DomBuilder t m) => Text -> Text -> m ()
+userDisplay name email = do
+  elClass "div" "w-full p-4 border-t border-metaline bg-white md:bg-less-sunken" $ do
+  elClass "div" "w-full flex flex-row items-center" $ do
+    elClass "div" "w-12 h-12 rounded-full bg-primary-darker mr-2 flex-shrink-0" blank
+    elClass "div" "flex flex-col font-facit text-label h-full flex-grow" $ do
+      elClass "div" "text-copy" $ text name
+      elClass "div" "text-light" $ text email
