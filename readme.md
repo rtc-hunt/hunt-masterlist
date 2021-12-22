@@ -174,3 +174,7 @@ convenient whenever it suffices).
 This directory contains the frontend. Perhaps surprisingly, this code in its entirety will also be part of the
 backend, used to pre-render any frontend routes, so that when they're delivered, they look approximately
 correct even before all the javascript loads.
+
+## CI
+
+CI results for this project are visible at https://ci.obsidian.systems/recent/gitea/rhyolite-example/rhyolite-example
