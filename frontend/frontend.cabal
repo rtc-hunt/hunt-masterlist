@@ -23,8 +23,10 @@ library
                , signed-data
                , rhyolite-groundhog-legacy-types
                , reflex
-
-               , dependent-monoidal-map
+               , vessel
+               , monoidal-containers
+               , containers
+               , semimap
   exposed-modules:
     Frontend
     Frontend.Authentication
