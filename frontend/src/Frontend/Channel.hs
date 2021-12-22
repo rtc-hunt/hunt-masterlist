@@ -34,6 +34,7 @@ import Common.Route
 import Common.Schema
 import Common.View
 
+import Frontend.ChannelList
 import Frontend.Types
 import Frontend.Utils
 

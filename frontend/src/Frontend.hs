@@ -64,7 +64,7 @@ frontend = Frontend
   { _frontend_head = do
       el "title" $ text "Rhyolite Example"
       elAttr "link" ("rel" =: "stylesheet" <> "href" =: "https://use.typekit.net/csf8rij.css") blank
-      elAttr "link" ("href" =: $(static "styles.css") <> "type" =: "text/css" <> "rel" =: "stylesheet") blank
+      elAttr "link" ("href" =: $(static "css/styles.css") <> "type" =: "text/css" <> "rel" =: "stylesheet") blank
       elAttr "link" ("rel" =: "preconnect" <> "href" =: "https://fonts.googleapis.com") blank
       elAttr "link" ("rel" =: "preconnect" <> "href" =: "https://fonts.gstatic.com" <> "crossorigin" =: "") blank
       elAttr "link" ("rel" =: "stylesheet" <> "href" =: "https://fonts.googleapis.com/css2?family=Karla:ital,wght@0,200;0,300;0,400;0,500;0,600;0,700;0,800;1,200;1,300;1,400;1,500;1,600;1,700;1,800&display=swap") blank
@@ -100,7 +100,7 @@ logIn serverError = screenContainer $ do
       & passwordInputConfig_error .~ dPError
 
     click <- primaryButton "Log In"
-    link (FrontendRoute_SignUp :/ ()) "Don't have an account?"
+    link (FrontendRoute_Signup :/ ()) "Don't have an account?"
     credentials <- zipDyn <$> holdDyn "" usernameEvent <*> holdDyn "" passwordEvent
     pure $ W.filter testCredentials $ tagPromptlyDyn credentials click
 
@@ -117,8 +117,8 @@ testValidation t
   | T.length t < 3 = Just "This isn't a valid email"
   | otherwise = Nothing
 
-signUp :: forall js t m. (MonadFix m, MonadHold t m, PostBuild t m, DomBuilder t m, RouteToUrl (R FrontendRoute) m, SetRoute t (R FrontendRoute) m, Prerender js t m) => m (Event t (Text, Text))
-signUp = screenContainer $ do
+signup :: forall js t m. (MonadFix m, MonadHold t m, PostBuild t m, DomBuilder t m, RouteToUrl (R FrontendRoute) m, SetRoute t (R FrontendRoute) m, Prerender js t m) => m (Event t (Text, Text))
+signup = screenContainer $ do
   elClass "div" "p-4 mx-auto md:w-sm" $ do
     elClass "h1" "font-karla font-bold text-h1 text-copy mt-12" $
       text "Sign Up"
@@ -166,11 +166,11 @@ frontendBody = do
         FrontendRoute_Channel -> authenticateWithToken mAuthCookie $ do
           logout <- channel
           pure $ Nothing <$ logout
-        FrontendRoute_SignUp -> do
-          credentials <- signUp
+        FrontendRoute_Signup -> do
+          credentials <- signup
           redirectIfAuthenticated mAuthCookie $ do
             (_loginFailed, loginSuccess) <- fmap fanEither . requestingIdentity . ffor credentials $ \(user, pw) ->
-              ApiRequest_Public $ PublicRequest_SignUp user pw
+              ApiRequest_Public $ PublicRequest_Signup user pw
             pure (fmap Just loginSuccess)
         FrontendRoute_Login -> mdo
           credentials <- logIn loginError

@@ -31,10 +31,13 @@ library
                , database-id-class
                , aeson
                , witherable
+               , some
+               , universe
   exposed-modules:
     Frontend
     Frontend.Authentication
     Frontend.Channel
+    Frontend.ChannelList
     Frontend.Types
     Frontend.Utils
     Rhyolite.Vessel.Path

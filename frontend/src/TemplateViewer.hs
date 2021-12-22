@@ -1,11 +1,17 @@
 module TemplateViewer where
 
+import Control.Monad
+import Control.Monad.Fix
 import Data.Map as Map
+import Data.Some
 import Data.Text (Text)
 import Data.Time
+import Data.Universe
 import Database.Id.Class
+import Obelisk.Route.Frontend
 import Reflex.Dom.Core
 
+import Common.Route
 import Common.View (Msg(..))
 import Templates
 import Templates.Partials.ChannelList
@@ -23,6 +29,7 @@ fakeMessages = Map.elems $ Map.mapWithKey (\k (h, m) -> Msg
     msgs = Map.fromList $ zip [(1 :: Int)..] rawMsgs
     rawMsgs :: [(Text, Text)]
     rawMsgs =
+      -- Source: http://www.u.arizona.edu/~kimmehea/purdue/421/exampleinterview.htm
       [ ("Interviewer", "Particularly in regard to design and development, what are your duties as a mechanical engineer?")
       , ("Interviewee", "Do you mean before I took this position or in this position.")
       , ("Interviewer", "Both.")
@@ -65,10 +72,33 @@ fakeMessages = Map.elems $ Map.mapWithKey (\k (h, m) -> Msg
       , ("Interviewee", "You're welcome.")
       ]
 
-templateViewer 
+templateViewer ::
+  ( Template t m
+  , MonadFix m
+  , MonadHold t m
+  , RouteToUrl (R FrontendRoute) m
+  , SetRoute t (R FrontendRoute) m
+  , Prerender js t m
+  )
+  => RoutedT t (R TemplateRoute) m ()
+templateViewer = do
+  subRoute_ $ \case
+    TemplateRoute_Index -> divClass "container mx-auto p-4" $ do
+      elClass "h1" "font-bold text-h1" $ text "Welcome to the template gallery"
+      el "p" $ text "Choose a template below:"
+      elClass "ul" "list-disc" $ do
+        let templateLink r desc = el "li" $ routeLink (FrontendRoute_Templates :/ r :/ ()) (text desc)
+        templateLink TemplateRoute_Login "Login"
+        templateLink TemplateRoute_Signup "Signup"
+        templateLink TemplateRoute_Channel "Channel"
+        templateLink TemplateRoute_Main "Main"
+    TemplateRoute_Channel -> channelTemplateViewer
+    _ -> blank
+
+channelTemplateViewer
   :: Template t m
   => m ()
-templateViewer = do
+channelTemplateViewer = do
   _ <- channel $ ChannelConfig
     { _channelConfig_name = pure "Fake Channel"
     , _channelConfig_clearInput = never

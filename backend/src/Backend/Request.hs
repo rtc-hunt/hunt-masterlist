@@ -62,7 +62,7 @@ requestHandler db csk = RequestHandler $ \case
       Just a -> do
         x <- signWithKey csk (AuthToken (Identity a))
         pure $ Right x
-  ApiRequest_Public (PublicRequest_SignUp user pass) -> do
+  ApiRequest_Public (PublicRequest_Signup user pass) -> do
     res <- runNoLoggingT $ runDb (Identity db) $ do
       (new, aid) <- ensureAccountExists Notify_Account user
       case not new of

@@ -1,5 +1,10 @@
 module.exports = {
-  purge: [],
+  purge: {
+    enabled: true,
+    content: ['./frontend/src/**/*.hs',
+              './frontend/src/*.hs'
+             ]
+  },
   darkMode: false, // or 'media' or 'class'
   theme: {
     fontFamily: {
