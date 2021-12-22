@@ -1,9 +1,8 @@
 module Templates.Types
   ( module Templates.Types
-  , module X
   ) where
 
-import Reflex.Dom.Core as X hiding (El)
+import Reflex.Dom.Core hiding (El)
 
 type Template t m = (DomBuilder t m, PostBuild t m)
 

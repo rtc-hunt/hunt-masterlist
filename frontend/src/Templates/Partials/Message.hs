@@ -4,6 +4,7 @@ import Common.View (Msg(..))
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time
+import Reflex.Dom.Core
 import Templates.Types
 
 message

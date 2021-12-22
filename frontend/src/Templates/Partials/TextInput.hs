@@ -2,7 +2,16 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE LambdaCase #-}
 
-module Templates.Partials.TextInput where
+module Templates.Partials.TextInput
+  ( TextInputConfig(..)
+  , TextInput(..)
+  , textInput
+  , textInputConfig_label
+  , textInputConfig_errorMessage
+  , textInputConfig_type
+  , textInput_value
+  , textInput_input
+  ) where
 
 
 import Frontend.Utils
@@ -17,6 +26,7 @@ import Reflex.Dom.Core hiding ( TextInputConfig
                               , TextInput
                               , textInput_value
                               , textInput_input
+                              , textInput
                               )
 
 data TextInputConfig t = TextInputConfig
