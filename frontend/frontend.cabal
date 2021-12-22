@@ -31,8 +31,6 @@ library
                , database-id-class
                , aeson
                , witherable
-               , some
-               , universe
   exposed-modules:
     Frontend
     Frontend.Authentication

@@ -1,12 +1,9 @@
 module TemplateViewer where
 
-import Control.Monad
 import Control.Monad.Fix
 import Data.Map as Map
-import Data.Some
 import Data.Text (Text)
 import Data.Time
-import Data.Universe
 import Database.Id.Class
 import Obelisk.Route.Frontend
 import Reflex.Dom.Core
