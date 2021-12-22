@@ -64,7 +64,7 @@ channel = do
   channelView <- channelBuilder mcid
   logout <- prerender (pure never) $ do
     rec
-      ChannelOut input send scrollEl logout clist <- Templates.channel $
+      ChannelOut input send msgs logout clist <- Templates.channel $
         ChannelConfig
           { _channelConfig_name = fromMaybe "" <$> _channelView_name channelView
           , _channelConfig_clearInput = clickOrEnter
@@ -73,7 +73,7 @@ channel = do
                 Nothing -> dynText $ ffor mcid $ \case
                   Nothing -> "⬅️ Select or create a channeel"
                   Just _ -> ""
-                Just msgs -> messagesHelper scrollEl msgs
+                Just ms -> messagesHelper (Templates._messagesOut_container msgs) ms
           , _channelConfig_channelList = ChannelListConfig $
               channelSearchResults clist
           }

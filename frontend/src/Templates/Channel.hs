@@ -21,7 +21,7 @@ data ChannelConfig t m = ChannelConfig
 data ChannelOut t m = ChannelOut
   { _channelOut_messageInput :: InputEl t m
   , _channelOut_send :: Event t ()
-  , _channelOut_scrollingContainer :: El t m
+  , _channelOut_messages :: MessagesOut t m
   , _channelOut_logout :: Event t Logout
   , _channelOut_channelList :: ChannelList t m
   }
@@ -43,7 +43,7 @@ channel cfg = screenContainer $ do
         pure $ ChannelOut
           { _channelOut_messageInput = input
           , _channelOut_send = send
-          , _channelOut_scrollingContainer = _messagesOut_container mout
+          , _channelOut_messages = mout
           , _channelOut_logout = logout
           , _channelOut_channelList = chanList
           }
