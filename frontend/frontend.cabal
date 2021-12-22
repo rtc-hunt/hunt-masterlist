@@ -19,20 +19,40 @@ library
                , text
                , data-default
                , lens
-
-               , dependent-monoidal-map
+               , rhyolite-common
+               , signed-data
+               , rhyolite-groundhog-legacy-types
+               , reflex
+               , vessel
+               , monoidal-containers
+               , containers
+               , semimap
+               , time
+               , database-id-class
+               , aeson
+               , witherable
   exposed-modules:
     Frontend
     Frontend.Authentication
     Frontend.Channel
     Frontend.Types
     Frontend.Utils
-    Templates
-    Templates.Partials.Header
-    Templates.Partials.TextInput
-    Templates.Channel
-    Templates.Signup
     Rhyolite.Vessel.Path
+    TemplateViewer
+    Templates
+    Templates.Channel
+    Templates.Partials.Buttons
+    Templates.Partials.ChannelList
+    Templates.Partials.Containers
+    Templates.Partials.Headers
+    Templates.Partials.Inputs
+    Templates.Partials.Lists
+    Templates.Partials.Message
+    Templates.Partials.PasswordInput
+    Templates.Partials.Searchbar
+    Templates.Partials.TextInput
+    Templates.Types
+
 
   ghc-options: -Wall -Wredundant-constraints -Wincomplete-uni-patterns -Wincomplete-record-updates -O -fno-show-valid-hole-fits
 

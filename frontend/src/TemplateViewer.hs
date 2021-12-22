@@ -4,6 +4,7 @@ import Data.Map as Map
 import Data.Text (Text)
 import Data.Time
 import Database.Id.Class
+import Reflex.Dom.Core
 
 import Common.View (Msg(..))
 import Templates
