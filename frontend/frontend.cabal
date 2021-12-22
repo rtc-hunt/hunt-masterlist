@@ -19,6 +19,10 @@ library
                , text
                , data-default
                , lens
+               , rhyolite-common
+               , signed-data
+               , rhyolite-groundhog-legacy-types
+               , reflex
 
                , dependent-monoidal-map
   exposed-modules:
