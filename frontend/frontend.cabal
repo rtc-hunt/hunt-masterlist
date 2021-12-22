@@ -27,6 +27,10 @@ library
                , monoidal-containers
                , containers
                , semimap
+               , time
+               , database-id-class
+               , aeson
+               , witherable
   exposed-modules:
     Frontend
     Frontend.Authentication
@@ -47,7 +51,6 @@ library
     Templates.Partials.PasswordInput
     Templates.Partials.Searchbar
     Templates.Partials.TextInput
-    Templates.Signup
     Templates.Types
 
 
