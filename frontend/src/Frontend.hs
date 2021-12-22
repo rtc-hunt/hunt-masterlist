@@ -148,21 +148,22 @@ signUp = screenContainer $ do
     pure $ W.filter testCredentials $ tagPromptlyDyn credentials click
 
 -- Surrounds view with header in a screen sized div, default for most pages
-appPage :: (Prerender js t m, DomBuilder t m, SetRoute t (R FrontendRoute) m)
-  => m a -> m a
+appPage :: (DomBuilder t m)
+  => m a
+  -> m (a, Event t Logout)
 appPage action = screenContainer $ do
   logout <- header
-  done <- manageAuthCookie (Nothing <$ logout)
-  setRoute (FrontendRoute_Login :/ () <$ done)
-  action
+  a <- action
+  pure (a, logout)
 
 -- | Handle setting the user's cookie to the given auth token (if any)
 manageAuthCookie :: (DomBuilder t m, Prerender js t m)
-  => Event t (Maybe (Signed (AuthToken Identity))) -> m (Event t ())
+  => Event t (Maybe (Signed (AuthToken Identity)))
+  -> m ()
 manageAuthCookie authChange = do
-  fmap (switch . current) $ prerender (pure never) $ do
+  prerender_ blank $ do
     doc <- currentDocumentUnchecked
-    performEvent $ ffor authChange $ \newAuth -> do
+    performEvent_ $ ffor authChange $ \newAuth -> do
       cookie <- defaultCookieJson authCookieName newAuth
       setPermanentCookie doc cookie
 
@@ -179,35 +180,34 @@ frontendBody = do
   -- (at least on GHC 8.6.5) the compiler cannot properly infer that
   -- this function has the proper higher rank type.
       authChange <- fmap switchDyn $ subRoute $ ((\case
-        FrontendRoute_Channel -> authenticateWithToken mAuthCookie $ appPage $ do
-          mcid <- maybeDyn =<< askRoute
-          dyn_ . ffor mcid $ \case
-            Nothing -> do
-              rec cl <- channelList (ChannelListConfig (channelSearchResults cl))
-              pure ()
-            Just cid -> do
-              channelView <- channelBuilder cid
-              prerender_ blank $ do
-                rec ChannelOut input send scrollEl <- channelPage $ ChannelConfig
-                      { _channelConfig_name = fromMaybe "" <$> _channelView_name channelView
-                      , _channelConfig_clearInput = clickOrEnter
-                      , _channelConfig_messagesConfig = MessagesConfig $ do
-                          dyn_ $ ffor (_channelView_messages channelView) $ \case
-                            Nothing -> text "loading..."
-                            Just msgs -> messagesHelper scrollEl msgs
-                      }
-                    let newMessage = current $ value input
-                        enter = keypress Enter $ _inputElement_element input
-                        clickOrEnter = leftmost [send, enter]
-                        sendMessage = gate (not . T.null . T.strip <$> newMessage) clickOrEnter
-                    _ <- requestingIdentity $ attachWith
-                      (\(c, m) _ -> ApiRequest_Private () $ PrivateRequest_SendMessage c m)
-                      ((,) <$> current cid <*> newMessage)
-                      sendMessage
+        FrontendRoute_Channel -> authenticateWithToken mAuthCookie $ do
+          (_, logout) <- appPage $ do
+            mcid <- maybeDyn =<< askRoute
+            dyn_ . ffor mcid $ \case
+              Nothing -> do
+                rec cl <- channelList (ChannelListConfig (channelSearchResults cl))
                 pure ()
-              -- setRoute $ FrontendRoute_Login :/ () <$ logout
-              -- pure $ Nothing <$ logout
-          pure never
+              Just cid -> do
+                channelView <- channelBuilder cid
+                prerender_ blank $ do
+                  rec ChannelOut input send scrollEl <- channelPage $ ChannelConfig
+                        { _channelConfig_name = fromMaybe "" <$> _channelView_name channelView
+                        , _channelConfig_clearInput = clickOrEnter
+                        , _channelConfig_messagesConfig = MessagesConfig $ do
+                            dyn_ $ ffor (_channelView_messages channelView) $ \case
+                              Nothing -> text "loading..."
+                              Just msgs -> messagesHelper scrollEl msgs
+                        }
+                      let newMessage = current $ value input
+                          enter = keypress Enter $ _inputElement_element input
+                          clickOrEnter = leftmost [send, enter]
+                          sendMessage = gate (not . T.null . T.strip <$> newMessage) clickOrEnter
+                      _ <- requestingIdentity $ attachWith
+                        (\(c, m) _ -> ApiRequest_Private () $ PrivateRequest_SendMessage c m)
+                        ((,) <$> current cid <*> newMessage)
+                        sendMessage
+                  pure ()
+          pure $ Nothing <$ logout
         FrontendRoute_SignUp -> do
           credentials <- signUp
           redirectIfAuthenticated mAuthCookie $ do

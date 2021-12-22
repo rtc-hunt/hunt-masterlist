@@ -34,6 +34,7 @@ import Common.View
 import Frontend.Templates.Types
 import Frontend.Templates.Partials.Buttons
 import Frontend.Templates.Partials.ChannelList
+import Frontend.Utils
 
 import qualified Data.Set as Set
 
@@ -142,10 +143,6 @@ data ChannelView t = ChannelView
   { _channelView_name :: Dynamic t (Maybe Text)
   , _channelView_messages :: Dynamic t (Maybe (Dynamic t (Map Int MsgView)))
   }
-
--- TODO move to reflex-dom-core and maybe explain why/when this is necessary
-onRender :: (Prerender js t m, Monad m) => m (Event t ())
-onRender = fmap updated (prerender blank blank)
 
 channelBuilder
   :: forall t m js.
