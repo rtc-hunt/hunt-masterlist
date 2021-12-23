@@ -6,3 +6,8 @@ body {
   overflow:hidden;
 }
 
+@layer components {
+  .t_login input[type=text], .t_login input[type=password] {
+    @apply focus:outline-none font-facit text-label placeholder-light p-4 bg-inset rounded shadow-input transition-all focus:ring-4 ring-opacity-50 ring-primary;
+    }
+}

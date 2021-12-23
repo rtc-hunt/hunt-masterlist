@@ -14,6 +14,61 @@ import Templates
 import Templates.Partials.ChannelList
 import Templates.Partials.Message
 
+templateViewer ::
+  ( Template t m
+  , MonadFix m
+  , MonadHold t m
+  , RouteToUrl (R FrontendRoute) m
+  , SetRoute t (R FrontendRoute) m
+  , Prerender js t m
+  )
+  => RoutedT t (R TemplateRoute) m ()
+templateViewer = do
+  subRoute_ $ \case
+    TemplateRoute_Index -> divClass "container mx-auto p-4" $ do
+      elClass "h1" "font-bold text-h1" $ text "Welcome to the template gallery"
+      el "p" $ text "Choose a template below:"
+      elClass "ul" "list-disc" $ do
+        let templateLink r desc = el "li" $ routeLink (FrontendRoute_Templates :/ r :/ ()) (text desc)
+        templateLink TemplateRoute_Login "Login"
+        templateLink TemplateRoute_Signup "Signup"
+        templateLink TemplateRoute_Channel "Channel"
+        templateLink TemplateRoute_Main "Main"
+    TemplateRoute_Channel -> channelTemplateViewer
+    TemplateRoute_Login -> do
+      _ <- Templates.login $ LoginConfig
+        { _loginConfig_mode = pure LoginMode_Login
+        , _loginConfig_switchModeLink = el "a" . dynText
+        , _loginConfig_errors = pure (Just "Those credentials are wrong!")
+        }
+      pure ()
+    TemplateRoute_Signup -> do
+      _ <- Templates.login $ LoginConfig
+        { _loginConfig_mode = pure LoginMode_Signup
+        , _loginConfig_switchModeLink = el "a" . dynText
+        , _loginConfig_errors = pure Nothing
+        }
+      pure ()
+    _ -> blank
+
+channelTemplateViewer
+  :: Template t m
+  => m ()
+channelTemplateViewer = do
+  _ <- channel $ ChannelConfig
+    { _channelConfig_name = pure "Fake Channel"
+    , _channelConfig_clearInput = never
+    , _channelConfig_messagesConfig = MessagesConfig
+      { _messagesConfig_messageList = mapM_ (message . pure) fakeMessages
+      }
+    , _channelConfig_channelList = ChannelListConfig $ do
+      _ <- channelItem "Interviews"
+      _ <- channelItem "Book Reviews"
+      _ <- channelItem "Opinions"
+      pure ()
+    }
+  pure ()
+
 fakeMessages :: [Msg]
 fakeMessages = Map.elems $ Map.mapWithKey (\k (h, m) -> Msg
   { _msg_id = Id $ fromIntegral k
@@ -68,44 +123,3 @@ fakeMessages = Map.elems $ Map.mapWithKey (\k (h, m) -> Msg
       , ("Interviewer", "Thanks for your time.")
       , ("Interviewee", "You're welcome.")
       ]
-
-templateViewer ::
-  ( Template t m
-  , MonadFix m
-  , MonadHold t m
-  , RouteToUrl (R FrontendRoute) m
-  , SetRoute t (R FrontendRoute) m
-  , Prerender js t m
-  )
-  => RoutedT t (R TemplateRoute) m ()
-templateViewer = do
-  subRoute_ $ \case
-    TemplateRoute_Index -> divClass "container mx-auto p-4" $ do
-      elClass "h1" "font-bold text-h1" $ text "Welcome to the template gallery"
-      el "p" $ text "Choose a template below:"
-      elClass "ul" "list-disc" $ do
-        let templateLink r desc = el "li" $ routeLink (FrontendRoute_Templates :/ r :/ ()) (text desc)
-        templateLink TemplateRoute_Login "Login"
-        templateLink TemplateRoute_Signup "Signup"
-        templateLink TemplateRoute_Channel "Channel"
-        templateLink TemplateRoute_Main "Main"
-    TemplateRoute_Channel -> channelTemplateViewer
-    _ -> blank
-
-channelTemplateViewer
-  :: Template t m
-  => m ()
-channelTemplateViewer = do
-  _ <- channel $ ChannelConfig
-    { _channelConfig_name = pure "Fake Channel"
-    , _channelConfig_clearInput = never
-    , _channelConfig_messagesConfig = MessagesConfig
-      { _messagesConfig_messageList = mapM_ (message . pure) fakeMessages
-      }
-    , _channelConfig_channelList = ChannelListConfig $ do
-      _ <- channelItem "Interviews"
-      _ <- channelItem "Book Reviews"
-      _ <- channelItem "Opinions"
-      pure ()
-    }
-  pure ()

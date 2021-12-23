@@ -38,7 +38,7 @@ authenticateWithToken mToken a = do
   fmap switchDyn $ widgetHold (pure never) $ ffor (leftmost [tag (current mToken) pb, updated mToken]) $ \case
     Nothing -> do
       r <- onRender
-      setRoute $ FrontendRoute_Login :/ () <$ r
+      setRoute $ FrontendRoute_Auth :/ AuthRoute_Login :/ () <$ r
       pure never
     Just token -> do
       fmap switchDyn $ mapRoutedT (authenticatedWidget token) $ handleAuthFailure renderInvalid a

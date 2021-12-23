@@ -41,6 +41,7 @@ library
     TemplateViewer
     Templates
     Templates.Channel
+    Templates.Login
     Templates.Partials.Buttons
     Templates.Partials.ChannelList
     Templates.Partials.Containers
@@ -48,9 +49,7 @@ library
     Templates.Partials.Inputs
     Templates.Partials.Lists
     Templates.Partials.Message
-    Templates.Partials.PasswordInput
     Templates.Partials.Searchbar
-    Templates.Partials.TextInput
     Templates.Types
 
 

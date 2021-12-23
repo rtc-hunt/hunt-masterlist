@@ -31,11 +31,14 @@ data BackendRoute :: * -> * where
 
 data FrontendRoute :: * -> * where
   FrontendRoute_Main :: FrontendRoute ()
-  FrontendRoute_Login :: FrontendRoute ()
-  FrontendRoute_Signup :: FrontendRoute ()
+  FrontendRoute_Auth :: FrontendRoute (R AuthRoute)
   FrontendRoute_Channel :: FrontendRoute (Maybe (Id Chatroom))
   FrontendRoute_Templates :: FrontendRoute (R TemplateRoute)
   -- This type is used to define frontend routes, i.e. ones for which the backend will serve the frontend.
+
+data AuthRoute a where
+  AuthRoute_Login :: AuthRoute ()
+  AuthRoute_Signup :: AuthRoute ()
 
 data TemplateRoute :: * -> * where
   -- The index route is where we select the template to view
@@ -56,8 +59,9 @@ fullRouteEncoder = mkFullRouteEncoder
       BackendRoute_Listen -> PathSegment "listen" $ unitEncoder mempty
   )
   (\case
-      FrontendRoute_Login -> PathSegment "login" $ unitEncoder mempty
-      FrontendRoute_Signup -> PathSegment "signup" $ unitEncoder mempty
+      FrontendRoute_Auth -> PathSegment "auth" $ pathComponentEncoder $ \case
+        AuthRoute_Login -> PathSegment "login" $ unitEncoder mempty
+        AuthRoute_Signup -> PathSegment "signup" $ unitEncoder mempty
       FrontendRoute_Main -> PathEnd $ unitEncoder mempty
       FrontendRoute_Channel -> PathSegment "channel" $ maybeEncoder (unitEncoder mempty) (singlePathSegmentEncoder . idEncoder)
       FrontendRoute_Templates -> PathSegment "templates" $ pathComponentEncoder $ \case 
@@ -76,4 +80,5 @@ concat <$> mapM deriveRouteComponent
   [ ''BackendRoute
   , ''FrontendRoute
   , ''TemplateRoute
+  , ''AuthRoute
   ]

@@ -9,36 +9,27 @@
 
 module Frontend where
 
-import Prelude hiding (id, (.))
 import Control.Category
 import Control.Monad.Fix
 import qualified Data.Aeson as A
 import Data.Functor.Identity
 import qualified Data.List as L
-import Data.Maybe (isNothing)
+import Data.Signed (Signed)
 import Data.Text (Text)
-import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
-import Data.Witherable as W
+import qualified Data.Witherable as W
 import GHCJS.DOM (currentDocumentUnchecked)
-import Obelisk.Frontend
 import Obelisk.Configs
+import Obelisk.Frontend
+import Obelisk.Generated.Static
 import Obelisk.Route
 import Obelisk.Route.Frontend
-import Obelisk.Generated.Static
-import Reflex.Dom.Core hiding ( link
-                              , textInput
-                              , TextInputConfig
-                              , TextInput(..)
-                              , textInput_value
-                              , textInput_input
-                              , _textInput_value
-                              )
+import Prelude hiding ((.), id)
+import Reflex.Dom.Core
 import Rhyolite.Account
 import Rhyolite.Api (ApiRequest(..))
 import Rhyolite.Frontend.App
 import Rhyolite.Frontend.Cookie
-import Data.Signed (Signed)
 
 import Common.Request
 import Common.Route
@@ -47,11 +38,8 @@ import Frontend.Authentication
 import Frontend.Channel (channel)
 import Frontend.Types
 
-import Templates.Partials.Containers
-import Templates.Partials.TextInput
-import Templates.Partials.PasswordInput
-import Templates.Partials.Buttons
 import TemplateViewer
+import Templates.Login
 
 authCookieName :: Text
 authCookieName = "auth"
@@ -73,70 +61,29 @@ frontend = Frontend
   , _frontend_body = runExampleWidget frontendBody
   }
 
-link :: (DomBuilder t m, RouteToUrl route m, SetRoute t route m, Prerender js t m) => route -> T.Text -> m ()
-link route label = do
-  routeLink route $ elClass "div" "font-facit font-label underline text-label text-link text-center mt-4" $ text label
-
-logIn
-  :: forall js t m. (PostBuild t m, MonadFix m, MonadHold t m, DomBuilder t m, RouteToUrl (R FrontendRoute) m, SetRoute t (R FrontendRoute) m, Prerender js t m)
-  => Event t (Maybe Text)
+auth :: forall js t m.
+  ( PostBuild t m
+  , MonadHold t m
+  , DomBuilder t m
+  , RouteToUrl (R FrontendRoute) m
+  , SetRoute t (R FrontendRoute) m
+  , Prerender js t m
+  )
+  => Dynamic t LoginMode
+  -> Event t (Maybe Text)
   -> m (Event t (Text, Text))
-logIn serverError = screenContainer $ do
-  elClass "div" "p-4 mx-auto md:w-sm" $ mdo
-    elClass "h1" "font-karla font-bold text-h1 text-copy mt-12" $
-      text "Log In"
-
-    let
-      usernameEvent = _textInput_input ti
-      passwordEvent = _passwordInput_input pi
-
-    dError <- holdDyn Nothing $ testValidation <$> usernameEvent
-    ti <- textInput $ (def :: TextInputConfig t)
-      & textInputConfig_label .~ "Email/Profile Name"
-      & textInputConfig_errorMessage .~ dError
-
-    dPError <- holdDyn Nothing $ leftmost [passwordValidation <$> passwordEvent, serverError]
-    pi <- passwordInput $ (def :: PasswordInputConfig t)
-      & passwordInputConfig_error .~ dPError
-
-    click <- primaryButton "Log In"
-    link (FrontendRoute_Signup :/ ()) "Don't have an account?"
-    credentials <- zipDyn <$> holdDyn "" usernameEvent <*> holdDyn "" passwordEvent
-    pure $ W.filter testCredentials $ tagPromptlyDyn credentials click
-
-testCredentials :: (T.Text, T.Text) -> Bool
-testCredentials (user, pass) = all isNothing [testValidation user, passwordValidation pass]
-
-passwordValidation :: T.Text -> Maybe T.Text
-passwordValidation t
-  | T.length t < 3 = Just "Not a valid password"
-  | otherwise = Nothing
-
-testValidation :: T.Text -> Maybe T.Text
-testValidation t
-  | T.length t < 3 = Just "This isn't a valid email"
-  | otherwise = Nothing
-
-signup :: forall js t m. (MonadFix m, MonadHold t m, PostBuild t m, DomBuilder t m, RouteToUrl (R FrontendRoute) m, SetRoute t (R FrontendRoute) m, Prerender js t m) => m (Event t (Text, Text))
-signup = screenContainer $ do
-  elClass "div" "p-4 mx-auto md:w-sm" $ do
-    elClass "h1" "font-karla font-bold text-h1 text-copy mt-12" $
-      text "Sign Up"
-
-    newAccount <- textInput $ def
-      & textInputConfig_label .~ "Email"
-      & textInputConfig_type .~ "email"
-
-    newPass <- passwordInput def
-
-    let
-      usernameEvent = _textInput_input newAccount
-      passwordEvent = _passwordInput_input newPass
-
-    click <- primaryButton "Sign Up"
-    link (FrontendRoute_Login :/ ()) "Already have an account?"
-    credentials <- zipDyn <$> holdDyn "" usernameEvent <*> holdDyn "" passwordEvent
-    pure $ W.filter testCredentials $ tagPromptlyDyn credentials click
+auth mode serverError =  do
+  errors <- holdDyn Nothing serverError
+  Login user pass submit <- login $ LoginConfig
+    { _loginConfig_mode = mode
+    , _loginConfig_switchModeLink = \t ->
+      let r = ffor mode $ \case
+            LoginMode_Signup -> FrontendRoute_Auth :/ AuthRoute_Login :/ ()
+            LoginMode_Login -> FrontendRoute_Auth :/ AuthRoute_Signup :/ ()
+      in dynRouteLink r $ dynText t
+    , _loginConfig_errors = errors
+    }
+  pure $ tag (current $ (,) <$> value user <*> value pass) submit
 
 -- | Handle setting the user's cookie to the given auth token (if any)
 manageAuthCookie :: (DomBuilder t m, Prerender js t m)
@@ -166,22 +113,25 @@ frontendBody = do
         FrontendRoute_Channel -> authenticateWithToken mAuthCookie $ do
           logout <- channel
           pure $ Nothing <$ logout
-        FrontendRoute_Signup -> do
-          credentials <- signup
-          redirectIfAuthenticated mAuthCookie $ do
-            (_loginFailed, loginSuccess) <- fmap fanEither . requestingIdentity . ffor credentials $ \(user, pw) ->
-              ApiRequest_Public $ PublicRequest_Signup user pw
-            pure (fmap Just loginSuccess)
-        FrontendRoute_Login -> mdo
-          credentials <- logIn loginError
-          (loginError, cookie) <- redirectIfAuthenticated mAuthCookie $ do
-            (loginFailed, loginSuccess) <- fmap fanEither . requestingIdentity . ffor credentials $ \(user, pw) ->
-              ApiRequest_Public $ PublicRequest_Login user pw
-            pure (fmap Just loginFailed, fmap Just loginSuccess)
-          pure cookie
+        FrontendRoute_Auth -> do
+          r <- askRoute
+          let mode = ffor r $ \case
+                AuthRoute_Signup :/ () -> LoginMode_Signup
+                AuthRoute_Login :/ () -> LoginMode_Login
+          rec credentials <- auth mode $ fmap Just errors
+              x :: Dynamic t (Event t (Either Text (Signed (AuthToken Identity)))) <- subRoute $ \case
+                AuthRoute_Login ->
+                  requestingIdentity . ffor credentials $ \(user, pw) ->
+                    ApiRequest_Public $ PublicRequest_Login user pw
+                AuthRoute_Signup -> 
+                  requestingIdentity . ffor credentials $ \(user, pw) ->
+                    ApiRequest_Public $ PublicRequest_Signup user pw
+              let (errors, token)  = fanEither $ switch $ current x
+          redirectIfAuthenticated mAuthCookie
+          pure $ Just <$> token
         FrontendRoute_Main -> do
           pb <- getPostBuild
-          setRoute $ FrontendRoute_Login :/ () <$ pb
+          setRoute $ FrontendRoute_Auth :/ AuthRoute_Login :/ () <$ pb
           pure never
         ) :: forall a. FrontendRoute a -> RoutedT t a (ExampleWidget t m) (Event t (Maybe (Signed (AuthToken Identity)))))
   manageAuthCookie authChange
@@ -192,12 +142,14 @@ redirectIfAuthenticated
      , SetRoute t (R FrontendRoute) m
      )
   => Dynamic t (Maybe token)
-  -> m a
-  -> m a
-redirectIfAuthenticated mAuthCookie w = do
+  -> m ()
+redirectIfAuthenticated mAuthCookie = do
   pb <- getPostBuild
-  setRoute $ FrontendRoute_Channel :/ Nothing <$ catMaybes (leftmost [ tag (current mAuthCookie) pb, updated mAuthCookie ])
-  w
+  let hasAuth = W.catMaybes $ leftmost
+        [ tag (current mAuthCookie) pb
+        , updated mAuthCookie
+        ]
+  setRoute $ FrontendRoute_Channel :/ Nothing <$ hasAuth
 
 runExampleWidget
   :: ( DomBuilder t m
