@@ -5,17 +5,12 @@ module Templates.Partials.Buttons where
 import Data.Text (Text)
 import Reflex.Dom.Core
 
-import Frontend.Utils
-
 iconButton :: DomBuilder t m => Text -> m (Event t ())
 iconButton icon = do
   (e, _) <- elClass' "button" classes $ text icon
   pure $ domEvent Click e
   where
-    classes =
-      classList [ "focus:outline-none flex-shrink-0 bg-primary rounded"
-                , "p-2.5 font-icon text-icon text-white leading-none shadow-button"
-                ]
+    classes = "focus:outline-none flex-shrink-0 bg-primary rounded p-2.5 font-icon text-icon text-white leading-none shadow-button"
 
 primaryButton :: DomBuilder t m => Text -> m (Event t ())
 primaryButton buttonText = do
@@ -23,11 +18,10 @@ primaryButton buttonText = do
   pure $ domEvent Click e
   where
     classes =
-      classList [ "focus:outline-none w-full p-4 mt-16 shadow-button bg-primary"
-                , "font-facit font-bold text-white text-body text-center rounded"
-                , "hover:bg-primary-rich active:bg-primary-desaturated"
-                , "focus:ring-4 ring-primary ring-opacity-50"
-                ]
+      "focus:outline-none w-full p-4 mt-16 shadow-button bg-primary \
+      \ font-facit font-bold text-white text-body text-center rounded \
+      \ hover:bg-primary-rich active:bg-primary-desaturated \
+      \ focus:ring-4 ring-primary ring-opacity-50"
 
 secondaryIconButton :: DomBuilder t m => Text -> Text -> m (Event t ())
 secondaryIconButton cs icon = do
@@ -36,11 +30,9 @@ secondaryIconButton cs icon = do
   pure $ domEvent Click e
   where
     classes =
-      classList [ "focus:outline-none rounded border border-metaline"
-                , "focus:ring-4 ring-primary ring-opacity-50"
-                , "p-2.5 flex-shrink-0 bg-primary-light"
-                , cs
-                ]
+      "focus:outline-none rounded border border-metaline \
+      \ focus:ring-4 ring-primary ring-opacity-50 \
+      \ p-2.5 flex-shrink-0 bg-primary-light " <> cs
 
 
 secondaryButton :: DomBuilder t m => Text -> Text -> m (Event t ())
@@ -50,11 +42,9 @@ secondaryButton cs label = do
   pure $ domEvent Click e
   where
     classes =
-      classList [ "w-full p-2.5 leading-none text-center rounded border border-metaline"
-                , "bg-primary-light text-primary-darker font-bold font-facit focus:outline-none"
-                , "focus:ring-4 ring-primary ring-opacity-50"
-                , cs
-                ]
+      "w-full p-2.5 leading-none text-center rounded border border-metaline \
+      \ bg-primary-light text-primary-darker font-bold font-facit focus:outline-none \
+      \ focus:ring-4 ring-primary ring-opacity-50 " <> cs
 
 sendButton :: DomBuilder t m => m (Event t ())
 sendButton = iconButton "send"

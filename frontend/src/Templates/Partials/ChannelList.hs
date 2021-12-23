@@ -9,7 +9,6 @@ import Templates.Partials.Buttons
 import Templates.Partials.Headers
 import Templates.Partials.Lists
 import Templates.Partials.Searchbar
-import Frontend.Utils
 
 data ChannelListConfig m = ChannelListConfig
   { _channelListConfig_resultDisplay :: m ()
@@ -24,7 +23,7 @@ channelList :: (DomBuilder t m) => ChannelListConfig m -> m (ChannelList t m)
 channelList cfg = do
   elClass "div" "flex-shrink-0 w-1/4 h-full flex-col bg-sunken hidden md:flex border-r border-metaline" $
     elClass "div" "flex-grow p-4" $ do
-      addClick <- elClass "div" (classList ["w-full flex flex-row items-center justify-between mt-6"]) $ do
+      addClick <- elClass "div" "w-full flex flex-row items-center justify-between mt-6" $ do
         h2 $ text "Channels"
         iconButton "add"
       search <- searchbar "Search for a channel, or create a new one"
