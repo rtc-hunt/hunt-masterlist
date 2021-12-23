@@ -1,5 +1,25 @@
 # rhyolite-example
 
+
+* [Getting Started](#getting-started)
+* [Architecture](#architecture)
+  * [./common](#common)
+    * [./common/src/Common/Request.hs](#commonsrccommonrequesths)
+    * [./common/src/Common/View.hs](#commonsrccommonviewhs)
+    * [./common/src/Common/Route.hs](#commonsrccommonroutehs)
+    * [./common/src/Common/Schema.hs](#commonsrccommonschemahs)
+  * [./backend](#backend)
+    * [./backend/Backend.hs](#backendbackendhs)
+    * [./backend/Request.hs](#backendrequesths)
+    * [./backend/View.hs](#backendviewhs)
+    * [./backend/View/](#backendview)
+    * [./backend/Listen.hs](#backendlistenhs)
+    * [./backend/Schema.hs](#backendschemahs)
+  * [./frontend](#frontend)
+    * [Frontend Organization](#frontend-organization)
+    * [Viewing Static Templates](#viewing-static-templates)
+* [CI](#ci)
+
 ## Getting Started
 
 Make sure that [Obelisk](https://github.com/obsidiansystems/obelisk) is installed on your machine.
@@ -174,3 +194,24 @@ convenient whenever it suffices).
 This directory contains the frontend. Perhaps surprisingly, this code in its entirety will also be part of the
 backend, used to pre-render any frontend routes, so that when they're delivered, they look approximately
 correct even before all the javascript loads.
+
+#### Frontend Organization
+
+For a general description, read over [this document](https://3.basecamp.com/4757487/buckets/18006584/uploads/3373096800). The principles in that
+document are applied to the frontend as follows:
+
+* The `frontend/src/Templates` directory contains html templates implemented in
+  reflex-dom. These templates should not be much more than DOM: most should
+  require no more than DomBuilder and PostBuild. Each template must define an
+  interface for any configurable or dynamic elements and an output type for
+  any "active" elements that must be used by code outside the template.
+* The `frontend/src/Templates/Partials` directory contains html templates for
+  reusable sub-page components.
+
+#### Viewing Static Templates
+
+Static templates can be viewed by going to `/templates`.
+
+## CI
+
+CI results for this project are visible [here](https://ci.obsidian.systems/recent/gitea/rhyolite-example/rhyolite-example).

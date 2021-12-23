@@ -18,7 +18,7 @@ data PrivateRequest a where
 -- Public requests are those which do not require the user to already be logged in.
 data PublicRequest a where
   PublicRequest_Login :: Text -> Text -> PublicRequest (Either Text (Signed (AuthToken Identity)))
-  PublicRequest_SignUp :: Text -> Text -> PublicRequest (Either Text (Signed (AuthToken Identity)))
+  PublicRequest_Signup :: Text -> Text -> PublicRequest (Either Text (Signed (AuthToken Identity)))
 
 deriveArgDict ''PrivateRequest
 deriveJSONGADT ''PrivateRequest

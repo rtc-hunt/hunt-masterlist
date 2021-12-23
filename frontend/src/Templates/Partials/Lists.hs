@@ -1,12 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Frontend.Templates.Partials.Lists where
+module Templates.Partials.Lists where
 
 import Data.Default
 import Data.Text (Text)
+import qualified Data.Text as T
 import Reflex.Dom.Core
-
-import Frontend.Utils
 
 data ListItemConfig = ListItemConfig
   { _listItemConfig_clickable :: Bool
@@ -31,7 +30,7 @@ listItem
   -> Dynamic t Text
   -> m (Event t ())
 listItem cfg label = do
-  let topClass = classList $
+  let topClass = T.intercalate " " $
         [ "flex flex-col py-2 border-b border-metaline"
         ] <> case _listItemConfig_clickable cfg of
           True -> ["cursor-pointer"]

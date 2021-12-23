@@ -17,7 +17,14 @@ library
                , monoidal-containers
                , obelisk-backend
                , obelisk-route
+               , semimap
                , signed-data-clientsession
+               , text
+               , time
+               , vessel
+               , rhyolite-common
+               , signed-data
+               , rhyolite-groundhog-legacy-types
                -- Logging
                , monad-logger
                -- Database

@@ -29,8 +29,6 @@ import Backend.Schema ()
 import Common.Schema
 import Common.View
 
-import Control.Monad.IO.Class
-
 data Notify a where
   Notify_Account :: Notify (Id Account)
   Notify_Chatroom :: Notify (Id Chatroom)
@@ -68,7 +66,6 @@ notifyHandler db nm v = case _dbNotification_message nm of
       else pure emptyV
     V_Messages -> const $ pure emptyV
   Notify_Message :/ mid -> do
-    putStrLn $ "Got message notification: " <> show mid
     runNoLoggingT $ do
       msgs :: [(Id Chatroom, Int, UTCTime, Text, Text)] <- runDb (Identity db) $ [iquery|
         select m.chatroom, m.mseq, m.timestamp at time zone 'utc', a.account_email, m.text
@@ -76,18 +73,16 @@ notifyHandler db nm v = case _dbNotification_message nm of
         join "Account" a on m.account = a.id
         where m.id = ${mid}
       |]
-      liftIO $ print msgs
-      liftIO $ print v
       case msgs of
         [] -> pure emptyV
         (cid, mseq, time, acc, txt):_ -> buildV v $ \case
           V_Messages -> \sv ->
             let msg = Identity . SemiMap_Partial . Map.singleton mseq . First . Just $
-                  MsgView
-                    { _msgView_id = mid
-                    , _msgView_timestamp = time
-                    , _msgView_handle = acc
-                    , _msgView_text = txt }
+                  Msg
+                    { _msg_id = mid
+                    , _msg_timestamp = time
+                    , _msg_handle = acc
+                    , _msg_text = txt }
             in case lookupSubVessel cid sv of
               Nothing -> pure emptyV
               Just (MapV reqs) -> pure . singletonSubVessel cid . MapV $

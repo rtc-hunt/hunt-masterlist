@@ -25,7 +25,6 @@ in pkgs.stdenv.mkDerivation {
   src = ./src;
   buildInputs = [pkgs.nodejs];
   installPhase = ''
-
     mkdir -p $out/css
     mkdir -p $out/images
 
@@ -38,7 +37,7 @@ in pkgs.stdenv.mkDerivation {
     ln -s ${frontendSrcFiles} frontend
 
     # Run the postcss compiler:
-    postcss styles.css -o $out/styles.css
+    postcss css/styles.css -o $out/css/styles.css
 
     # We can write other commands to produce more static files as well:
     cp -r images/* $out/images/
