@@ -7,6 +7,7 @@ import Reflex.Dom.Core
 import Obelisk.Route.Frontend
 import qualified Data.Map as Map
 import Rhyolite.Api hiding (Request)
+import Rhyolite.Frontend.App
 import Rhyolite.Vessel.Path
 
 import Common.Request

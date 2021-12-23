@@ -21,6 +21,7 @@ import Obelisk.Route
 import Obelisk.Route.Frontend
 import Reflex.Dom.Core hiding (El)
 import Rhyolite.Api (ApiRequest(..))
+import Rhyolite.Frontend.App
 import Rhyolite.Vessel.Path
 
 import Templates (ChannelConfig(..), ChannelOut(..), MessagesConfig(..))
