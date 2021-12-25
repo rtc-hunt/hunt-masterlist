@@ -1,24 +1,17 @@
-{-# LANGUAGE EmptyCase #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeFamilies #-}
+{-# Language ScopedTypeVariables #-}
 module Common.Route where
 
-import Prelude hiding (id, (.))
 import Control.Category
-import Data.Text (Text)
+import Control.Monad.Except
+import Data.Coerce
 import Data.Functor.Identity
-import Database.Id.Class
+import Data.Int
+import Database.Beam.Backend.SQL.Types
+import Data.Text (Text)
+import qualified Data.Text as T
 import Obelisk.Route
 import Obelisk.Route.TH
-import Rhyolite.Schema
+import Prelude hiding ((.), id)
 
 import Common.Schema
 
@@ -75,6 +68,18 @@ checkedFullRouteEncoder :: Encoder Identity Identity (R (FullRoute BackendRoute 
 checkedFullRouteEncoder = case checkEncoder fullRouteEncoder of
   Left e -> error $ show e
   Right x -> x
+
+idEncoder :: forall x check parse.
+  ( MonadError Text parse
+  , Applicative check
+  , Coercible (PrimaryKey x Identity) (SqlSerial Int64)
+  )
+  => Encoder check parse (PrimaryKey x Identity) Text
+idEncoder = unsafeMkEncoder EncoderImpl
+  { _encoderImpl_encode = T.pack . show . (coerce :: PrimaryKey x Identity -> Int64)
+  , _encoderImpl_decode = \x ->
+    (coerce :: Int64 -> PrimaryKey x Identity) <$> tryDecode unsafeTshowEncoder x
+  }
 
 concat <$> mapM deriveRouteComponent
   [ ''BackendRoute

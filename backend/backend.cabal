@@ -24,27 +24,25 @@ library
                , vessel
                , rhyolite-common
                , signed-data
-               , rhyolite-groundhog-legacy-types
-               -- Logging
                , monad-logger
-               -- Database
-               , database-id-class
-               , database-id-groundhog
                , gargoyle-postgresql-connect
-               , groundhog
-               , groundhog-postgresql
-               , groundhog-th
                , postgresql-simple
                , postgresql-simple-interpolate
                , resource-pool
+               , rhyolite-account-backend
+               , rhyolite-account-types
                , rhyolite-notify-listen
-               , rhyolite-groundhog-legacy
+               , rhyolite-notify-listen-beam
                , psql-simple-class
-               -- Accounts
                , rhyolite-backend
                , clientsession
+               , beam-core
+               , beam-postgres
+               , beam-automigrate
+               , psql-simple-beam
   exposed-modules:
     Backend
+    Backend.Db
     Backend.Listen
     Backend.Request
     Backend.View.Chatroom

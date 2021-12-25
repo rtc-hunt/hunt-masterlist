@@ -12,9 +12,7 @@ module Frontend where
 import Control.Category
 import Control.Monad.Fix
 import qualified Data.Aeson as A
-import Data.Functor.Identity
 import qualified Data.List as L
-import Data.Signed (Signed)
 import Data.Text (Text)
 import qualified Data.Text.Encoding as T
 import qualified Data.Witherable as W
@@ -26,13 +24,13 @@ import Obelisk.Route
 import Obelisk.Route.Frontend
 import Prelude hiding ((.), id)
 import Reflex.Dom.Core
-import Rhyolite.Account
 import Rhyolite.Api (ApiRequest(..))
 import Rhyolite.Frontend.App
 import Rhyolite.Frontend.Cookie
 
 import Common.Request
 import Common.Route
+import Common.Schema
 
 import Frontend.Authentication
 import Frontend.Channel (channel)
@@ -87,7 +85,7 @@ auth mode serverError =  do
 
 -- | Handle setting the user's cookie to the given auth token (if any)
 manageAuthCookie :: (DomBuilder t m, Prerender js t m)
-  => Event t (Maybe (Signed (AuthToken Identity)))
+  => Event t (Maybe AuthToken)
   -> m ()
 manageAuthCookie authChange = do
   prerender_ blank $ do
@@ -119,7 +117,7 @@ frontendBody = do
                 AuthRoute_Signup :/ () -> LoginMode_Signup
                 AuthRoute_Login :/ () -> LoginMode_Login
           rec credentials <- auth mode $ fmap Just errors
-              x :: Dynamic t (Event t (Either Text (Signed (AuthToken Identity)))) <- subRoute $ \case
+              x :: Dynamic t (Event t (Either Text AuthToken)) <- subRoute $ \case
                 AuthRoute_Login ->
                   requestingIdentity . ffor credentials $ \(user, pw) ->
                     ApiRequest_Public $ PublicRequest_Login user pw
@@ -133,7 +131,7 @@ frontendBody = do
           pb <- getPostBuild
           setRoute $ FrontendRoute_Auth :/ AuthRoute_Login :/ () <$ pb
           pure never
-        ) :: forall a. FrontendRoute a -> RoutedT t a (ExampleWidget t m) (Event t (Maybe (Signed (AuthToken Identity)))))
+        ) :: forall a. FrontendRoute a -> RoutedT t a (ExampleWidget t m) (Event t (Maybe AuthToken)))
   manageAuthCookie authChange
   pure ()
 

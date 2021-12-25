@@ -6,29 +6,25 @@ build-type: Simple
 library
   hs-source-dirs: src
   build-depends: base
-               , obelisk-route
-               , mtl
-               , text
-               , time
-               , rhyolite-common
-               , dependent-sum-template
-               -- Schema
-               , rhyolite-groundhog-legacy-types
-               , signed-data
-               , database-id-class
-               -- Api
                , aeson
                , aeson-gadt-th
-               , constraints-extras
-               -- Views
-               , semimap
-               , vessel
-               -- Auth
+               , beam-core
                , constraints
-               , some
-               , reflex
-               , witherable
+               , constraints-extras
+               , dependent-sum-template
+               , mtl
+               , obelisk-route
                , patch
+               , reflex
+               , rhyolite-common
+               , semimap
+               , signed-data
+               , some
+               , text
+               , time
+               , vessel
+               , witherable
+               , rhyolite-account-types
   exposed-modules:
     Common.Request
     Common.Route
@@ -40,7 +36,10 @@ library
     FlexibleContexts
     FlexibleInstances
     GADTs
+    LambdaCase
     MultiParamTypeClasses
+    OverloadedStrings
+    RankNTypes
     TemplateHaskell
     TypeFamilies
     UndecidableInstances

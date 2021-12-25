@@ -8,11 +8,11 @@ import qualified Data.Set as Set
 import Data.Set (Set)
 import Data.Text (Text)
 import Data.Time
-import Rhyolite.DB.Groundhog ()
 import Rhyolite.SemiMap
 import Database.PostgreSQL.Simple.Types
 import Database.PostgreSQL.Simple.Class
 
+import Backend.Schema ()
 import Common.Schema
 import Common.View
 
@@ -26,11 +26,11 @@ getMessages reqs = do
         pure (cid, mid, before, after)
   results :: [(Id Chatroom, Int, Int, Int, Int, UTCTime, Id Message, Text, Text)] <- [iquery|
     select r.cid, r.seq, r.before, r.after,
-           m.seq, m.timestamp at time zone 'utc', m.id, m.text, a.account_email
-    from (select m.*, row_number() over (partition by m.chatroom order by timestamp) as seq from "Message" m) as m
-    join "Account" a on a.id = m.account
+           m.seq, m.message_timestamp, m.message_id, m.message_text, a.account_email
+    from (select m.*, row_number() over (partition by m.message_chatroom__chatroom_id order by message_timestamp) as seq from db_message m) as m
+    join db_account a on a.account_id = m.message_account__account_id
     join ${requestValues} as r (cid,seq,before,after)
-      on r.cid = m.chatroom
+      on r.cid = m.message_chatroom__chatroom_id
       and (r.seq - r.before <= m.seq)
       and (m.seq <= r.seq + r.after)
   |]
