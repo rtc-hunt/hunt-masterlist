@@ -3,9 +3,7 @@ module Common.Request where
 import Data.Aeson
 import Data.Aeson.GADT.TH
 import Data.Constraint.Extras.TH
-import Data.Functor.Identity
 import Data.Text
-import Data.Signed
 
 import Common.Schema
 
@@ -17,8 +15,8 @@ data PrivateRequest a where
 
 -- Public requests are those which do not require the user to already be logged in.
 data PublicRequest a where
-  PublicRequest_Login :: Text -> Text -> PublicRequest (Either Text (Signed (AuthToken Identity)))
-  PublicRequest_Signup :: Text -> Text -> PublicRequest (Either Text (Signed (AuthToken Identity)))
+  PublicRequest_Login :: Text -> Text -> PublicRequest (Either Text AuthToken)
+  PublicRequest_Signup :: Text -> Text -> PublicRequest (Either Text AuthToken)
 
 deriveArgDict ''PrivateRequest
 deriveJSONGADT ''PrivateRequest

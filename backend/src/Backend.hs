@@ -6,45 +6,39 @@ import Backend.Request
 import Backend.Schema
 import Common.Route
 import Control.Monad.IO.Class
-import Control.Monad.Logger
+import Database.PostgreSQL.Simple.Transaction
 import Data.Coerce
-import Data.Functor.Identity
 import Data.Maybe
+import Data.Pool
+import Data.Signed.ClientSession
 import Data.Vessel
-import Database.Groundhog (runMigration)
-import Database.Groundhog.Generic.Migration (getTableAnalysis)
 import Gargoyle.PostgreSQL.Connect
 import Obelisk.Backend
 import Obelisk.Route
 import Rhyolite.Account
-import Rhyolite.Account.Groundhog
 import Rhyolite.Backend.App
 import Rhyolite.Vessel.AuthMapV
-import Data.Signed.ClientSession
-import Rhyolite.DB.Groundhog
 import qualified Web.ClientSession as CS
 
 import Backend.Listen
 import Backend.View
+import Common.Schema
 
 backend :: Backend BackendRoute FrontendRoute
 backend = Backend
   { _backend_run = \serve -> do
     csk <- CS.getKey "config/backend/clientSessionKey"
     let checkToken t = do
-          let x = readSignedWithKey @(AuthToken Identity) csk t
+          let x = readSignedWithKey @(Id Account) csk t
           pure x
-    withDb "db" $ \db -> do
-      runNoLoggingT $ runDb (Identity db) $ do
-        tables <- getTableAnalysis
-        runMigration $ do
-          migrateAccount tables
-          migrateSchema tables
+    withDb "db" $ \pool -> do
+      withResource pool $ \conn -> withTransactionSerializable conn $
+        runMigrations conn
       (listen, _) <- liftIO $ serveDbOverWebsockets
-        (coerce db)
-        (requestHandler db csk)
-        (\nm q -> fmap (fromMaybe emptyV) $ mapDecomposedV (handleAuthMapQuery checkToken (notifyHandler db nm)) q)
-        (QueryHandler $ \q -> fromMaybe emptyV <$> mapDecomposedV (handleAuthMapQuery checkToken (privateQueryHandler db)) q)
+        (coerce pool)
+        (requestHandler pool csk)
+        (\nm q -> fmap (fromMaybe emptyV) $ mapDecomposedV (handleAuthMapQuery checkToken (notifyHandler pool nm)) q)
+        (QueryHandler $ \q -> fromMaybe emptyV <$> mapDecomposedV (handleAuthMapQuery checkToken (privateQueryHandler pool)) q)
         vesselFromWire
         vesselPipeline
       serve $ \case

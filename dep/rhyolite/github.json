@@ -1,8 +1,8 @@
 {
   "owner": "obsidiansystems",
   "repo": "rhyolite",
-  "branch": "develop",
+  "branch": "aa/beam-accounts-2",
   "private": false,
-  "rev": "c663e92e68942a8438c4d22cf018880e94c14215",
-  "sha256": "0gzlaq90nv9iq3y53h6c8idp0301rfadqyp5j5f8ygfkgm9yfbbb"
+  "rev": "64f5ff33f44c23c6f362927f12b0c39d08d2f7e4",
+  "sha256": "0qzbd9ra0wb5hsy5f8ks55dwav38x0zkplrbg6qayr5sypjmp1nm"
 }

@@ -11,9 +11,9 @@ import Data.Set (Set)
 import Data.Text (Text)
 import Database.PostgreSQL.Simple.Types
 import Database.PostgreSQL.Simple.Class
-import Rhyolite.DB.Groundhog ()
 import Rhyolite.SemiMap
 
+import Backend.Schema ()
 import Common.Schema
 import Common.View
 
@@ -21,10 +21,10 @@ searchForChatroom :: Psql m => Set ChatroomQuery -> m (MonoidalMap ChatroomQuery
 searchForChatroom qs = fmap (Map.unionsWith (<>)) $ forM (Set.toList qs) $ \q -> do
     let textQuery = "%" <> _chatroomQuery_search q <> "%"
     results <- [iquery|
-      select id, title
-      from "Chatroom"
-      where title ilike ${textQuery}
-      order by id desc
+      select chatroom_id, chatroom_title
+      from db_chatroom
+      where chatroom_title ilike ${textQuery}
+      order by chatroom_id desc
       limit 10
     |]
     pure $ Map.singleton q $ SemiMap_Complete $ Map.fromList results
@@ -33,8 +33,8 @@ getChatrooms :: Psql m => Set (Id Chatroom) -> m (MonoidalMap (Id Chatroom) (Fir
 getChatrooms qs = do
     let cids = In $ Set.toList qs
     results :: [(Id Chatroom, Text)] <- [iquery|
-      select id, title
-      from "Chatroom"
-      where id in ${cids}
+      select chatroom_id, chatroom_title
+      from db_chatroom
+      where chatroom_id in ${cids}
     |]
     pure $ Map.fromList $ fmap (fmap First) results

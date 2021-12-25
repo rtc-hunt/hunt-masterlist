@@ -14,7 +14,6 @@ import qualified Data.Set as Set
 import qualified Data.Text as T
 import Data.Text (Text)
 import Data.Vessel
-import Database.Id.Class
 import qualified GHCJS.DOM.Element as JS
 import GHCJS.DOM.Types (MonadJSM)
 import Obelisk.Route

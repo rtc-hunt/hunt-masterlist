@@ -28,7 +28,6 @@ library
                , containers
                , semimap
                , time
-               , database-id-class
                , aeson
                , witherable
   exposed-modules:

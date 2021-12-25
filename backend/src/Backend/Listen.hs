@@ -13,19 +13,20 @@ import Data.Semigroup (First(..))
 import Data.Text
 import Data.Time
 import Data.Vessel
-import Database.Groundhog
-import Database.Id.Groundhog
+import Database.Beam
+import Database.Beam.Postgres
 import Database.PostgreSQL.Simple (Connection)
-import Obelisk.Route
+import Database.PostgreSQL.Simple.Beam ()
 import Database.PostgreSQL.Simple.Class
-import Rhyolite.DB.Groundhog
+import Obelisk.Route
+import Rhyolite.Account
 import Rhyolite.DB.NotifyListen
-import Rhyolite.DB.NotifyListen.Groundhog
-
+import Rhyolite.DB.NotifyListen.Beam
 import Rhyolite.SemiMap
 
+import Backend.Db
+import Backend.Schema
 import Backend.View.Chatroom (searchForChatroom)
-import Backend.Schema ()
 import Common.Schema
 import Common.View
 
@@ -45,42 +46,46 @@ instance HasNotification Notify Chatroom where
 instance HasNotification Notify Message where
   notification _ = Notify_Message
 
+getChatroom  :: Id Chatroom -> Pg (Maybe (Chatroom Identity))
+getChatroom cid = do
+  runSelectReturningOne $ select $ filter_ (\x -> primaryKey x ==. val_ cid) $ all_ (_db_chatroom db)
+
 notifyHandler
   :: Pool Connection
   -> DbNotification Notify
   -> PrivateChatV Proxy
   -> IO (PrivateChatV Identity)
-notifyHandler db nm v = case _dbNotification_message nm of
+notifyHandler pool nm v = case _dbNotification_message nm of
   Notify_Account :/ _ -> pure emptyV
   Notify_Chatroom :/ cid -> buildV v $ \case
     V_Chatrooms -> \(MapV queries) -> do
-      results :: Map.MonoidalMap ChatroomQuery (SemiMap (Id Chatroom) Text) <- runNoLoggingT $ runDb (Identity db) $ searchForChatroom $ Map.keysSet queries
+      results :: Map.MonoidalMap ChatroomQuery (SemiMap (Id Chatroom) Text) <- runDb pool $ searchForChatroom $ Map.keysSet queries
       let x = if Map.null results
             then emptyV
             else MapV $ pure <$> results
       pure x
     V_Chatroom -> \(MapV cs) -> if Map.member cid cs
-      then runNoLoggingT $ runDb (Identity db) (get $ fromId cid) >>= pure . \case
+      then runDb pool (getChatroom cid) >>= pure . \case
         Nothing -> emptyV
         Just c -> MapV $ Map.singleton cid $ pure (First (_chatroom_title c))
       else pure emptyV
     V_Messages -> const $ pure emptyV
   Notify_Message :/ mid -> do
     runNoLoggingT $ do
-      msgs :: [(Id Chatroom, Int, UTCTime, Text, Text)] <- runDb (Identity db) $ [iquery|
-        select m.chatroom, m.mseq, m.timestamp at time zone 'utc', a.account_email, m.text
-        from (select *, row_number() over (partition by m.chatroom order by timestamp) as mseq from "Message" m) as m
-        join "Account" a on m.account = a.id
-        where m.id = ${mid}
+      msgs :: [(Id Chatroom, Int, UTCTime, Text, Text)] <- runDb pool $ [iquery|
+        select m.message_chatroom__chatroom_id, m.mseq, m.message_timestamp, a.account_email, m.message_text
+        from (select *, row_number() over (partition by m.message_chatroom__chatroom_id order by message_timestamp) as mseq from db_message m) as m
+        join db_account a on m.message_account__account_id = a.account_id
+        where m.message_id = ${mid}
       |]
       case msgs of
         [] -> pure emptyV
-        (cid, mseq, time, acc, txt):_ -> buildV v $ \case
+        (cid, mseq, t, acc, txt):_ -> buildV v $ \case
           V_Messages -> \sv ->
             let msg = Identity . SemiMap_Partial . Map.singleton mseq . First . Just $
                   Msg
                     { _msg_id = mid
-                    , _msg_timestamp = time
+                    , _msg_timestamp = t
                     , _msg_handle = acc
                     , _msg_text = txt }
             in case lookupSubVessel cid sv of

@@ -4,11 +4,11 @@ import Control.Monad.Fix
 import Data.Map as Map
 import Data.Text (Text)
 import Data.Time
-import Database.Id.Class
 import Obelisk.Route.Frontend
 import Reflex.Dom.Core
 
 import Common.Route
+import Common.Schema
 import Common.View (Msg(..))
 import Templates
 import Templates.Partials.ChannelList
@@ -71,7 +71,7 @@ channelTemplateViewer = do
 
 fakeMessages :: [Msg]
 fakeMessages = Map.elems $ Map.mapWithKey (\k (h, m) -> Msg
-  { _msg_id = Id $ fromIntegral k
+  { _msg_id = MessageId $ fromIntegral k
   , _msg_timestamp = UTCTime day (fromIntegral k * 60)
   , _msg_handle = h
   , _msg_text = m
