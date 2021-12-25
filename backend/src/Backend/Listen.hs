@@ -47,8 +47,7 @@ instance HasNotification Notify Message where
   notification _ = Notify_Message
 
 getChatroom  :: Id Chatroom -> Pg (Maybe (Chatroom Identity))
-getChatroom cid = do
-  runSelectReturningOne $ select $ filter_ (\x -> primaryKey x ==. val_ cid) $ all_ (_db_chatroom db)
+getChatroom = runSelectReturningOne . lookup_ (_db_chatroom db)
 
 notifyHandler
   :: Pool Connection
