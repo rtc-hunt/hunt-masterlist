@@ -36,11 +36,13 @@ library
                , psql-simple-class
                , rhyolite-backend
                , clientsession
+               , beam-core
                , beam-postgres
                , beam-automigrate
                , psql-simple-beam
   exposed-modules:
     Backend
+    Backend.Db
     Backend.Listen
     Backend.Request
     Backend.View.Chatroom
