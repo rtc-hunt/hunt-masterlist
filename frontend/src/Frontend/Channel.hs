@@ -92,6 +92,59 @@ channel = do
     pure logout
   pure $ switchDyn logout
 
+embeddableChannel ::
+  ( Monad m
+  , MonadIO (Performable m)
+  , MonadFix m
+  , MonadHold t m
+  , PostBuild t m
+  , PerformEvent t m
+  , TriggerEvent t m
+  , DomBuilder t m
+  , Prerender js t m
+  , MonadQuery t (Vessel V (Const SelectedCount)) m
+  , MonadQuery t (Vessel V (Const SelectedCount)) (Client m)
+  , SetRoute t (R FrontendRoute) (Client m)
+  , Requester t m
+  , Requester t (Client m)
+  , Response m ~ Identity
+  , Response (Client m) ~ Identity
+  , Request m ~ ApiRequest () PublicRequest PrivateRequest
+  , Request (Client m) ~ ApiRequest () PublicRequest PrivateRequest
+  )
+  => Dynamic t (Maybe (Id Chatroom))-> m ()
+embeddableChannel mcid = mdo      
+    channelView <- channelBuilder mcid
+    _ <- prerender (pure ()) $ do
+      rec
+        ChannelOut input send msgs logout clist <- Templates.channel $
+          ChannelConfig
+            { _channelConfig_name = fromMaybe "" <$> _channelView_name channelView
+            , _channelConfig_clearInput = clickOrEnter
+            , _channelConfig_messagesConfig = MessagesConfig $ do
+                dyn_ $ ffor (_channelView_messages channelView) $ \case
+                  Nothing -> dynText $ ffor mcid $ \case
+                    Nothing -> "⬅️ Select or create a channeel"
+                    Just _ -> ""
+                  Just ms -> messagesHelper (Templates._messagesOut_container msgs) ms
+            , _channelConfig_channelList = ChannelListConfig $
+                channelSearchResults clist
+            }
+        let newMessage = current $ value input
+            enter = keypress Enter $ _inputElement_element input
+            clickOrEnter = leftmost [send, enter]
+            sendMessage = gate (not . T.null . T.strip <$> newMessage) clickOrEnter
+            mkMsgReq c m = case c of
+              Nothing -> Nothing
+              Just c' -> Just $ ApiRequest_Private () $ PrivateRequest_SendMessage c' m
+        _ <- requestingIdentity $ attachWithMaybe
+          (\(c, m) _ -> mkMsgReq c m)
+          ((,) <$> current mcid <*> newMessage)
+          sendMessage
+        blank
+      blank
+    blank
+
 data ChannelView t = ChannelView
   { _channelView_name :: Dynamic t (Maybe Text)
   , _channelView_messages :: Dynamic t (Maybe (Dynamic t (Map Int Msg)))

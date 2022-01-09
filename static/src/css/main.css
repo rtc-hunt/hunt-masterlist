@@ -1,0 +1,179 @@
+p {
+  color: red;  
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  height: 100vh !important;
+}
+
+.appMain {
+  position: relative;
+  top: 3em;
+  notflex-grow: 1;
+  height: calc(100% - 3rem - 5px);
+  display: flex;
+}
+.appMain > div {
+  height: 100%;
+  width: 100%;
+  display: inline-grid;
+  grid-template-rows: 1fr min-content min-content; /*calc(100% - 2.5em);*/
+  grid-template-columns: 1fr;
+  grid-template-areas: "bodymain" "over-input" "commandOutput" "input";
+
+  /* display: flex; */
+  /* flex-direction: column; */
+}
+
+.hidden { display: none; }
+
+.appMain > div.SplitTab {
+  height: 100%;
+  width: 100%;
+  display: inline-grid;
+  grid-template-rows: 1fr min-content min-content; /*calc(100% - 2.5em);*/
+  grid-template-columns: 4fr 1fr;
+  grid-template-areas: "bodymain bodyright" "over-input bodyright" "commandOutput bodyright" "input input";
+
+  /* display: flex; */
+  /* flex-direction: column; */
+}
+.tabbedContent {
+  height: 100%;
+  overflow: hidden;
+  grid-area: bodymain;
+  /* scroll-snap-type: x mandatory; */
+}
+
+
+.tabbedContentContainer {
+  display: grid;
+  column-gap: 0px;
+  grid-template-columns: repeat(4, 100%);
+  grid-template-rows: 100%;
+  position: relative;
+  z-index: 0;
+  height: 100%;
+}
+.tabbedContentContainer > div {
+  /* scroll-snap-align: start; */
+  notheight: 100%;
+  notwidth: 100vw;
+}
+.framed { height: 100%; width: 100%; }
+iframe { height: 100%; width: 100%; }
+
+.authentication {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.scrollable { height: 95%; overflow-y: scroll; margin: 1em; flex-direction: column-reverse; display: flex;}
+.inner-scrolled { height: 100%; display: flex; flex-direction: column-reverse; }
+
+.top-scrollable { height: 95%; overflow-y: scroll; }
+
+.chat-overlay {
+  padding: 1em;
+}
+
+.MutedChat .chat-overlay {
+  display: none;
+}
+
+.FullTab .chat-overlay {
+  transition: opacity 1s;
+  z-index: 5; 
+  position: fixed;
+  right: 0;
+  width: 40vw;
+  background-color: white;
+  border-radius: 1em;
+  border: 1px solid gray;
+  height: 15.7em;
+  overflow: hidden;
+}
+
+.FullTab .chat-overlay.hide-state-0 {
+  display: none;
+}
+.FullTab .chat-overlay.hide-state-1 {
+  opacity: 0;
+}
+
+.SplitTab .chat-overlay {
+  grid-area: bodyright;
+  border-left: 1px solid gray;
+  margin: 0px;
+  padding: 1em;
+  height: 100% !important;
+  /* display: block !important; */
+}
+
+.bottomwidget {
+  grid-area: over-input;
+}
+
+.commandOutput {
+  grid-area: commandOutput;
+  border-top: 1px solid gray;
+}
+.commandOutput:empty {
+  display: none;
+}
+
+.chatInput {
+  line-height: 2.5;
+  grid-area: input;
+}
+
+.toptabs {
+  height: 3em;
+}
+
+.toptabs button {
+  width: 10em;
+}
+
+.puzContent {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+}
+
+.ui.simple.dropdown.item.menuShrink {
+  flex: initial !important;
+  min-width: 3em;
+}
+.ellipsisShrink {
+  width: 50em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.maxwidth {
+  max-width: 80em;
+}
+
+
+
+
+span[data-tag="solved"] {
+  background-color: lightgreen !important;
+}
+span[data-tag="in-progress"] {
+  background-color: yellow !important;
+}
+span[data-tag="stalled"] {
+  background-color: mediumpurple !important;
+}
+span[data-tag="extraction"] {
+  background-color: skyblue !important;
+}
+span[data-tag="done"] {
+  background-color: mediumseagreen !important;
+}

@@ -26,6 +26,7 @@ data FrontendRoute :: * -> * where
   FrontendRoute_Main :: FrontendRoute ()
   FrontendRoute_Auth :: FrontendRoute (R AuthRoute)
   FrontendRoute_Channel :: FrontendRoute (Maybe (Id Chatroom))
+  FrontendRoute_Puzzle :: FrontendRoute (Maybe (Id Puzzle))
   FrontendRoute_Templates :: FrontendRoute (R TemplateRoute)
   -- This type is used to define frontend routes, i.e. ones for which the backend will serve the frontend.
 
@@ -42,6 +43,8 @@ data TemplateRoute :: * -> * where
   TemplateRoute_Signup :: TemplateRoute ()
   TemplateRoute_Channel :: TemplateRoute ()
   TemplateRoute_Main :: TemplateRoute ()
+  TemplateRoute_PuzzleList :: TemplateRoute ()
+  TemplateRoute_Puzzle :: TemplateRoute ()
 
 fullRouteEncoder
   :: Encoder (Either Text) Identity (R (FullRoute BackendRoute FrontendRoute)) PageName
@@ -56,13 +59,16 @@ fullRouteEncoder = mkFullRouteEncoder
         AuthRoute_Login -> PathSegment "login" $ unitEncoder mempty
         AuthRoute_Signup -> PathSegment "signup" $ unitEncoder mempty
       FrontendRoute_Main -> PathEnd $ unitEncoder mempty
+      FrontendRoute_Puzzle -> PathSegment "puzzle" $ maybeEncoder (unitEncoder mempty) (singlePathSegmentEncoder . idEncoder)
       FrontendRoute_Channel -> PathSegment "channel" $ maybeEncoder (unitEncoder mempty) (singlePathSegmentEncoder . idEncoder)
       FrontendRoute_Templates -> PathSegment "templates" $ pathComponentEncoder $ \case 
         TemplateRoute_Index -> PathEnd $ unitEncoder mempty
         TemplateRoute_Login -> PathSegment "login" $ unitEncoder mempty
         TemplateRoute_Signup -> PathSegment "signup" $ unitEncoder mempty
         TemplateRoute_Channel -> PathSegment "channel" $ unitEncoder mempty
-        TemplateRoute_Main -> PathSegment "main" $ unitEncoder mempty)
+        TemplateRoute_Main -> PathSegment "main" $ unitEncoder mempty
+        TemplateRoute_PuzzleList -> PathSegment "puzzlelist" $ unitEncoder mempty
+        TemplateRoute_Puzzle -> PathSegment "puzzle" $ unitEncoder mempty)
 
 checkedFullRouteEncoder :: Encoder Identity Identity (R (FullRoute BackendRoute FrontendRoute)) PageName
 checkedFullRouteEncoder = case checkEncoder fullRouteEncoder of

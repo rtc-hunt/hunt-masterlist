@@ -6,14 +6,21 @@
 {-# LANGUAGE RecursiveDo #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE DataKinds #-}
 
 module Frontend where
 
 import Control.Category
+import Control.Lens
+import Control.Monad
+import Control.Monad.Identity
+import Control.Monad.IO.Class
 import Control.Monad.Fix
 import qualified Data.Aeson as A
 import qualified Data.List as L
 import Data.Text (Text)
+import Data.Maybe
 import qualified Data.Text.Encoding as T
 import qualified Data.Witherable as W
 import GHCJS.DOM (currentDocumentUnchecked)
@@ -27,6 +34,8 @@ import Reflex.Dom.Core
 import Rhyolite.Api (ApiRequest(..))
 import Rhyolite.Frontend.App
 import Rhyolite.Frontend.Cookie
+import qualified GHCJS.DOM.Element as JS
+import qualified Language.Javascript.JSaddle as JS
 
 import Common.Request
 import Common.Route
@@ -34,7 +43,9 @@ import Common.Schema
 
 import Frontend.Authentication
 import Frontend.Channel (channel)
+import Frontend.Puzzle (puzzles)
 import Frontend.Types
+-- import OldFrontend
 
 import TemplateViewer
 import Templates.Login
@@ -49,16 +60,66 @@ frontend :: Frontend (R FrontendRoute)
 frontend = Frontend
   { _frontend_head = do
       el "title" $ text "Rhyolite Example"
+      elAttr "link" ( "rel" =: "stylesheet" <> "media" =: "screen" <> "href" =: $(static "css/main.css") <> "type" =: "text/css") $ blank
+      elAttr "link" ( "rel" =: "stylesheet" <> "media" =: "screen" <> "href" =: "https://fontlibrary.org/face/symbola" <> "type" =: "text/css") $ blank
+      elAttr "link" ( "rel" =: "stylesheet" <> "media" =: "screen" <> "href" =: "https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.4.1/semantic.min.css" <> "integrity"=:"sha512-8bHTC73gkZ7rZ7vpqUQThUDhqcNFyYi2xgDgPDHc+GXVGHXq+xPjynxIopALmOPqzo9JZj0k6OqqewdGO3EsrQ==" <> "crossorigin"=:"anonymous" <> "type" =: "text/css") $ blank
+      elAttr "link" ( "rel" =: "stylesheet" <> "media" =: "screen" <> "href" =: "https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.4.1/components/table.min.css" <> "type" =: "text/css") $ blank
+      elAttr "link" ( "rel" =: "stylesheet" <> "media" =: "screen" <> "href" =: "https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.4.1/components/popup.min.css" <> "type" =: "text/css") $ blank
+      elAttr "link" ( "rel" =: "stylesheet" <> "media" =: "screen" <> "href" =: "https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.4.1/components/icon.min.css" <> "type" =: "text/css") $ blank
+
       elAttr "link" ("rel" =: "stylesheet" <> "href" =: "https://use.typekit.net/csf8rij.css") blank
       elAttr "link" ("href" =: $(static "css/styles.css") <> "type" =: "text/css" <> "rel" =: "stylesheet") blank
       elAttr "link" ("rel" =: "preconnect" <> "href" =: "https://fonts.googleapis.com") blank
       elAttr "link" ("rel" =: "preconnect" <> "href" =: "https://fonts.gstatic.com" <> "crossorigin" =: "") blank
       elAttr "link" ("rel" =: "stylesheet" <> "href" =: "https://fonts.googleapis.com/css2?family=Karla:ital,wght@0,200;0,300;0,400;0,500;0,600;0,700;0,800;1,200;1,300;1,400;1,500;1,600;1,700;1,800&display=swap") blank
       elAttr "link" ("rel" =: "stylesheet" <> "href" =: "https://fonts.googleapis.com/icon?family=Material+Icons") blank
-      elAttr "meta" ("name"=:"viewport" <> "content" =: "width=device-width, initial-scale=1") blank
+      elAttr "meta" ("name"=: "viewport" <> "content" =: "width=device-width, initial-scale=1") blank
+      elAttr "script" ("src" =: "https://apis.google.com/js/platform.js") blank
+      el "script" $ text " \
+          \ var prev=5; \
+          \ function renderButton() {\
+          \   gapi.signin2.render('signin-button', {});\
+          \ }"
+      blank
   , _frontend_body = runExampleWidget frontendBody
   }
 
+initGauth
+  :: ( DomBuilder t m
+     , Prerender js t m
+     , MonadHold t m
+     , PostBuild t m
+     , Request m ~ ApiRequest AuthToken PublicRequest PrivateRequest
+     , Response m ~ Identity
+     , HasConfigs (Client m)
+     , Requester t m)
+--  => m (Dynamic t (Maybe (Text)))
+  => m (Event t AuthToken)
+initGauth = do
+  elClass "div" "w-screen h-screen bg-background flex flex-col overflow-hidden" $ divClass "p-4 mx-auto md:w-sm t_login" $ do
+    elClass "h1" "font-karla font-bold text-h1 text-copy mt-12" $ text "Login"
+    elClass "div" "flex flex-col mt-4" $ elAttr "div" ("href" =: "#" <> "id" =: "signinButton") $ text "GOOGLE"
+  updatedUserE <- fmap switchDyn $ prerender (return never) $ do
+    pb <- getPostBuild
+    (updatedUserE :: Event t (Maybe Text), updatedUserT) <- newTriggerEvent
+    void $ JS.liftJSM $ do
+      updatedUserJS <- JS.toJSVal $ JS.fun $ \ _ _ [ipt] -> JS.eval ("prev.getAuthResponse().id_token"::Text) >>= JS.fromJSVal >>= (liftIO . updatedUserT)
+      JS.setProp "fireSigninEvt" updatedUserJS JS.global
+      JS.eval $ ("fireSigninEvtInner = (e) => { /*console.log(prev != e); */ console.log(e.getAuthResponse().id_token); /* if(prev != e)*/ { prev = e; fireSigninEvt([String(e.getAuthResponse().id_token)]);} }" :: Text)
+    -- let client_id = "570358826294-2ut7bnk6ar7jmqifsef48ljlk0o5m8p4.apps.googleusercontent.com";
+    client_id <- fromMaybe "" . (>>= A.decodeStrict') <$> getConfig "common/clientGoogleKey"
+    performEvent_ $ (void $ JS.liftJSM $ JS.eval ("console.log('"<>client_id<>"'); gapi.load('auth2', () => {auth2 = gapi.auth2.init({client_id: '" <> client_id <> "'}); auth2.attachClickHandler('signinButton', {}, fireSigninEvtInner, console.log); gapi.signin2.render('signinButton', {onsuccess: fireSigninEvtInner}); if(gapi.auth2.getAuthInstance().isSignedIn) { /*fireSigninEvtInner(gapi.auth2.getAuthInstance().currentUser.get());*/ }}); " :: Text)) <$ pb
+    prevState <- hold Nothing $ traceEvent "UpdatedUserE" updatedUserE
+    return $ attachWithMaybe (\a b -> if a/=b then Just b else Nothing) prevState updatedUserE
+
+  let loginRequest = (ApiRequest_Public . PublicRequest_GoogleLogin) <$> fmapMaybe id updatedUserE
+  loginResponse <- requestingIdentity $ loginRequest
+  let loginSuccess = fmapMaybe (^? _Right) $ traceEvent "Login Response" $ loginResponse
+  return $ traceEvent "Updated Login" loginSuccess
+  -- tellEvent $ First <$> loginSuccess
+  
+  --holdDyn Nothing $ updatedUserE
+{-
 auth :: forall js t m.
   ( PostBuild t m
   , MonadHold t m
@@ -82,6 +143,7 @@ auth mode serverError =  do
     , _loginConfig_errors = errors
     }
   pure $ tag (current $ (,) <$> value user <*> value pass) submit
+-}
 
 -- | Handle setting the user's cookie to the given auth token (if any)
 manageAuthCookie :: (DomBuilder t m, Prerender js t m)
@@ -111,12 +173,18 @@ frontendBody = do
         FrontendRoute_Channel -> authenticateWithToken mAuthCookie $ do
           logout <- channel
           pure $ Nothing <$ logout
+        FrontendRoute_Puzzle -> authenticateWithToken mAuthCookie $ do
+          logout <- puzzles
+          pure $ Nothing <$ logout
         FrontendRoute_Auth -> do
           r <- askRoute
-          let mode = ffor r $ \case
+          {-let mode = ffor r $ \case
                 AuthRoute_Signup :/ () -> LoginMode_Signup
-                AuthRoute_Login :/ () -> LoginMode_Login
-          rec credentials <- auth mode $ fmap Just errors
+                AuthRoute_Login :/ () -> LoginMode_Login-}
+          -- rec credentials <- do
+          token <- initGauth
+              
+              {-   auth mode $ fmap Just errors
               x :: Dynamic t (Event t (Either Text AuthToken)) <- subRoute $ \case
                 AuthRoute_Login ->
                   requestingIdentity . ffor credentials $ \(user, pw) ->
@@ -124,7 +192,7 @@ frontendBody = do
                 AuthRoute_Signup -> 
                   requestingIdentity . ffor credentials $ \(user, pw) ->
                     ApiRequest_Public $ PublicRequest_Signup user pw
-              let (errors, token)  = fanEither $ switch $ current x
+              let (errors, token)  = fanEither $ switch $ current x -}
           redirectIfAuthenticated mAuthCookie
           pure $ Just <$> token
         FrontendRoute_Main -> do
@@ -147,7 +215,7 @@ redirectIfAuthenticated mAuthCookie = do
         [ tag (current mAuthCookie) pb
         , updated mAuthCookie
         ]
-  setRoute $ FrontendRoute_Channel :/ Nothing <$ hasAuth
+  setRoute $ FrontendRoute_Puzzle :/ Nothing <$ hasAuth
 
 runExampleWidget
   :: ( DomBuilder t m
@@ -170,3 +238,4 @@ runExampleWidget = fmap snd . runObeliskRhyoliteWidget
   "common/route"
   checkedFullRouteEncoder
   (BackendRoute_Listen :/ ())
+

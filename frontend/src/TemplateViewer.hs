@@ -1,18 +1,25 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE OverloadedLists #-}
 module TemplateViewer where
 
 import Control.Monad.Fix
 import Data.Map as Map
-import Data.Text (Text)
+import Data.Text (Text, pack)
 import Data.Time
 import Obelisk.Route.Frontend
 import Reflex.Dom.Core
 
 import Common.Route
 import Common.Schema
+import Database.Beam
+import Database.Beam.Backend.SQL
 import Common.View (Msg(..))
+import Frontend.Types
 import Templates
 import Templates.Partials.ChannelList
 import Templates.Partials.Message
+import Templates.PuzzleList
+import Templates.Puzzle
 
 templateViewer ::
   ( Template t m
@@ -34,7 +41,10 @@ templateViewer = do
         templateLink TemplateRoute_Signup "Signup"
         templateLink TemplateRoute_Channel "Channel"
         templateLink TemplateRoute_Main "Main"
+        templateLink TemplateRoute_PuzzleList "PuzzleList"
     TemplateRoute_Channel -> channelTemplateViewer
+    TemplateRoute_PuzzleList -> puzzleListTemplateViewer
+    TemplateRoute_Puzzle -> puzzleTemplateViewer
     TemplateRoute_Login -> do
       _ <- Templates.login $ LoginConfig
         { _loginConfig_mode = pure LoginMode_Login
@@ -68,6 +78,70 @@ channelTemplateViewer = do
       pure ()
     }
   pure ()
+
+puzzleTemplateViewer
+  :: forall t m js.
+  ( Template t m, MonadHold t m, MonadFix m
+  , RouteToUrl (R FrontendRoute) m
+  , SetRoute t (R FrontendRoute) m
+  , Prerender js t m
+  , MonadHold t m
+  )
+  => m ()
+puzzleTemplateViewer = do
+  puzzle <- button "puzzle"
+  sheet <- button "sheet"
+  chat <- button "chat"
+  config <- button "config"
+  puzzleTab <- holdDyn PuzzlePageTab_Puzzle $ leftmost [PuzzlePageTab_Puzzle <$ puzzle, PuzzlePageTab_Sheet <$ sheet, PuzzlePageTab_Chat <$ chat, PuzzlePageTab_Config <$ config]
+  updatePuzzle <- button "Simulate Update Puzzle"
+  fakePuz <- holdDyn (fakePuzzles ! PuzzleId 1) $ (fakePuzzles ! PuzzleId 1) <$ updatePuzzle
+  dynText $ pack . show <$> puzzleTab
+  puzzleView $ PuzzleConfig
+    { _puzzleConfig_puzzle = constDyn $ fakePuzzles ! PuzzleId 1
+    , _puzzleConfig_tab = puzzleTab
+    , _puzzleConfig_chatWidget = blank
+    , _puzzleConfig_configuratorWidget = do
+         puzzleConfigurator $ PuzzleConfiguratorConfig fakePuz (constDyn ["solved", "stalled"])
+         blank
+    , _puzzleConfig_puzzleLink = \_ -> routeLink (FrontendRoute_Templates :/ TemplateRoute_Puzzle :/ ())
+    }
+
+
+
+puzzleListTemplateViewer
+  :: forall t m js. (
+    Template t m, MonadHold t m, MonadFix m
+  , RouteToUrl (R FrontendRoute) m
+  , SetRoute t (R FrontendRoute) m
+  , Prerender js t m
+  )
+  => m ()
+puzzleListTemplateViewer = do
+  {-let puzzles :: Dynamic t ( Map (PrimaryKey Puzzle Identity) (PuzzleData t) ) = constDyn $ Map.fromList [ (PuzzleId 1, PuzzleData {
+    _puzzleData_puzzle = constDyn $ Puzzle 1 "test" "someuri" (Just "somesheet") False Nothing (ChatroomId $ Just 0) (HuntId 1),
+    _puzzleData_metas = constDyn $ PuzzleId 2 =: "Noodle Bowl" <> PuzzleId 3 =: "Cheezeburger",
+    _puzzleData_tags = constDyn $ "Oddball" =: () <> "Extraction" =: (),
+    _puzzleData_solutions = constDyn $ Map.fromList $ (\a -> (primaryKey a, a)) <$> [Solution (PuzzleId 1) "JEANLUCPICARD" False, Solution (PuzzleId 1) "LOMEIN" True],
+    _puzzleData_notes = constDyn $ Map.fromList $ (\a -> (primaryKey a, a)) <$> [Note 1 (PuzzleId 1) "WTF is up with this pasta?"],
+    _puzzleData_currentSolvers = constDyn $ AccountId 1 =: "jonored" <> AccountId 2 =: "tuttleturtle",
+    _puzzleData_status = constDyn "InProgress"
+    }) ] -}
+  puzzlesTable PuzzleTableConfig {
+    _puzzleTableConfig_results = constDyn fakePuzzles,
+    _puzzleTableConfig_puzzleLink = \_ -> routeLink (FrontendRoute_Templates :/ TemplateRoute_Puzzle :/ ())
+  }
+  
+fakePuzzles :: Reflex t => Map (PrimaryKey Puzzle Identity) (PuzzleData t)
+fakePuzzles = Map.fromList [ (PuzzleId 1, PuzzleData {
+    _puzzleData_puzzle = constDyn $ Puzzle 1 "test" "http://hackaday.com/" (Just "somesheet") False Nothing (ChatroomId $ Just 0) (HuntId 1),
+    _puzzleData_metas = constDyn $ PuzzleId 2 =: "Noodle Bowl" <> PuzzleId 3 =: "Cheezeburger",
+    _puzzleData_tags = constDyn $ "Oddball" =: () <> "Extraction" =: (),
+    _puzzleData_solutions = constDyn $ Map.fromList $ (\a -> (primaryKey a, a)) <$> [Solution (PuzzleId 1) "JEANLUCPICARD" False, Solution (PuzzleId 1) "LOMEIN" True],
+    _puzzleData_notes = constDyn $ Map.fromList $ (\a -> (primaryKey a, a)) <$> [Note 1 (PuzzleId 1) "WTF is up with this pasta?"],
+    _puzzleData_currentSolvers = constDyn $ AccountId 1 =: "jonored" <> AccountId 2 =: "tuttleturtle",
+    _puzzleData_status = constDyn "InProgress"
+    }) ]
 
 fakeMessages :: [Msg]
 fakeMessages = Map.elems $ Map.mapWithKey (\k (h, m) -> Msg

@@ -26,7 +26,7 @@ getMessages reqs = do
         pure (cid, mid, before, after)
   results :: [(Id Chatroom, Int, Int, Int, Int, UTCTime, Id Message, Text, Text)] <- [iquery|
     select r.cid, r.seq, r.before, r.after,
-           m.seq, m.message_timestamp, m.message_id, m.message_text, a.account_email
+           m.seq, m.message_timestamp, m.message_id, m.message_text, a.account_name
     from (select m.*, row_number() over (partition by m.message_chatroom__chatroom_id order by message_timestamp) as seq from db_message m) as m
     join db_account a on a.account_id = m.message_account__account_id
     join ${requestValues} as r (cid,seq,before,after)

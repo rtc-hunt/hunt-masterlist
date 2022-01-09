@@ -35,12 +35,14 @@ library
     Frontend.Authentication
     Frontend.Channel
     Frontend.ChannelList
+    Frontend.Puzzle
     Frontend.Types
     Frontend.Utils
     TemplateViewer
     Templates
     Templates.Channel
     Templates.Login
+    Templates.Frame
     Templates.Partials.Buttons
     Templates.Partials.ChannelList
     Templates.Partials.Containers
@@ -49,6 +51,8 @@ library
     Templates.Partials.Lists
     Templates.Partials.Message
     Templates.Partials.Searchbar
+    Templates.PuzzleList
+    Templates.Puzzle
     Templates.Types
 
 

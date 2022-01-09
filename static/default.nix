@@ -38,6 +38,7 @@ in pkgs.stdenv.mkDerivation {
 
     # Run the postcss compiler:
     postcss css/styles.css -o $out/css/styles.css
+    cp css/main.css $out/css/main.css
 
     # We can write other commands to produce more static files as well:
     cp -r images/* $out/images/

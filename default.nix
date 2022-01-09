@@ -20,6 +20,7 @@ project ./. ({ pkgs, hackGet, ... }@args: {
     (pkgs.callPackage (hackGet ./dep/rhyolite) args).haskellOverrides
     (self: super: with pkgs.haskell.lib; {
       beam-automigrate = doJailbreak (self.callCabal2nix "beam-automigrate" (hackGet ./dep/beam-automigrate) {});
+      websockets = self.callHackage "websockets" "0.12.6.0" {};
     });
   staticFiles = import ./static {inherit pkgs; };
   android.applicationId = "systems.obsidian.obelisk.examples.rhyolite";
