@@ -6,6 +6,8 @@ build-type: Simple
 library
   hs-source-dirs: src
   build-depends: base
+               , beam-core
+               , bytestring
                , common
                , obelisk-frontend
                , obelisk-route
@@ -19,6 +21,7 @@ library
                , text
                , data-default
                , lens
+               , mtl
                , rhyolite-common
                , signed-data
                , rhyolite-groundhog-legacy-types

@@ -10,6 +10,8 @@ library
   build-depends: base
                , aeson
                , lens-aeson
+               , lens
+               , mtl
                , aeson-gadt-th
                , bytestring
                , common
@@ -45,6 +47,8 @@ library
                , beam-automigrate
                , psql-simple-beam
                , websockets
+               , rhyolite-frontend
+               , reflex
   exposed-modules:
     Backend
     Backend.Db

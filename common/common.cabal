@@ -11,6 +11,7 @@ library
                , beam-core
                , constraints
                , constraints-extras
+               , data-default
                , dependent-sum-template
                , mtl
                , obelisk-route
