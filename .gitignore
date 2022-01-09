@@ -15,5 +15,6 @@ tags
 TAGS
 static.out
 
+config/
 config/backend/clientSessionKey
 db
