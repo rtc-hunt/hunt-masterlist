@@ -130,7 +130,8 @@ masterlist = do
             puzzlesTable PuzzleTableConfig
               { _puzzleTableConfig_results = puzzleListD
               , _puzzleTableConfig_puzzleLink = \id -> routeLink $ FrontendRoute_Puzzle :/ Just id
-              })
+              }
+              )
            <> MasterlistPage_HuntPage =: ("frontpage", do
                frameURI $ _hunt_rootpage <$> hunt
               )
@@ -149,6 +150,27 @@ masterlist = do
                         _ <- requestingIdentity $ attachWithMaybe (\c m -> mkMsgReq c m) (current mcid) cmdString
                         blank
                  )
+        let showAddPuzzle = \case
+              MasterlistPage_List -> "class" =: "bottomwidget"
+              _ -> "class" =: "hidden"
+        elDynAttr "div" (showAddPuzzle <$> activeTab) $ do
+              elClass "form" "ui form" $ divClass "inline fields" $ prerender_ (return ()) $ do
+                let labeledField label = divClass "field" $ do
+                      el "label" $ text label
+                      inputElement $ def
+                title <- labeledField "Title"
+                isMeta <- divClass "field" $ divClass "ui toggle checkbox" $ do
+                  ie <- inputElement $ def & inputElementConfig_elementConfig . elementConfig_initialAttributes .~ ("type" =: "checkbox")
+                  el "label" $ text "Is meta?"
+                  return ie
+                url <- labeledField "URL" 
+  
+                pzl <- buttonClass "ui button" "Add Puzzle"
+              
+                let curNewPuzzle = current $ PrivateRequest_AddPuzzle <$> _inputElement_value title <*> _inputElement_checked isMeta <*> _inputElement_value url <*> pure (HuntId 1)
+                requestingIdentity $ ApiRequest_Private () <$> curNewPuzzle <@ pzl
+                blank
+          
     }
 
 buildHunt

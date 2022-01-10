@@ -115,12 +115,12 @@ puzzleConfigurator PuzzleConfiguratorConfig
                         & puzzleUri .~ labeledField id id "Puzzle URI"
                         & puzzleSheetURI .~ labeledField Just (fromMaybe "") "Puzzle Sheet URI"
                         & puzzleIsMeta .~ (ConfiguratorField $ \val -> divClass "field" $ divClass "ui toggle checkbox" $ do
-                            el "label" $ text "Is Meta?"
                             initial <- sample (current val)
                             ie <- inputElement $ 
                                def & inputElementConfig_initialChecked .~ initial
                                    & inputElementConfig_setChecked .~ updated val
                                    & inputElementConfig_elementConfig . elementConfig_initialAttributes .~ ("type" =: "checkbox")
+                            el "label" $ text "Is Meta?"
                             return $ _inputElement_checked ie)
                 , _configuratorConfig_lenses = tableLenses
                 , _configuratorConfig_submit = button "Update"

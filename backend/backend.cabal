@@ -11,6 +11,7 @@ library
                , aeson
                , lens-aeson
                , lens
+               , directory
                , mtl
                , aeson-gadt-th
                , bytestring
@@ -22,6 +23,8 @@ library
                , monoidal-containers
                , obelisk-backend
                , obelisk-route
+               , gogol
+               , gogol-drive
                , semimap
                , signed-data-clientsession
                , text

@@ -16,13 +16,17 @@ import Database.Beam
 import Database.Beam.Postgres
 import Database.PostgreSQL.Simple
 import Database.PostgreSQL.Simple.Class
+import System.IO (stderr)
 -- import Rhyolite.Account
 import Rhyolite.Api
 -- import Rhyolite.Backend.Account
 import Rhyolite.Backend.App
 import Rhyolite.DB.NotifyListen.Beam
 import Web.ClientSession as CS
-
+import Network.Google.Drive (driveFileScope, filesCreate, file, fMimeType, fName, fParents, fId)
+import qualified Network.Google as Google
+import System.Directory
+import System.Environment
 
 import Backend.Db (runDb, current_timestamp_)
 import Backend.Listen ()
@@ -32,6 +36,15 @@ import Common.Request
 import Common.Schema
 
 import Debug.Trace
+
+createSheet :: Text -> IO (Maybe Text)
+createSheet name = do
+    canonicalizePath "config/backend" >>= setEnv "CLOUDSDK_CONFIG"
+    lgr  <- Google.newLogger Google.Debug stderr
+    env  <- Google.newEnv <&> (Google.envLogger .~ lgr) . (Google.envScopes .~ driveFileScope) -- (2) (3)
+    qqq  <- Google.runResourceT . Google.runGoogle env $
+      Google.send $ filesCreate $ file & (fMimeType ?~ "application/vnd.google-apps.spreadsheet") . (fName ?~ name) . (fParents .~ ["1F40xJAGFXFE8Z64xw_gxSR_P8TBYrwsi"])
+    return $ qqq ^. fId
 
 requestHandler
   :: Pool Connection
@@ -73,8 +86,8 @@ requestHandler pool csk gsk authAudience = RequestHandler $ \case
           _ -> pure . Left $ "PrivateRequest_LatestMessage: got more than one row"
       PrivateRequest_AddPuzzle title ismeta url hunt -> auth $ \_user -> runDb pool $ do
         let sheet = Nothing
-        -- sheet <- liftIO $ do
-        --   createSheet title
+        sheet <- liftIO $ do
+          createSheet title
         -- Also queue create new puzzle spreadsheet here through job system.
         channelId <-  insertAndNotify (_db_chatroom db) Chatroom
           { _chatroom_id = default_
@@ -148,7 +161,7 @@ requestHandler pool csk gsk authAudience = RequestHandler $ \case
   ApiRequest_Public (PublicRequest_GoogleLogin token) -> do
       traceM ("TOKEN: " <> show token)
       (parsedToken :: Either JWT.JWTError JWT.ClaimsSet) <- runExceptT $ do
-         let config = JWT.defaultJWTValidationSettings ((== authAudience) . (^. JWT.string)) -- "570358826294-2ut7bnk6ar7jmqifsef48ljlk0o5m8p4.apps.googleusercontent.com"
+         let config = JWT.defaultJWTValidationSettings (const True . (== authAudience) . (^. JWT.string)) -- "570358826294-2ut7bnk6ar7jmqifsef48ljlk0o5m8p4.apps.googleusercontent.com"
          decoded <- JWT.decodeCompact $ fromStrict $ encodeUtf8 token
          JWT.verifyClaims config gsk decoded
       let handleValidClaims claims = do

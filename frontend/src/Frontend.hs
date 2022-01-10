@@ -59,7 +59,7 @@ authCookieName = "auth"
 frontend :: Frontend (R FrontendRoute)
 frontend = Frontend
   { _frontend_head = do
-      el "title" $ text "Rhyolite Example"
+      el "title" $ text "Hunt Master List"
       elAttr "link" ( "rel" =: "stylesheet" <> "media" =: "screen" <> "href" =: $(static "css/main.css") <> "type" =: "text/css") $ blank
       elAttr "link" ( "rel" =: "stylesheet" <> "media" =: "screen" <> "href" =: "https://fontlibrary.org/face/symbola" <> "type" =: "text/css") $ blank
       elAttr "link" ( "rel" =: "stylesheet" <> "media" =: "screen" <> "href" =: "https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.4.1/semantic.min.css" <> "integrity"=:"sha512-8bHTC73gkZ7rZ7vpqUQThUDhqcNFyYi2xgDgPDHc+GXVGHXq+xPjynxIopALmOPqzo9JZj0k6OqqewdGO3EsrQ==" <> "crossorigin"=:"anonymous" <> "type" =: "text/css") $ blank
