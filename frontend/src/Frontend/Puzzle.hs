@@ -165,10 +165,10 @@ masterlist = do
                   return ie
                 url <- labeledField "URL" 
   
-                pzl <- buttonClass "ui button" "Add Puzzle"
-              
                 let curNewPuzzle = current $ PrivateRequest_AddPuzzle <$> _inputElement_value title <*> _inputElement_checked isMeta <*> _inputElement_value url <*> pure (HuntId 1)
-                requestingIdentity $ ApiRequest_Private () <$> curNewPuzzle <@ pzl
+                
+                rec pzl <- buttonOneshotClass "ui button" "Add Puzzle" $ () <$ reqDone
+                    reqDone <- requestingIdentity $ ApiRequest_Private () <$> curNewPuzzle <@ pzl
                 blank
           
     }

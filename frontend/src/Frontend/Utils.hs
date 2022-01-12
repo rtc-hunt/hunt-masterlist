@@ -14,6 +14,14 @@ import Data.Text (Text)
 buttonClass :: DomBuilder t m => Text -> Text -> m (Event t ())
 buttonClass cls = fmap (domEvent Click . fst) . elAttr' "button" ("type" =: "button" <> "class" =: cls) . text
 
+buttonOneshotClass :: (DomBuilder t m, MonadFix m, PostBuild t m, MonadHold t m) => Text -> Text -> Event t () -> m (Event t ())
+buttonOneshotClass cls lbl rst = do
+  rec
+    disabledD <- holdDyn mempty $ (("disabled" =: "") <$ clicked) <> (mempty <$ rst)
+    clicked <- fmap (domEvent Click . fst) . elDynAttr' "button" ((("type" =: "button" <> "class" =: cls) <>) <$> disabledD) $ text lbl
+  pure clicked
+
+
 buttonClassIcon :: DomBuilder t m => Text -> Text -> m (Event t ())
 buttonClassIcon cls = fmap (domEvent Click . fst) . elAttr' "button" ("type" =: "button" <> "class" =: cls) . flip (elClass "i") blank
 
