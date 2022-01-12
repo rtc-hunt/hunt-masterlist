@@ -12,6 +12,7 @@ import Data.Proxy
 import Data.Semigroup (First(..))
 import Data.Text
 import Data.These
+import Data.These.Combinators
 import Data.Time
 import Data.Vessel
 import Database.Beam
@@ -97,6 +98,7 @@ notifyHandler pool nm v = case _dbNotification_message nm of
     V_Messages -> const $ pure emptyV
     V_Puzzle -> const $ pure emptyV
     V_HuntPuzzles -> const $ pure emptyV
+    V_HuntMetas -> const $ pure emptyV
     V_Solutions -> const $ pure emptyV
     V_Tags -> const $ pure emptyV
     V_UniqueTags -> const $ pure emptyV
@@ -131,18 +133,23 @@ notifyHandler pool nm v = case _dbNotification_message nm of
           V_Chatrooms -> const $ pure emptyV
           V_Puzzle -> const $ pure emptyV
           V_HuntPuzzles -> const $ pure emptyV
+          V_HuntMetas -> const $ pure emptyV
           V_Solutions -> const $ pure emptyV
           V_Tags -> const $ pure emptyV
           V_UniqueTags -> const $ pure emptyV
           V_Notes -> const $ pure emptyV
           V_Metas -> const $ pure emptyV
-  Notify_Puzzle :/ change@(Change pid _) -> buildV v $ \case
+  Notify_Puzzle :/ change@(Change pid theChange) -> buildV v $ \case
     V_Puzzle -> \(MapV cs) -> if Map.member pid cs
       then runDb pool (runSelectReturningOne $ lookup_ (_db_puzzles db) pid) >>= pure . \case
         Nothing -> emptyV
         Just c -> MapV $ Map.singleton pid $ pure (First c)
       else pure emptyV
     V_HuntPuzzles -> idSetByForeignKey _puzzle_Hunt _db_puzzles change
+    V_HuntMetas -> \(MapV hs) -> case justThat theChange of
+      Just puz | Map.member (_puzzle_Hunt puz) hs && _puzzle_IsMeta puz -> pure $ MapV $ Map.singleton (_puzzle_Hunt puz) $ pure $ SemiMap_Partial $ Map.singleton (primaryKey puz) $ First (Just $ _puzzle_Title puz)
+      _ -> pure emptyV
+-- idSetByForeignKey _puzzle_Hunt _db_puzzles change
     V_Chatroom -> const $ pure emptyV
     V_Chatrooms -> const $ pure emptyV
     V_Messages -> const $ pure emptyV
@@ -158,6 +165,7 @@ notifyHandler pool nm v = case _dbNotification_message nm of
     V_Messages -> const $ pure emptyV
     V_Puzzle -> const $ pure emptyV
     V_HuntPuzzles -> const $ pure emptyV
+    V_HuntMetas -> const $ pure emptyV
     V_Tags -> const $ pure emptyV
     V_UniqueTags -> const $ pure emptyV
     V_Notes -> const $ pure emptyV
@@ -169,6 +177,7 @@ notifyHandler pool nm v = case _dbNotification_message nm of
     V_Messages -> const $ pure emptyV
     V_Puzzle -> const $ pure emptyV
     V_HuntPuzzles -> const $ pure emptyV
+    V_HuntMetas -> const $ pure emptyV
     V_Solutions -> const $ pure emptyV
     V_UniqueTags -> getUniqueTags change
     V_Notes -> const $ pure emptyV
@@ -180,6 +189,7 @@ notifyHandler pool nm v = case _dbNotification_message nm of
     V_Messages -> const $ pure emptyV
     V_Puzzle -> const $ pure emptyV
     V_HuntPuzzles -> const $ pure emptyV
+    V_HuntMetas -> const $ pure emptyV
     V_Solutions -> const $ pure emptyV
     V_Tags -> const $ pure emptyV
     V_UniqueTags -> const $ pure emptyV
@@ -191,6 +201,7 @@ notifyHandler pool nm v = case _dbNotification_message nm of
     V_Messages -> const $ pure emptyV
     V_Puzzle -> const $ pure emptyV
     V_HuntPuzzles -> const $ pure emptyV
+    V_HuntMetas -> const $ pure emptyV
     V_Solutions -> const $ pure emptyV
     V_Tags -> const $ pure emptyV
     V_UniqueTags -> const $ pure emptyV

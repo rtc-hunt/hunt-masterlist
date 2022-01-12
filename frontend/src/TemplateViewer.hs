@@ -102,7 +102,7 @@ puzzleTemplateViewer = do
     , _puzzleConfig_tab = puzzleTab
     , _puzzleConfig_chatWidget = blank
     , _puzzleConfig_configuratorWidget = do
-         puzzleConfigurator $ PuzzleConfiguratorConfig fakePuz (constDyn ["solved", "stalled"])
+         puzzleConfigurator $ PuzzleConfiguratorConfig fakePuz (constDyn ["solved", "stalled"]) (constDyn mempty)
          blank
     , _puzzleConfig_puzzleLink = \_ -> routeLink (FrontendRoute_Templates :/ TemplateRoute_Puzzle :/ ())
     }

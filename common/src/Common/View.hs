@@ -77,6 +77,7 @@ data V a where
   V_Notes :: V (MapV (Id Puzzle) (SemiMap (Id Note) (Note Identity)))
   V_Metas :: V (MapV (Id Puzzle) (SemiSet (Metapuzzle Identity)))
   V_Hunts :: V (MapV (Id Hunt) (First (Id Hunt)))
+  V_HuntMetas :: V (MapV (Id Hunt) (SemiMap (Id Puzzle) Text))
 
 deriving instance Show (V a)
 

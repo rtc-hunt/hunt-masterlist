@@ -213,6 +213,7 @@ puzzle :: (Monad m, Reflex t, DomBuilder t m
 puzzle puz = do
   puzzleDataDM <- (puzzleBuilder $ constDyn puz) >>= maybeDyn
   knownTags <- getKnownTags
+  knownMetas <- fmap (fmap (fromMaybe mempty)) $ watch $ constDyn $ key V_HuntMetas ~> key (HuntId 1 :: Id Hunt) ~> postMap (traverse (fmap getMonoidalMap . getComplete))
   dyn_ $ ffor puzzleDataDM $ \case
     Nothing -> blank
     Just puzzleData -> framed $ Framed
@@ -248,6 +249,7 @@ puzzle puz = do
                   cfgOut <- puzzleConfigurator PuzzleConfiguratorConfig
                     { _puzzleConfiguratorConfig_puzzle = puzzleData
                     , _puzzleConfiguratorConfig_knownTags = knownTags
+                    , _puzzleConfiguratorConfig_huntMetas = knownMetas
                     }
                   _ <- requestingIdentity $ ApiRequest_Private () . PrivateRequest_UpdatePuzzle <$> _puzzleConfiguratorOut_puzzle cfgOut
                   _ <- requestingIdentity $ ApiRequest_Private () . PrivateRequest_PuzzleCommand . uncurry (PuzzleCommand_Solve puz) <$> _puzzleConfiguratorOut_addSolution cfgOut

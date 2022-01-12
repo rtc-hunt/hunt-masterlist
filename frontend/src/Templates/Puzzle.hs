@@ -71,6 +71,7 @@ puzzleView (PuzzleConfig
 data PuzzleConfiguratorConfig t = PuzzleConfiguratorConfig
   { _puzzleConfiguratorConfig_puzzle :: Dynamic t (PuzzleData t)
   , _puzzleConfiguratorConfig_knownTags :: Dynamic t (Set Text)
+  , _puzzleConfiguratorConfig_huntMetas :: Dynamic t (Map (Id Puzzle) Text)
   -- , _puzzleConfiguratorConfig_puzzleCfg :: Puzzle (ConfiguratorField t m)
   -- , _puzzleConfiguratorConfig_labeledField :: forall a. Text -> (a -> Text) -> Dynamic t a -> InputEl t m
   }
@@ -99,6 +100,7 @@ puzzleConfigurator
 puzzleConfigurator PuzzleConfiguratorConfig
   { _puzzleConfiguratorConfig_puzzle = puzData
   , _puzzleConfiguratorConfig_knownTags = knownTags
+  , _puzzleConfiguratorConfig_huntMetas = metas
   } = do
     divClass "framed" $ divClass "top-scrollable" $ divClass "ui container" $ do
       updatePuzzle <- divClass "ui vertical segment" $ do
@@ -147,7 +149,7 @@ puzzleConfigurator PuzzleConfiguratorConfig
                 removeEvt <- buttonClass "ui right floated button" "Remove"
                 divClass "header" . dynText $ mn
                 pure removeEvt
-              addMeta <- dropdown Nothing ((<> Nothing =: "Add Meta") . Map.mapKeys Just <$> (puzData >>= _puzzleData_metas)) $ def
+              addMeta <- dropdown Nothing ((<> Nothing =: "Add Meta") . Map.mapKeys Just <$> metas) $ def
               pure (MetapuzzleId <$> current (puzData >>= fmap primaryKey . _puzzleData_puzzle) <@> (switchDyn $ leftmost . Map.elems . imap (\i evt -> i <$ evt) <$> removeEvts), fmapMaybe id ( _dropdown_change addMeta))
       (removeTagEvents, addTag) <- divClass "ui vertical segment" $ do
             el "h2" $ text "Tags"

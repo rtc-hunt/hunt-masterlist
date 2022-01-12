@@ -74,4 +74,10 @@ privateQueryHandler pool q = (>>= (\a -> print "Passed" >> return a)) $ (print q
       meta <- all_ (_db_metas db)
       guard_ $ _meta_Puzzle meta ==. val_ h
       return $ meta
+  V_HuntMetas -> \(MapV hs) ->
+    fmap MapV $ ifor hs $ \h _ -> runDb pool $ fmap (Identity . SemiMap_Complete . Map.fromList) $ runSelectReturningList $ select $ do
+      puzzle <- all_ (_db_puzzles db)
+      guard_ $ _puzzle_Hunt puzzle ==. val_ h
+      guard_ $ _puzzle_IsMeta puzzle ==. val_ True
+      return $ (primaryKey puzzle, _puzzle_Title puzzle)
 
