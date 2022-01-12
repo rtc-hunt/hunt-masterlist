@@ -154,21 +154,23 @@ masterlist = do
               MasterlistPage_List -> "class" =: "bottomwidget"
               _ -> "class" =: "hidden"
         elDynAttr "div" (showAddPuzzle <$> activeTab) $ do
-              elClass "form" "ui form" $ divClass "inline fields" $ prerender_ (return ()) $ do
+              elClass "form" "ui form" $ divClass "inline fields" $ prerender_ (return ()) $ mdo
                 let labeledField label = divClass "field" $ do
                       el "label" $ text label
-                      inputElement $ def
+                      inputElement $ def & inputElementConfig_setValue .~ ("" <$ reqDone)
                 title <- labeledField "Title"
                 isMeta <- divClass "field" $ divClass "ui toggle checkbox" $ do
-                  ie <- inputElement $ def & inputElementConfig_elementConfig . elementConfig_initialAttributes .~ ("type" =: "checkbox")
+                  ie <- inputElement $ def
+                           & inputElementConfig_elementConfig . elementConfig_initialAttributes .~ ("type" =: "checkbox")
+                           & inputElementConfig_setChecked .~ (False <$ reqDone)
                   el "label" $ text "Is meta?"
                   return ie
                 url <- labeledField "URL" 
   
                 let curNewPuzzle = current $ PrivateRequest_AddPuzzle <$> _inputElement_value title <*> _inputElement_checked isMeta <*> _inputElement_value url <*> pure (HuntId 1)
                 
-                rec pzl <- buttonOneshotClass "ui button" "Add Puzzle" $ () <$ reqDone
-                    reqDone <- requestingIdentity $ ApiRequest_Private () <$> curNewPuzzle <@ pzl
+                pzl <- buttonOneshotClass "ui button" "Add Puzzle" $ () <$ reqDone
+                reqDone <- requestingIdentity $ ApiRequest_Private () <$> curNewPuzzle <@ pzl
                 blank
           
     }
