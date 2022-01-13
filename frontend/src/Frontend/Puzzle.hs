@@ -126,6 +126,21 @@ masterlist = do
             return $ activeTab
     , _framed_body = \(activeTab :: Dynamic t MasterlistPage) cmdString _ -> do
         let frameURI uriD = divClass "framed" $ elDynAttr "iframe" (("src" =: ) <$> uriD) blank
+        let mcid = (Just) <$> (_hunt_channel <$> hunt)
+            chatWidget cls = do
+                   channelView <- channelBuilder mcid
+                   void $ prerender blank $ do
+                    rec (msgs, _) <- elAttr' "div" ("class" =: cls <> "style" =: "height: 100%; flex-direction: column-reverse; display: flex;") $ divClass "flex-grow flex flex-col" $ do
+                          dyn_ $ ffor (_channelView_messages channelView) $ \case
+                            Nothing -> text "No messages"
+                            Just ms -> void $ listWithKey ms $ \_ -> Templates.message
+                    blank
+            mkMsgReq c m = case c of
+                        Nothing -> Nothing
+                        Just c' -> Just $ ApiRequest_Private () $ PrivateRequest_SendMessage c' m
+        chatOverlay $ mcid
+        _ <- requestingIdentity $ attachWithMaybe (\c m -> mkMsgReq c m) (current mcid) cmdString
+        
         myTabDisplay "ui top attached tabular menu" "activeTab" activeTab $
           MasterlistPage_List =: ("List", do
             puzzleListD <- puzzleListBuilder
@@ -138,19 +153,7 @@ masterlist = do
                frameURI $ _hunt_rootpage <$> hunt
               )
            <> MasterlistPage_Chat =: ("Chat",
-                      let mcid = (Just) <$> (_hunt_channel <$> hunt)
-                          mkMsgReq c m = case c of
-                            Nothing -> Nothing
-                            Just c' -> Just $ ApiRequest_Private () $ PrivateRequest_SendMessage c' m
-                      in do
-                       channelView <- channelBuilder mcid
-                       void $ prerender blank $ do
-                        rec (msgs, _) <- elAttr' "div" ("class" =: "ui container p-4 flex-grow flex flex-col overflow-y-scroll" <> "style" =: "height: 100%") $ do
-                              dyn_ $ ffor (_channelView_messages channelView) $ \case
-                                Nothing -> text "No messages"
-                                Just ms -> messagesHelper msgs ms
-                        _ <- requestingIdentity $ attachWithMaybe (\c m -> mkMsgReq c m) (current mcid) cmdString
-                        blank
+                      chatWidget "ui container p-4 flex-grow flex flex-col overflow-y-scroll"
                  )
         let showAddPuzzle = \case
               MasterlistPage_List -> "class" =: "bottomwidget"
@@ -174,8 +177,9 @@ masterlist = do
                 pzl <- buttonOneshotClass "ui button" "Add Puzzle" $ () <$ reqDone
                 reqDone <- requestingIdentity $ ApiRequest_Private () <$> curNewPuzzle <@ pzl
                 blank
+        divClass "chat-sidebar" $ chatWidget "flex flex-col flex-grow p-4 overflow-y-scroll"
           
-    , _framed_layout = \_ _ -> constDyn FullTab
+    , _framed_layout = \ (MenuSettings layout) tab -> (\t l -> if t == MasterlistPage_Chat then MutedChat else l) <$> tab <*> layout
     }
 
 buildHunt
