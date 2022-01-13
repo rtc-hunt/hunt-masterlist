@@ -69,6 +69,17 @@ requestHandler pool csk gsk authAudience = RequestHandler $ \case
           , _message_text = val_ content
           , _message_timestamp = current_timestamp_
           , _message_account = val_ user
+          , _message_isMe = val_ (Just False)
+          }
+        pure $ Right ()
+      PrivateRequest_SendMe room content -> auth $ \user -> runDb pool $ do
+        _ <- insertAndNotify (_db_message db) $ Message
+          { _message_id = default_
+          , _message_chatroom = val_ room
+          , _message_text = val_ content
+          , _message_timestamp = current_timestamp_
+          , _message_account = val_ user
+          , _message_isMe = val_ (Just True)
           }
         pure $ Right ()
       PrivateRequest_CreateChatroom newName -> auth $ \_user -> runDb pool $ do

@@ -9,6 +9,8 @@ library
                , beam-core
                , bytestring
                , common
+               , dependent-sum
+               , dependent-map
                , obelisk-frontend
                , obelisk-route
                , jsaddle
@@ -16,6 +18,7 @@ library
                , reflex-dom-core
                , ref-tf
                , rhyolite-frontend
+               , optparse-applicative
                , obelisk-executable-config-lookup
                , obelisk-generated-static
                , text
@@ -39,6 +42,7 @@ library
     Frontend.Chat
     Frontend.Channel
     Frontend.ChannelList
+    Frontend.Cli
     Frontend.Puzzle
     Frontend.Types
     Frontend.Utils

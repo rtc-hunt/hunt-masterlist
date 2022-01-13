@@ -7,6 +7,7 @@ import Data.Aeson.GADT.TH
 import Data.Constraint.Extras.TH
 import Data.Functor.Identity
 import qualified Data.Map.Monoidal as Map
+import Data.Maybe
 import Data.Pool
 import Data.Proxy
 import Data.Semigroup (First(..))
@@ -111,22 +112,23 @@ notifyHandler pool nm v = case _dbNotification_message nm of
     V_ActiveUsers -> const $ pure emptyV
   Notify_Message :/ mid -> do
     runNoLoggingT $ do
-      msgs :: [(Id Chatroom, Int, UTCTime, Text, Text)] <- runDb pool $ [iquery|
-        select m.message_chatroom__chatroom_id, m.mseq, m.message_timestamp, a.account_name, m.message_text
+      msgs :: [(Id Chatroom, Int, UTCTime, Text, Text, Maybe Bool)] <- runDb pool $ [iquery|
+        select m.message_chatroom__chatroom_id, m.mseq, m.message_timestamp, a.account_name, m.message_text, m."message_isMe"
         from (select *, row_number() over (partition by m.message_chatroom__chatroom_id order by message_timestamp) as mseq from db_message m) as m
         join db_account a on m.message_account__account_id = a.account_id
         where m.message_id = ${mid}
       |]
       case msgs of
         [] -> pure emptyV
-        (cid, mseq, t, acc, txt):_ -> buildV v $ \case
+        (cid, mseq, t, acc, txt, isme):_ -> buildV v $ \case
           V_Messages -> \sv ->
             let msg = Identity . SemiMap_Partial . Map.singleton mseq . First . Just $
                   Msg
                     { _msg_id = mid
                     , _msg_timestamp = t
                     , _msg_handle = acc
-                    , _msg_text = txt }
+                    , _msg_text = txt
+                    , _msg_isme = fromMaybe False isme }
             in case lookupSubVessel cid sv of
               Nothing -> pure emptyV
               Just (MapV reqs) -> pure . singletonSubVessel cid . MapV $

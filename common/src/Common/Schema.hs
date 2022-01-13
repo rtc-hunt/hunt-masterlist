@@ -86,6 +86,7 @@ data Message f = Message
   , _message_chatroom :: PrimaryKey Chatroom f
   , _message_text :: Columnar f Text
   , _message_timestamp :: Columnar f UTCTime
+  , _message_isMe :: Columnar f (Maybe Bool)
   , _message_account :: PrimaryKey Account f
   }
   deriving (Generic, Beamable)

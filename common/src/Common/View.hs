@@ -29,6 +29,7 @@ data Msg = Msg
   , _msg_timestamp :: UTCTime
   , _msg_handle :: Text
   , _msg_text :: Text
+  , _msg_isme :: Bool
   }
   deriving (Show, Generic, Eq)
 

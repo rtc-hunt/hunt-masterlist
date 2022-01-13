@@ -45,6 +45,7 @@ import Database.Beam.Schema
 import Frontend.Chat
 import Frontend.ChannelList
 import Frontend.Channel
+import Frontend.Cli
 import Frontend.Types
 import Frontend.Utils
 
@@ -124,7 +125,7 @@ masterlist = do
             activeTab :: Dynamic t MasterlistPage <- holdDyn MasterlistPage_List $ leftmost $ zipWith (<$) [MasterlistPage_List, MasterlistPage_HuntPage, MasterlistPage_Chat] evts
             -- activeSolverList puzId puzzlesData
             return $ activeTab
-    , _framed_body = \(activeTab :: Dynamic t MasterlistPage) cmdString _ -> do
+    , _framed_body = \(activeTab :: Dynamic t MasterlistPage) msgString cmdString _ -> do
         let frameURI uriD = divClass "framed" $ elDynAttr "iframe" (("src" =: ) <$> uriD) blank
         let mcid = (Just) <$> (_hunt_channel <$> hunt)
             chatWidget cls = do
@@ -139,7 +140,7 @@ masterlist = do
                         Nothing -> Nothing
                         Just c' -> Just $ ApiRequest_Private () $ PrivateRequest_SendMessage c' m
         chatOverlay $ mcid
-        _ <- requestingIdentity $ attachWithMaybe (\c m -> mkMsgReq c m) (current mcid) cmdString
+        _ <- requestingIdentity $ attachWithMaybe (\c m -> mkMsgReq c m) (current mcid) msgString
         
         myTabDisplay "ui top attached tabular menu" "activeTab" activeTab $
           MasterlistPage_List =: ("List", do
@@ -178,6 +179,13 @@ masterlist = do
                 reqDone <- requestingIdentity $ ApiRequest_Private () <$> curNewPuzzle <@ pzl
                 blank
         divClass "chat-sidebar" $ chatWidget "flex flex-col flex-grow p-4 overflow-y-scroll"
+        let (cliErrors, cmdSel) = parseCli Nothing cmdString
+        clearErrors <- fmap switchDyn $ prerender (return never) $ debounce 10 $ "" <$ cliErrors
+        lastError <- holdDyn "" $ leftmost [cliErrors, clearErrors]
+        requestingSimpleCommands cmdSel
+        _ <- requestingIdentity $ attachWithMaybe (\c a -> case c of { Just c' -> Just $ ApiRequest_Private () $ PrivateRequest_SendMe c' a; Nothing -> Nothing; }) (current mcid) $ select cmdSel CliCommandTag_Me -- attachWithMaybe (\c m -> mkMsgReq c m) (current mcid) msgString
+        elClass "pre" "commandOutput" $ dynText lastError
+
           
     , _framed_layout = \ (MenuSettings layout) tab -> (\t l -> if t == MasterlistPage_Chat then MutedChat else l) <$> tab <*> layout
     }
@@ -236,7 +244,7 @@ puzzle puz = do
             activeTab <- holdDyn (PuzzlePageTab_Sheet) $ leftmost evts
             activeSolverList $ puzzleData >>= _puzzleData_currentSolvers
             return $ activeTab
-        , _framed_body = \ activeTab cmd _ -> do -- divClass "" $ do
+        , _framed_body = \ activeTab newMsg cmd _ -> do -- divClass "" $ do
             chatOverlay $ fmap ChatroomId . unChatroomId . _puzzle_Channel <$> (puzzleData >>= _puzzleData_puzzle) -- divClass "chat-overlay scrollable" $ text "Chat Messagez"
             let mcid = (fmap ChatroomId . unChatroomId . _puzzle_Channel) <$> (puzzleData >>= _puzzleData_puzzle)
                 chatWidget cls = do
@@ -250,7 +258,15 @@ puzzle puz = do
                 mkMsgReq c m = case c of
                             Nothing -> Nothing
                             Just c' -> Just $ ApiRequest_Private () $ PrivateRequest_SendMessage c' m
-            _ <- requestingIdentity $ attachWithMaybe (\c m -> mkMsgReq c m) (current mcid) cmd
+            _ <- requestingIdentity $ attachWithMaybe (\c m -> mkMsgReq c m) (current mcid) newMsg
+            
+            let (cliErrors, cmdSel) = parseCli (Just puz) cmd
+            clearErrors <- fmap switchDyn $ prerender (return never) $ debounce 10 $ "" <$ cliErrors
+            lastError <- holdDyn "" $ leftmost [cliErrors, clearErrors]
+            requestingSimpleCommands cmdSel
+            _ <- requestingIdentity $ attachWithMaybe (\c a -> case c of { Just c' -> Just $ ApiRequest_Private () $ PrivateRequest_SendMe c' a; Nothing -> Nothing; }) (current mcid) $ select cmdSel CliCommandTag_Me -- attachWithMaybe (\c m -> mkMsgReq c m) (current mcid) msgString
+
+
             puzzleView PuzzleConfig
               { _puzzleConfig_puzzle = puzzleData
               , _puzzleConfig_tab = activeTab
@@ -272,6 +288,7 @@ puzzle puz = do
                   blank
               }
             divClass "chat-sidebar" $ chatWidget "flex flex-col flex-grow p-4 overflow-y-scroll"
+            elClass "pre" "commandOutput" $ dynText lastError
         , _framed_layout = \ (MenuSettings layout) tab -> (\t l -> if t == PuzzlePageTab_Chat then MutedChat else l) <$> tab <*> layout
         }
 

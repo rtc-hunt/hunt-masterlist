@@ -11,6 +11,7 @@ import Common.Schema
 -- Private requests require the user to be logged in.
 data PrivateRequest a where
   PrivateRequest_SendMessage :: Id Chatroom -> Text -> PrivateRequest (Either Text ())
+  PrivateRequest_SendMe :: Id Chatroom -> Text -> PrivateRequest (Either Text ())
   PrivateRequest_CreateChatroom :: Text -> PrivateRequest (Either Text (Id Chatroom))
   PrivateRequest_LatestMessage :: Id Chatroom -> PrivateRequest (Either Text (Id Chatroom, Int))
   PrivateRequest_AddPuzzle :: Text -> Bool -> Text -> Id Hunt -> PrivateRequest (Either Text (Id Puzzle))
