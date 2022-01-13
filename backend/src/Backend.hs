@@ -2,6 +2,9 @@
 {-# LANGUAGE TypeApplications #-}
 module Backend where
 
+
+import Prelude hiding ((.))
+import Control.Category
 import Backend.Request
 import Backend.Schema
 import Common.Route
@@ -9,6 +12,13 @@ import Control.Monad.IO.Class
 import Database.PostgreSQL.Simple.Transaction
 import qualified Data.Aeson as Aeson
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as LBS
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
+import qualified Data.Signed
+import qualified Data.Map.Monoidal
+import qualified Reflex.Query.Class
+import qualified Common.View
 import Data.Coerce
 import Data.Maybe
 import Data.Pool
@@ -42,16 +52,29 @@ backend = Backend
     -- forkIO (addLoad csk)
     withDb "db" $ \pool -> do
       catch (withResource pool $ \conn -> withTransactionSerializable conn $
-        runMigrations conn) $ \(e :: SomeException) -> threadDelay 100000000
+        runMigrations conn) $ \(e :: SomeException) -> (putStr "Waiting for DB fixes\n" >> threadDelay 100000000)
       (listen, _) <- liftIO $ serveDbOverWebsockets
         (coerce pool)
         (requestHandler pool csk gsk cgk)
         (\nm q -> fmap (fromMaybe emptyV) $ mapDecomposedV (handleAuthMapQuery checkToken (notifyHandler pool nm)) q)
         (QueryHandler $ \q -> fromMaybe emptyV <$> mapDecomposedV (handleAuthMapQuery checkToken (privateQueryHandler pool)) q)
         vesselFromWire
-        vesselPipeline
+        (vesselPipeline . observePipelineQuery (trackActiveUsers csk pool))
       serve $ \case
         BackendRoute_Listen :/ () -> listen
         BackendRoute_Missing :/ () -> return ()
   , _backend_routeEncoder = fullRouteEncoder
   }
+
+
+observePipelineQuery :: (q -> IO ()) -> Pipeline IO q q
+observePipelineQuery f = Pipeline $ \qh r -> do
+  return 
+    ( QueryHandler $ \q -> do
+        f q
+        qr <- runQueryHandler qh q
+        return qr
+    , Recipient $ \qr -> do
+        tellRecipient r qr
+    )
+

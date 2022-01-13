@@ -26,6 +26,7 @@ data Db f = Db
   , _db_tags :: f (TableEntity Tag)
   , _db_notes :: f (TableEntity Note)
   , _db_metas :: f (TableEntity Metapuzzle)
+  , _db_activeUsers :: f (TableEntity ActiveUser)
   }
   deriving (Generic, Database be)
 
@@ -246,3 +247,24 @@ instance ToJSONKey (PrimaryKey Hunt Identity)
 instance FromJSONKey (PrimaryKey Hunt Identity)
 instance ToJSON (Hunt Identity)
 instance FromJSON (Hunt Identity)
+
+data ActiveUser f = ActiveUser
+  { _activeUser_chat :: PrimaryKey Chatroom f
+  , _activeUser_user :: PrimaryKey Account f
+  , _activeUser_openCount :: Columnar f Int64
+  } deriving (Generic, Beamable)
+
+instance Table ActiveUser where
+  data PrimaryKey ActiveUser f = ActiveUserId { _activeUserId_chat :: PrimaryKey Chatroom f, _activeUserId_user :: PrimaryKey Account f }
+    deriving (Generic, Beamable)
+  primaryKey au = ActiveUserId (_activeUser_chat au) (_activeUser_user au)
+
+deriving instance Show (PrimaryKey ActiveUser Identity)
+deriving instance Eq (PrimaryKey ActiveUser Identity)
+deriving instance Ord (PrimaryKey ActiveUser Identity)
+instance ToJSON (PrimaryKey ActiveUser Identity)
+instance FromJSON (PrimaryKey ActiveUser Identity)
+instance ToJSONKey (PrimaryKey ActiveUser Identity)
+instance FromJSONKey (PrimaryKey ActiveUser Identity)
+instance ToJSON (ActiveUser Identity)
+instance FromJSON (ActiveUser Identity)

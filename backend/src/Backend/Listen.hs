@@ -42,6 +42,7 @@ data Notify a where
   Notify_Tag :: Notify (Change Tag)
   Notify_Note :: Notify (Change Note)
   Notify_Meta :: Notify (Change Metapuzzle)
+  Notify_ActiveUser :: Notify (Id ActiveUser)
 
 deriveArgDict ''Notify
 deriveJSONGADT ''Notify
@@ -71,6 +72,9 @@ instance HasChangeNotification Notify Note where
 
 instance HasChangeNotification Notify Metapuzzle where
   changeNotification _ = Notify_Meta
+
+instance HasNotification Notify ActiveUser where
+  notification _ = Notify_ActiveUser
 
 getChatroom  :: Id Chatroom -> Pg (Maybe (Chatroom Identity))
 getChatroom = runSelectReturningOne . lookup_ (_db_chatroom db)
@@ -104,6 +108,7 @@ notifyHandler pool nm v = case _dbNotification_message nm of
     V_UniqueTags -> const $ pure emptyV
     V_Notes -> const $ pure emptyV
     V_Metas -> const $ pure emptyV
+    V_ActiveUsers -> const $ pure emptyV
   Notify_Message :/ mid -> do
     runNoLoggingT $ do
       msgs :: [(Id Chatroom, Int, UTCTime, Text, Text)] <- runDb pool $ [iquery|
@@ -139,6 +144,7 @@ notifyHandler pool nm v = case _dbNotification_message nm of
           V_UniqueTags -> const $ pure emptyV
           V_Notes -> const $ pure emptyV
           V_Metas -> const $ pure emptyV
+          V_ActiveUsers -> const $ pure emptyV
   Notify_Puzzle :/ change@(Change pid theChange) -> buildV v $ \case
     V_Puzzle -> \(MapV cs) -> if Map.member pid cs
       then runDb pool (runSelectReturningOne $ lookup_ (_db_puzzles db) pid) >>= pure . \case
@@ -158,6 +164,7 @@ notifyHandler pool nm v = case _dbNotification_message nm of
     V_UniqueTags -> const $ pure emptyV
     V_Notes -> const $ pure emptyV
     V_Metas -> const $ pure emptyV
+    V_ActiveUsers -> const $ pure emptyV
   Notify_Solve :/ change -> buildV v $ \case
     V_Solutions -> byForeignKey _solution_Puzzle _db_solves change
     V_Chatroom -> const $ pure emptyV
@@ -170,6 +177,7 @@ notifyHandler pool nm v = case _dbNotification_message nm of
     V_UniqueTags -> const $ pure emptyV
     V_Notes -> const $ pure emptyV
     V_Metas -> const $ pure emptyV
+    V_ActiveUsers -> const $ pure emptyV
   Notify_Tag :/ change -> buildV v $ \case
     V_Tags -> byForeignKey _tag_Puzzle _db_tags change
     V_Chatroom -> const $ pure emptyV
@@ -182,6 +190,7 @@ notifyHandler pool nm v = case _dbNotification_message nm of
     V_UniqueTags -> getUniqueTags change
     V_Notes -> const $ pure emptyV
     V_Metas -> const $ pure emptyV
+    V_ActiveUsers -> const $ pure emptyV
   Notify_Note :/ change -> buildV v $ \case
     V_Notes -> byForeignKey _note_Puzzle _db_notes change
     V_Chatroom -> const $ pure emptyV
@@ -194,6 +203,7 @@ notifyHandler pool nm v = case _dbNotification_message nm of
     V_Tags -> const $ pure emptyV
     V_UniqueTags -> const $ pure emptyV
     V_Metas -> const $ pure emptyV
+    V_ActiveUsers -> const $ pure emptyV
   Notify_Meta :/ change -> buildV v $ \case
     V_Metas -> setByForeignKey _meta_Puzzle _db_metas change
     V_Chatroom -> const $ pure emptyV
@@ -206,6 +216,27 @@ notifyHandler pool nm v = case _dbNotification_message nm of
     V_Tags -> const $ pure emptyV
     V_UniqueTags -> const $ pure emptyV
     V_Notes -> const $ pure emptyV
+    V_ActiveUsers -> const $ pure emptyV
+  Notify_ActiveUser :/ auid -> buildV v $ \case
+    V_Chatroom -> const $ pure emptyV
+    V_Chatrooms -> const $ pure emptyV
+    V_Messages -> const $ pure emptyV
+    V_Puzzle -> const $ pure emptyV
+    V_HuntPuzzles -> const $ pure emptyV
+    V_HuntMetas -> const $ pure emptyV
+    V_Solutions -> const $ pure emptyV
+    V_Tags -> const $ pure emptyV
+    V_UniqueTags -> const $ pure emptyV
+    V_Notes -> const $ pure emptyV
+    V_Metas -> const $ pure emptyV
+    V_ActiveUsers -> \(MapV cids) ->
+        runDb pool $ do
+          au <- runSelectReturningOne $ lookup_ (_db_activeUsers db) auid
+          acc <- runSelectReturningOne $ lookup_ (_db_account db) (_activeUserId_user auid)
+          pure $ case (au, acc) of
+            (Just p, Just u) | Map.member (_activeUser_chat p) cids && _activeUser_openCount p > 0 -> MapV $ Map.singleton (_activeUserId_chat auid) $ pure $ SemiMap_Partial $ Map.singleton (_activeUserId_user auid) $ First (Just $ _account_name u)
+            (Just p, Just u) | Map.member (_activeUser_chat p) cids -> MapV $ Map.singleton (_activeUserId_chat auid) $ pure $ SemiMap_Partial $ Map.singleton (_activeUserId_user auid) $ First Nothing
+            _ -> emptyV
   where 
     nt = _dbNotification_notificationType nm
     byForeignKey 

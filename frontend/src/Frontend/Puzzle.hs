@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE OverloadedLists #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Frontend.Puzzle where
 
@@ -308,6 +309,13 @@ puzzleBuilder puzIdD = do
   tags <- watch $ (\puzId -> key V_Tags ~> key puzId ~> postMap (traverse (fmap getMonoidalMap . getComplete))) <$> puzIdD
   solutions <- watch $ (\puzId -> key V_Solutions ~> key puzId ~> postMap (traverse (fmap getMonoidalMap . getComplete))) <$> puzIdD
   notes <- watch $ (\puzId -> key V_Notes ~> key puzId ~> postMap (traverse (fmap getMonoidalMap . getComplete))) <$> puzIdD
+  let puzChan = (>>= fmap (ChatroomId @Identity) . unChatroomId . _puzzle_Channel) <$> puzzle
+  dynCurrentDyn <- maybeDyn puzChan
+  let currentSolverQuery = fmap (fmap ((\chanId -> key V_ActiveUsers ~> key chanId ~> postMap (traverse (fmap getMonoidalMap . getComplete))))) <$> dynCurrentDyn
+  let watcher = fmap watch <$> currentSolverQuery
+  dynRes <- dyn $ fromMaybe (return $ constDyn mempty) <$> watcher
+  currentSolvers <- join <$> holdDyn (constDyn mempty) dynRes
+  -- currentSolvers <- fromMaybe (constDyn mempty) . watch . 
   -- display puzzles
   return $ ffor puzzle $ \foundPuzD ->
     ffor foundPuzD $ \puz -> PuzzleData
@@ -317,7 +325,7 @@ puzzleBuilder puzIdD = do
     , _puzzleData_solutions = fromMaybe mempty <$> solutions
     , _puzzleData_notes = fromMaybe mempty <$> notes
     , _puzzleData_status = constDyn ""
-    , _puzzleData_currentSolvers = constDyn mempty
+    , _puzzleData_currentSolvers = fromMaybe mempty <$> currentSolvers
     }
 
 puzzleListBuilder

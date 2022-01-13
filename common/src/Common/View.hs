@@ -78,6 +78,7 @@ data V a where
   V_Metas :: V (MapV (Id Puzzle) (SemiSet (Metapuzzle Identity)))
   V_Hunts :: V (MapV (Id Hunt) (First (Id Hunt)))
   V_HuntMetas :: V (MapV (Id Hunt) (SemiMap (Id Puzzle) Text))
+  V_ActiveUsers :: V (MapV (Id Chatroom) (SemiMap (Id Account) Text))
 
 deriving instance Show (V a)
 
