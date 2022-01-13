@@ -9,7 +9,9 @@ library
                , beam-core
                , bytestring
                , common
+               , constraints-extras
                , dependent-sum
+               , dependent-sum-template
                , dependent-map
                , obelisk-frontend
                , obelisk-route
