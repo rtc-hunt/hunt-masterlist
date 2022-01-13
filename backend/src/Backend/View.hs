@@ -65,6 +65,7 @@ privateQueryHandler pool q = (>>= (\a -> print "Passed" >> return a)) $ (print q
     fmap MapV $ ifor hs $ \h _ -> runDb pool $ fmap (Identity . SemiMap_Complete . Map.fromList . fmap (\a -> (a, ()))) $ runSelectReturningList $ select $ do
       puzzle <- all_ (_db_puzzles db)
       guard_ $ _puzzle_Hunt puzzle ==. val_ h
+      guard_ $ _puzzle_removed puzzle /=. val_ (Just True)
       return $ primaryKey puzzle
   V_Solutions -> \(MapV hs) ->
     fmap MapV $ ifor hs $ \h _ -> runDb pool $ fmap (Identity . SemiMap_Complete . Map.fromList . fmap (\a -> (primaryKey a, a))) $ runSelectReturningList $ select $ do
@@ -95,6 +96,7 @@ privateQueryHandler pool q = (>>= (\a -> print "Passed" >> return a)) $ (print q
       puzzle <- all_ (_db_puzzles db)
       guard_ $ _puzzle_Hunt puzzle ==. val_ h
       guard_ $ _puzzle_IsMeta puzzle ==. val_ True
+      guard_ $ _puzzle_removed puzzle /=. val_ (Just True)
       return $ (primaryKey puzzle, _puzzle_Title puzzle)
   V_ActiveUsers -> \(MapV hs) ->
     fmap MapV $ ifor hs $ \h _ -> runDb pool $ fmap (Identity . SemiMap_Complete . Map.fromList) $ runSelectReturningList $ select $ do

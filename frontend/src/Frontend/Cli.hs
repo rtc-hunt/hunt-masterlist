@@ -75,6 +75,10 @@ cliCommandParser theRoute = info (hsubparser commands <**> helper) fullDesc
                 <*> Opt.switch (long "backsolve" <> short 'b' <> help "Solution was backsolved"))
                 <*> fmap (T.intercalate " ") (some (fmap T.pack $ strArgument $ metavar "SOLUTION")) 
            ) $ fullDesc
+        , command "delete-puzzle" $ info (
+          fmap ((CliCommandTag_PuzzleCommand ==>) . mkSome) $
+             (PuzzleCommand_DeletePuzzle <$> puzzleOption )
+           ) $ fullDesc
         ]
     puzzleOption :: Parser (PrimaryKey Puzzle Identity)
     puzzleOption = option (PuzzleId . SqlSerial <$> auto) (short 'p' <> long "puzzle" <> metavar "PUZZLE" <> puzzleOptionMod)

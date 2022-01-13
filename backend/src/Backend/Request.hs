@@ -113,6 +113,7 @@ requestHandler pool csk gsk authAudience = RequestHandler $ \case
           , _puzzle_SheetURI = val_ $ (\a->"https://docs.google.com/spreadsheets/d/" <> a <> "/edit") <$> sheet
           , _puzzle_Channel = val_ $ (ChatroomId . fmap unChatroomId) $ channelId
           , _puzzle_Hunt = val_ $ hunt
+          , _puzzle_removed = val_ $ Nothing
           }
         pure $ case puzzle of
           Nothing -> Left "Couldn't create channel"
@@ -144,6 +145,9 @@ requestHandler pool csk gsk authAudience = RequestHandler $ \case
         pure $ Right ()
       PrivateRequest_PuzzleCommand (PuzzleCommand_RemoveMeta meta) -> auth $ \_user -> runDb pool $ do
         deleteAndNotifyChange (_db_metas db) $ meta
+        pure $ Right ()
+      PrivateRequest_PuzzleCommand (PuzzleCommand_DeletePuzzle puzId) -> auth $ \_user -> runDb pool $ do
+        updateAndNotifyChange (_db_puzzles db) puzId $ (\p -> _puzzle_removed p <-. val_ (Just True))
         pure $ Right ()
 
 

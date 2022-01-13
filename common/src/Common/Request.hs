@@ -27,6 +27,7 @@ data PuzzleCommand a where
   PuzzleCommand_UnSolve :: Id Solution -> PuzzleCommand (Id Solution)
   PuzzleCommand_AddMeta :: Id Puzzle -> Id Puzzle -> PuzzleCommand (Id Puzzle, Id Puzzle)
   PuzzleCommand_RemoveMeta :: Id Metapuzzle -> PuzzleCommand (Id Metapuzzle)
+  PuzzleCommand_DeletePuzzle :: Id Puzzle -> PuzzleCommand (Id Puzzle)
 
 -- Public requests are those which do not require the user to already be logged in.
 data PublicRequest a where
