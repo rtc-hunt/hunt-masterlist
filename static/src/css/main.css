@@ -84,6 +84,10 @@ iframe { height: 100%; width: 100%; }
   display: none;
 }
 
+.SplitTab .chat-overlay {
+  display: none !important;
+} 
+
 .FullTab .chat-overlay {
   transition: opacity 1s;
   z-index: 5; 
@@ -104,13 +108,22 @@ iframe { height: 100%; width: 100%; }
   opacity: 0;
 }
 
-.SplitTab .chat-overlay {
+.FullTab .chat-sidebar, .MutedChat .chat-sidebar {
+  display: none; 
+}
+
+.SplitTab .chat-sidebar {
   grid-area: bodyright;
   border-left: 1px solid gray;
   margin: 0px;
   padding: 1em;
   height: 100% !important;
-  /* display: block !important; */
+  width: 100%;
+}
+
+.bottomScroller {
+  display: flex;
+  flex-direction: column-reverse;
 }
 
 .bottomwidget {

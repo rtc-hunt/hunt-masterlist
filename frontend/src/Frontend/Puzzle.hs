@@ -42,6 +42,7 @@ import Common.Schema
 import Common.View
 import Database.Beam.Schema
 
+import Frontend.Chat
 import Frontend.ChannelList
 import Frontend.Channel
 import Frontend.Types
@@ -123,7 +124,7 @@ masterlist = do
             activeTab :: Dynamic t MasterlistPage <- holdDyn MasterlistPage_List $ leftmost $ zipWith (<$) [MasterlistPage_List, MasterlistPage_HuntPage, MasterlistPage_Chat] evts
             -- activeSolverList puzId puzzlesData
             return $ activeTab
-    , _framed_body = \(activeTab :: Dynamic t MasterlistPage) cmdString -> do
+    , _framed_body = \(activeTab :: Dynamic t MasterlistPage) cmdString _ -> do
         let frameURI uriD = divClass "framed" $ elDynAttr "iframe" (("src" =: ) <$> uriD) blank
         myTabDisplay "ui top attached tabular menu" "activeTab" activeTab $
           MasterlistPage_List =: ("List", do
@@ -174,6 +175,7 @@ masterlist = do
                 reqDone <- requestingIdentity $ ApiRequest_Private () <$> curNewPuzzle <@ pzl
                 blank
           
+    , _framed_layout = \_ _ -> constDyn FullTab
     }
 
 buildHunt
@@ -228,26 +230,27 @@ puzzle puz = do
                      "class" =: if aTab == tab then "item active" else "item"
               in fmap (domEvent Click . fst) $ elDynAttr' "div" itemClass $ text $ tabToText tab
             activeTab <- holdDyn (PuzzlePageTab_Sheet) $ leftmost evts
-            -- activeSolverList puzId puzzlesData
+            activeSolverList $ puzzleData >>= _puzzleData_currentSolvers
             return $ activeTab
-        , _framed_body = \ activeTab cmd -> do
+        , _framed_body = \ activeTab cmd _ -> do -- divClass "" $ do
+            chatOverlay $ fmap ChatroomId . unChatroomId . _puzzle_Channel <$> (puzzleData >>= _puzzleData_puzzle) -- divClass "chat-overlay scrollable" $ text "Chat Messagez"
+            let mcid = (fmap ChatroomId . unChatroomId . _puzzle_Channel) <$> (puzzleData >>= _puzzleData_puzzle)
+                chatWidget cls = do
+                       channelView <- channelBuilder mcid
+                       void $ prerender blank $ do
+                        rec (msgs, _) <- elAttr' "div" ("class" =: cls <> "style" =: "height: 100%; flex-direction: column-reverse; display: flex;") $ divClass "flex-grow flex flex-col" $ do
+                              dyn_ $ ffor (_channelView_messages channelView) $ \case
+                                Nothing -> text "No messages"
+                                Just ms -> void $ listWithKey ms $ \_ -> Templates.message
+                        blank
+                mkMsgReq c m = case c of
+                            Nothing -> Nothing
+                            Just c' -> Just $ ApiRequest_Private () $ PrivateRequest_SendMessage c' m
+            _ <- requestingIdentity $ attachWithMaybe (\c m -> mkMsgReq c m) (current mcid) cmd
             puzzleView PuzzleConfig
               { _puzzleConfig_puzzle = puzzleData
               , _puzzleConfig_tab = activeTab
-              , _puzzleConfig_chatWidget =
-                      let mcid = (fmap ChatroomId . unChatroomId . _puzzle_Channel) <$> (puzzleData >>= _puzzleData_puzzle)
-                          mkMsgReq c m = case c of
-                            Nothing -> Nothing
-                            Just c' -> Just $ ApiRequest_Private () $ PrivateRequest_SendMessage c' m
-                      in do
-                       channelView <- channelBuilder mcid
-                       void $ prerender blank $ do
-                        rec (msgs, _) <- elAttr' "div" ("class" =: "ui container p-4 flex-grow flex flex-col overflow-y-scroll" <> "style" =: "height: 100%") $ do
-                              dyn_ $ ffor (_channelView_messages channelView) $ \case
-                                Nothing -> text "No messages"
-                                Just ms -> messagesHelper msgs ms
-                        _ <- requestingIdentity $ attachWithMaybe (\c m -> mkMsgReq c m) (current mcid) cmd
-                        blank
+              , _puzzleConfig_chatWidget = chatWidget "ui container p-4 flex-grow flex flex-col overflow-y-scroll"
               , _puzzleConfig_configuratorWidget = do
                   cfgOut <- puzzleConfigurator PuzzleConfiguratorConfig
                     { _puzzleConfiguratorConfig_puzzle = puzzleData
@@ -264,7 +267,18 @@ puzzle puz = do
                   _ <- requestingIdentity $ ApiRequest_Private () . PrivateRequest_PuzzleCommand . PuzzleCommand_Note puz <$> _puzzleConfiguratorOut_addNote cfgOut
                   blank
               }
+            divClass "chat-sidebar" $ chatWidget "flex flex-col flex-grow p-4 overflow-y-scroll"
+        , _framed_layout = \ (MenuSettings layout) tab -> (\t l -> if t == PuzzlePageTab_Chat then MutedChat else l) <$> tab <*> layout
         }
+
+activeSolverList solvers =
+          elClass "div" "ui simple dropdown item menuShrink" $ do
+            let solverNames = Map.elems <$> solvers -- fmap (\(a :*: _) -> _user_name a) . Map.elems <$> solvers
+            elClass "div" "ellipsisShrink" $ dynText $ "Active Users: " <> fmap (T.intercalate ",") solverNames
+            -- elClass "i" "dropdown icon" blank
+            elClass "div" "menu" $ do
+              simpleList solverNames $ elClass "div" "item" . dynText
+
 
 getKnownTags
   :: forall t m js.
