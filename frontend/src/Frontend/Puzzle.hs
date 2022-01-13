@@ -61,6 +61,7 @@ import Common.Schema
 import Debug.Trace
 
 puzzles :: (Monad m, MonadFix m, Reflex t, Routed t (Maybe (Id Puzzle)) m, Adjustable t m, NotReady t m, PostBuild t m, DomBuilder t m, MonadHold t m
+     , Routed t (Maybe (Id Puzzle)) (Client m)
      , Requester t m, Response m ~ Identity, Request m ~ ApiRequest () PublicRequest PrivateRequest
      , SetRoute t (R FrontendRoute) m, RouteToUrl (R FrontendRoute) m
      , PerformEvent t m
@@ -75,7 +76,7 @@ puzzles :: (Monad m, MonadFix m, Reflex t, Routed t (Maybe (Id Puzzle)) m, Adjus
      , Request (Client m) ~ ApiRequest () PublicRequest PrivateRequest
   ) => m (Event t ())
 puzzles = do
-  mPuzzle <- askRoute
+  mPuzzle <- join <$> prerender (pure $ constDyn Nothing) askRoute
   dyn $ ffor mPuzzle $ \case
     Nothing -> masterlist
     Just i -> puzzle i
