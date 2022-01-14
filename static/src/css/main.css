@@ -158,11 +158,10 @@ iframe { height: 100%; width: 100%; }
 }
 
 .ui.simple.dropdown.item.menuShrink {
-  flex: initial !important;
+  flex: auto !important;
   min-width: 3em;
 }
 .ellipsisShrink {
-  width: 50em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

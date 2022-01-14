@@ -8,8 +8,9 @@ module.exports = {
   darkMode: false, // or 'media' or 'class'
   theme: {
     fontFamily: {
-      'karla' : ['Karla', 'sans-serif'],
-      'facit' : ['jaf-facitweb', 'sans-serif'],
+      'sans' : [ 'ui-sans-serif','system-ui','-apple-system','BlinkMacSystemFont','Segoe UI','Roboto','Helvetica Neue','Arial','Noto Sans','sans-serif','Apple Color Emoji','Segoe UI Emoji','Segoe UI Symbol','Noto Color Emoji', 'Symbola' ],
+      'karla' : ['Karla', 'sans-serif', 'Symbola'],
+      'facit' : ['jaf-facitweb', 'sans-serif', 'Symbola'],
       'icon' : ['"Material Icons"']
     },
     borderRadius: {

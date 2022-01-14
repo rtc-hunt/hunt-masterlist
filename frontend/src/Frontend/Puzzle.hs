@@ -115,6 +115,8 @@ masterlist :: (Monad m, MonadHold t m, PostBuild t m, Reflex t, DomBuilder t m, 
   => m ()
 masterlist = do
   hunt <- buildHunt
+  knownMetas <- fmap (fmap (fromMaybe mempty)) $ watch $ constDyn $ key V_HuntMetas ~> key (HuntId 1 :: Id Hunt) ~> postMap (traverse (fmap getMonoidalMap . getComplete))
+  knownTags <- getKnownTags
   framed $ Framed
     { _framed_headerItems = mdo
             let tabs = [MasterlistPage_List .. MasterlistPage_Chat]
@@ -149,6 +151,8 @@ masterlist = do
             puzzlesTable PuzzleTableConfig
               { _puzzleTableConfig_results = puzzleListD
               , _puzzleTableConfig_puzzleLink = \id -> dynRouteLink $ (\i -> FrontendRoute_Puzzle :/ Just i) <$> id
+              , _puzzleTableConfig_metas = knownMetas
+              , _puzzleTableConfig_tags = knownTags
               }
               )
            <> MasterlistPage_HuntPage =: ("frontpage", do
@@ -323,7 +327,7 @@ getKnownTags
   => m (Dynamic t (Set Text))
 getKnownTags = do
   tags <- watch $ constDyn $ key V_UniqueTags ~> key () ~> postMap (traverse (fmap (Map.keysSet . getMonoidalMap) . getComplete))
-  return $ (<> ["solved", "in-progress", "stalled", "extraction", "done"]) . fromMaybe mempty <$> tags
+  return $ (<> statusTags) . fromMaybe mempty <$> tags
   
 
 puzzleBuilder

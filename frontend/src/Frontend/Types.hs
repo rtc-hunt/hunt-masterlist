@@ -1,3 +1,4 @@
+{-# Language OverloadedLists #-}
 module Frontend.Types where
 
 import Data.Functor.Const
@@ -9,6 +10,7 @@ import Data.Text
 import Data.Map (Map)
 import Data.Map as Map
 import Control.Monad.Identity
+import Data.Set
 
 import Common.Request
 import Common.Schema
@@ -34,7 +36,7 @@ data PuzzleQuery = PuzzleQuery
   { _puzzleQuery_select :: PuzzleSelect
   , _puzzleQuery_ordering :: PuzzleOrdering
   }
-  deriving (Eq, Show, Ord)
+  deriving (Eq, Show, Ord, Read)
 
 instance Semigroup PuzzleQuery where
   PuzzleQuery sa oa <> PuzzleQuery sb ob = PuzzleQuery (sa <> sb) (oa <> ob)
@@ -44,17 +46,28 @@ instance Monoid PuzzleQuery where
 
 data PuzzleSelect
   = PuzzleSelect_All
-  deriving (Eq, Show, Ord)
+  | PuzzleSelect_And PuzzleSelect PuzzleSelect
+  | PuzzleSelect_Not PuzzleSelect
+  | PuzzleSelect_WithTag Text
+  | PuzzleSelect_HasVoice
+  | PuzzleSelect_IsMeta
+  | PuzzleSelect_HasSolution
+  | PuzzleSelect_HasSolvers
+  | PuzzleSelect_HasMeta (Id Puzzle)
+  deriving (Eq, Show, Ord, Read)
 
 instance Semigroup PuzzleSelect where
   PuzzleSelect_All <> PuzzleSelect_All = PuzzleSelect_All
+  PuzzleSelect_All <> a = a
+  a <> PuzzleSelect_All = a
+  a <> b = PuzzleSelect_And a b
 
 instance Monoid PuzzleSelect where
   mempty = PuzzleSelect_All
 
 data PuzzleOrdering
   = PuzzleOrdering_Any
-  deriving (Eq, Show, Ord)
+  deriving (Eq, Show, Ord, Read)
 
 instance Semigroup PuzzleOrdering where
   PuzzleOrdering_Any <> PuzzleOrdering_Any = PuzzleOrdering_Any
@@ -65,3 +78,6 @@ instance Monoid PuzzleOrdering where
 data PuzzleSortKey
   = PuzzleSortKey_Id (Id Puzzle)
   deriving (Eq, Show, Ord)
+
+statusTags :: Set Text
+statusTags = [ "solved", "in-progress", "stalled", "extraction", "done" ]

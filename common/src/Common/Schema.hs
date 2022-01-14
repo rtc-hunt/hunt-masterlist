@@ -123,6 +123,7 @@ instance Table Puzzle where
   primaryKey = PuzzleId . _puzzle_id
 
 deriving instance Show (PrimaryKey Puzzle Identity)
+deriving instance Read (PrimaryKey Puzzle Identity)
 deriving instance Eq (PrimaryKey Puzzle Identity)
 deriving instance Ord (PrimaryKey Puzzle Identity)
 instance ToJSON (PrimaryKey Puzzle Identity)
