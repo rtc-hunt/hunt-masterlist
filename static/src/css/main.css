@@ -202,3 +202,141 @@ span[data-tag="done"] {
   background-color: #e8e8e8;
   padding: 1em;
 }
+
+/* Opinionated HML CSS tweaks patch */
+
+/* General styling */
+h1, h2 {
+    font-size: revert;
+    font-weight: revert;
+    padding-bottom: 15px;
+}
+input {
+    border: revert;
+    padding: revert;
+}
+button {
+    background-color: revert;
+    border: revert;
+    padding: revert;
+}
+select {
+    border: revert;
+}
+
+/* Master List
+ *  - Add commas to solver list
+ *
+ * selector:
+ * .appMain .tabbedContentContainer > :nth-child(1)
+ */
+.appMain .tabbedContentContainer > :nth-child(1) .puzzletable td:nth-of-type(6) > span:not(:first-of-type)::before {
+    content: ', ';
+}
+
+/* Config Tab
+ *
+ * selector:
+ * .appMain .tabbedContentContainer > :nth-child(4) .ui.container
+ */
+.appMain .tabbedContentContainer > :nth-child(4) .ui.container > .ui.vertical.segment {
+    border-bottom: 2px solid rgba(34,36,38,.5);
+}
+
+/* Basic Information
+ *  - add table layout
+ *  - restyle Is Meta? checkbox
+ *  - margin for Update notification
+ *
+ * selector: .appMain .tabbedContentContainer > :nth-child(4) .ui.container > :nth-child(1)
+ */
+.appMain .tabbedContentContainer > :nth-child(4) .ui.container > :nth-child(1) .ui.vertical.segment {
+    display: table;
+}
+.appMain .tabbedContentContainer > :nth-child(4) .ui.container > :nth-child(1) .field {
+    display: table-row;
+}
+.appMain .tabbedContentContainer > :nth-child(4) .ui.container > :nth-child(1) .field > * {
+    display: table-cell;
+    margin: 10px;
+}
+.appMain .tabbedContentContainer > :nth-child(4) .ui.container > :nth-child(1) .field > :nth-child(1) {
+    text-align: right;
+    width: 20%;
+}
+.appMain .tabbedContentContainer > :nth-child(4) .ui.container > :nth-child(1) .field > :nth-child(2) {
+    width: 100%;
+}
+
+/* Remove Is Meta? checkbox custom styling, and move right*/
+.appMain .tabbedContentContainer > :nth-child(4) .ui.container > :nth-child(1) .field:nth-of-type(4) input {
+    display: inline;
+    left: 140px;
+    opacity: 1 !important;
+    position: relative;
+}
+.appMain .tabbedContentContainer > :nth-child(4) .ui.container > :nth-child(1) .field:nth-of-type(4) label {
+    display: inline;
+}
+.appMain .tabbedContentContainer > :nth-child(4) .ui.container > :nth-child(1) .field:nth-of-type(4) label::before {
+    display: none;
+}
+.appMain .tabbedContentContainer > :nth-child(4) .ui.container > :nth-child(1) .field:nth-of-type(4) label::after {
+    display: none;
+}
+
+/* Spacing for Update alert */
+.appMain .tabbedContentContainer > :nth-child(4) .ui.container > :nth-child(1) > button:nth-last-child(1) {
+    margin-left: 160px;
+    margin-right: 15px;
+}
+
+/* Solution(s)
+ *  - add margins and borders
+ *  - restyle Remove button
+ *  - add info about backsolve checkbox
+ *
+ * selector: 
+ * .appMain .tabbedContentContainer > :nth-child(4) .ui.container > :nth-child(2)
+ */
+.appMain .tabbedContentContainer > :nth-child(4) .ui.container > :nth-child(2) pre {
+    border-top: 1px solid rgba(34,36,38,.15);
+    padding: 10px 0 10px 10px;
+}
+.appMain .tabbedContentContainer > :nth-child(4) .ui.container > :nth-child(2) pre button {
+    background-color: revert;
+    border: revert;
+    border-radius: revert;
+    color: revert;
+    font-weight: revert;
+    line-height: 1.5;
+    padding: revert;
+}
+.appMain .tabbedContentContainer > :nth-child(4) .ui.container > :nth-child(2) input[type=checkbox] {
+    margin: 0 10px;
+}
+.appMain .tabbedContentContainer > :nth-child(4) .ui.container > :nth-child(2)::after {
+    content: 'Check the box for backsolved solutions.';
+    display: block;
+}
+
+/* Meta(s)
+ * - restyle Remove button
+ *
+ * selector: 
+ * .appMain .tabbedContentContainer > :nth-child(4) .ui.container > :nth-child(3)
+ */
+.appMain .tabbedContentContainer > :nth-child(4) .ui.container > :nth-child(3) .item {
+    padding: 10px 0 10px 10px;
+}
+
+.appMain .tabbedContentContainer > :nth-child(4) .ui.container > :nth-child(3) .item button {
+    background-color: revert;
+    border: revert;
+    border-radius: revert;
+    color: revert;
+    font-weight: revert;
+    line-height: 1.5;
+    padding: revert;
+}
+

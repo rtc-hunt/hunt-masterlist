@@ -116,7 +116,7 @@ puzzleConfigurator PuzzleConfiguratorConfig
                     def & puzzleTitle .~ labeledField id id "Title"
                         & puzzleUri .~ labeledField id id "Puzzle URI"
                         & puzzleSheetURI .~ labeledField Just (fromMaybe "") "Puzzle Sheet URI"
-                        & puzzleIsMeta .~ (ConfiguratorField $ \val -> divClass "field" $ divClass "ui toggle checkbox" $ do
+                        & puzzleIsMeta .~ (ConfiguratorField $ \val -> divClass "field" $ divClass "" $ do
                             initial <- sample (current val)
                             ie <- inputElement $ 
                                def & inputElementConfig_initialChecked .~ initial
@@ -132,7 +132,7 @@ puzzleConfigurator PuzzleConfiguratorConfig
                 }
       (removeSolution, addSolution) <- divClass "ui vertical segment" $ do
             el "h2" $ text "Solution(s)"
-            removals <- listWithKey (puzData >>= _puzzleData_solutions) $ \k sol ->  do
+            removals <- listWithKey (puzData >>= _puzzleData_solutions) $ \k sol -> do
               el "pre" $ do
                 dynText $ _solution_Solution <$> sol
                 dyn_ $ (\a -> if a then backsolve1 else blank) . _solution_IsBacksolve <$> sol
@@ -171,10 +171,10 @@ puzzleConfigurator PuzzleConfiguratorConfig
                    ])
       newNote <- divClass "ui vertical segment" $ do
             el "h2" $ text "Notes"
-            newNote <- inputElement $ def
-            listWithKey (puzData >>= _puzzleData_notes) $ \id note -> elClass "div" "border-solid p-4 border-black rounded border-2" $ dynText $ _note_Note <$> note
+            newNote <- el "div" $ textAreaElement $ def & textAreaElementConfig_elementConfig . elementConfig_initialAttributes .~ ("class" =: "w-full")
             addNoteButton <- button "Add Note"
-            pure (current (_inputElement_value newNote) <@ addNoteButton)
+            listWithKey (puzData >>= _puzzleData_notes) $ \id note -> elClass "div" "border-solid p-4 border-black rounded border-2" $ dynText $ _note_Note <$> note
+            pure (current (_textAreaElement_value newNote) <@ addNoteButton)
       return $ PuzzleConfiguratorOut
         { _puzzleConfiguratorOut_puzzle = updatePuzzle
         , _puzzleConfiguratorOut_addSolution = addSolution
