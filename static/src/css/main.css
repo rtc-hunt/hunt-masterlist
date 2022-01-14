@@ -157,9 +157,17 @@ iframe { height: 100%; width: 100%; }
   flex-grow: 1;
 }
 
+.item.menuShrink {
+  flex: auto !important;
+  min-width: 3em;
+}
 .ui.simple.dropdown.item.menuShrink {
   flex: auto !important;
   min-width: 3em;
+}
+
+.whitespace-nowrap {
+        white-space: nowrap;
 }
 
 .min-w-4 { min-width: 1rem; }

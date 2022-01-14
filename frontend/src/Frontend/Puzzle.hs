@@ -247,7 +247,7 @@ puzzle puz = do
                      "class" =: if aTab == tab then "item active" else "item"
               in fmap (domEvent Click . fst) $ elDynAttr' "div" itemClass $ text $ tabToText tab
             activeTab <- holdDyn (PuzzlePageTab_Sheet) $ leftmost evts
-            divClass "item" $ do
+            divClass "item menuShrink" $ divClass "ellipsisShrink" $ do
               text "Title: "
               dynText $ _puzzle_Title <$> (puzzleData >>= _puzzleData_puzzle)
             activeSolverList $ puzzleData >>= _puzzleData_currentSolvers
