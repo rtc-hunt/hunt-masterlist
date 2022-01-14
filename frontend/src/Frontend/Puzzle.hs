@@ -243,7 +243,12 @@ puzzle puz = do
                      "class" =: if aTab == tab then "item active" else "item"
               in fmap (domEvent Click . fst) $ elDynAttr' "div" itemClass $ text $ tabToText tab
             activeTab <- holdDyn (PuzzlePageTab_Sheet) $ leftmost evts
+            divClass "item" $ do
+              text "Title: "
+              dynText $ _puzzle_Title <$> (puzzleData >>= _puzzleData_puzzle)
             activeSolverList $ puzzleData >>= _puzzleData_currentSolvers
+            let lnkD = _puzzle_voicelink <$> (puzzleData >>= _puzzleData_puzzle)
+             in elDynAttr "a" (fromMaybe mempty . fmap ((<> ("class" =: "item" <> "target" =: "_blank")) . ("href" =:)) <$> lnkD) $ (dynText $ fromMaybe "" . (fmap ("Voice: " <>)) <$> lnkD)
             return $ activeTab
         , _framed_body = \ activeTab newMsg cmd _ -> do -- divClass "" $ do
             chatOverlay $ fmap ChatroomId . unChatroomId . _puzzle_Channel <$> (puzzleData >>= _puzzleData_puzzle) -- divClass "chat-overlay scrollable" $ text "Chat Messagez"

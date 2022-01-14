@@ -149,6 +149,9 @@ requestHandler pool csk gsk authAudience = RequestHandler $ \case
       PrivateRequest_PuzzleCommand (PuzzleCommand_DeletePuzzle puzId) -> auth $ \_user -> runDb pool $ do
         updateAndNotifyChange (_db_puzzles db) puzId $ (\p -> _puzzle_removed p <-. val_ (Just True))
         pure $ Right ()
+      PrivateRequest_PuzzleCommand (PuzzleCommand_Voice puzId chatUrl) -> auth $ \_user -> runDb pool $ do
+        updateAndNotifyChange (_db_puzzles db) puzId $ (\p -> _puzzle_voicelink p <-. val_ chatUrl)
+        pure $ Right ()
 
 
 

@@ -113,6 +113,7 @@ data Puzzle f = Puzzle
   , _puzzle_Channel :: PrimaryKey Chatroom (Nullable f)
   , _puzzle_Hunt :: PrimaryKey Hunt f
   , _puzzle_removed :: Columnar f (Maybe Bool)
+  , _puzzle_voicelink :: Columnar f (Maybe Text)
   }
   deriving (Generic, Beamable)
 

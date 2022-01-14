@@ -91,7 +91,7 @@ backsolve1 :: DomBuilder t m => m ()
 backsolve1 = elAttr "span" ("class" =: "tooltip" <> "style" =: "font-family: 'SymbolaRegular'" <> "data-tooltip" =: "This solution was backsolved.") $ do
   text " 🝡⃪"
 
-Puzzle _ (LensFor puzzleTitle) (LensFor puzzleUri) (LensFor puzzleSheetURI) (LensFor puzzleIsMeta) _ _ _ _ = tableLenses
+Puzzle _ (LensFor puzzleTitle) (LensFor puzzleUri) (LensFor puzzleSheetURI) (LensFor puzzleIsMeta) _ _ _ _ (LensFor puzzleVoiceLink) = tableLenses
 
 puzzleConfigurator
   :: forall t m js. (Template t m, MonadHold t m, MonadFix m, Prerender js t m)
@@ -124,6 +124,7 @@ puzzleConfigurator PuzzleConfiguratorConfig
                                    & inputElementConfig_elementConfig . elementConfig_initialAttributes .~ ("type" =: "checkbox")
                             el "label" $ text "Is Meta?"
                             return $ _inputElement_checked ie)
+                        & puzzleVoiceLink .~ (labeledField (\case { "" -> Nothing; a -> Just a; }) (fromMaybe "") "Voice Channel Link")
                 , _configuratorConfig_lenses = tableLenses
                 , _configuratorConfig_submit = button "Update"
                 , _configuratorConfig_warnchange = text "Warning: the data on the backend was changed."

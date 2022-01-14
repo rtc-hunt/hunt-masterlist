@@ -5,6 +5,7 @@ import Data.Default
 import Data.Text
 import Data.Map (Map)
 import Data.Map as Map
+import Data.Maybe (fromMaybe)
 import Reflex.Dom.Core
 import Control.Monad.Identity
 import Obelisk.Route.Frontend
@@ -65,6 +66,10 @@ puzzlesTable PuzzleTableConfig { _puzzleTableConfig_results = puzzles, _puzzleTa
             , ("Status", \_ puzData -> dynText $ (puzData >>= _puzzleData_status), return $ constDyn mempty)
             , ("Current Solvers", \_ puzDat -> 
                 void $ listWithKey (puzDat >>= _puzzleData_currentSolvers) $ \k u -> el "span" $ dynText u
+              , return $ constDyn mempty)
+            , ("Voice Chat", \_ puzDat -> 
+                let lnkD = _puzzle_voicelink <$> (puzDat >>= _puzzleData_puzzle)
+                in elDynAttr "a" (fromMaybe mempty . fmap ((<> ("class" =: "text-xs voicelink" <> "target" =: "_blank")) . ("href" =:)) <$> lnkD) $ dynText $ fromMaybe "" <$> lnkD
               , return $ constDyn mempty)
             , ("Tags", \_ puzDat ->
                 void $ listWithKey (puzDat >>= _puzzleData_tags) $ \k _ -> elAttr "span" ("class" =: "ui label" <> "data-tag" =: k) $ text k

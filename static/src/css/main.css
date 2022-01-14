@@ -190,3 +190,13 @@ span[data-tag="extraction"] {
 span[data-tag="done"] {
   background-color: mediumseagreen !important;
 }
+
+.text-xs {
+  font-size: 0.75rem;
+}
+
+.voicelink {
+  border-radius: 0.5em;
+  background-color: #e8e8e8;
+  padding: 1em;
+}

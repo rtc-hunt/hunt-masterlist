@@ -79,6 +79,10 @@ cliCommandParser theRoute = info (hsubparser commands <**> helper) fullDesc
           fmap ((CliCommandTag_PuzzleCommand ==>) . mkSome) $
              (PuzzleCommand_DeletePuzzle <$> puzzleOption )
            ) $ fullDesc
+        , command "voice" $ info (
+          fmap ((CliCommandTag_PuzzleCommand ==>) . mkSome) $
+             (PuzzleCommand_Voice <$> puzzleOption <*> optional (fmap T.pack $ strArgument $ metavar "VOICE_CHAT_URL"))
+           ) $ fullDesc
         ]
     puzzleOption :: Parser (PrimaryKey Puzzle Identity)
     puzzleOption = option (PuzzleId . SqlSerial <$> auto) (short 'p' <> long "puzzle" <> metavar "PUZZLE" <> puzzleOptionMod)
