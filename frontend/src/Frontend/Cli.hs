@@ -85,7 +85,7 @@ cliCommandParser theRoute = info (hsubparser commands <**> helper) fullDesc
            ) $ fullDesc
         ]
     puzzleOption :: Parser (PrimaryKey Puzzle Identity)
-    puzzleOption = option (PuzzleId . SqlSerial <$> auto) (short 'p' <> long "puzzle" <> metavar "PUZZLE" <> puzzleOptionMod)
+    puzzleOption = option (PuzzleId . SqlSerial <$> auto) (short 'p' <> long "puzzle" <> metavar "PUZZLE" <> puzzleOptionMod <> help "Puzzle identifier. Auto-fills on puzzle pages, which is the expected use.")
     puzzleOptionMod :: Mod OptionFields (PrimaryKey Puzzle Identity) = case theRoute of
       (Just puz) -> value puz
       _ -> idm

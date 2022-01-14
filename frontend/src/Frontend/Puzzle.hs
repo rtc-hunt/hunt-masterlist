@@ -148,7 +148,7 @@ masterlist = do
             puzzleListD <- puzzleListBuilder
             puzzlesTable PuzzleTableConfig
               { _puzzleTableConfig_results = puzzleListD
-              , _puzzleTableConfig_puzzleLink = \id -> routeLink $ FrontendRoute_Puzzle :/ Just id
+              , _puzzleTableConfig_puzzleLink = \id -> dynRouteLink $ (\i -> FrontendRoute_Puzzle :/ Just i) <$> id
               }
               )
            <> MasterlistPage_HuntPage =: ("frontpage", do
@@ -248,7 +248,7 @@ puzzle puz = do
               dynText $ _puzzle_Title <$> (puzzleData >>= _puzzleData_puzzle)
             activeSolverList $ puzzleData >>= _puzzleData_currentSolvers
             let lnkD = _puzzle_voicelink <$> (puzzleData >>= _puzzleData_puzzle)
-             in elDynAttr "a" (fromMaybe mempty . fmap ((<> ("class" =: "item" <> "target" =: "_blank")) . ("href" =:)) <$> lnkD) $ (dynText $ fromMaybe "" . (fmap ("Voice: " <>)) <$> lnkD)
+             in elDynAttr "a" (fromMaybe mempty . fmap ((<> ("class" =: "item" <> "target" =: "_blank")) . ("href" =:)) <$> lnkD) $ (dynText $ fromMaybe "" . (fmap (const "Voice Chat")) <$> lnkD)
             return $ activeTab
         , _framed_body = \ activeTab newMsg cmd _ -> do -- divClass "" $ do
             chatOverlay $ fmap ChatroomId . unChatroomId . _puzzle_Channel <$> (puzzleData >>= _puzzleData_puzzle) -- divClass "chat-overlay scrollable" $ text "Chat Messagez"

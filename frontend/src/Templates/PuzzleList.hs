@@ -7,16 +7,18 @@ import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (fromMaybe)
 import Reflex.Dom.Core
+import Database.Beam
 import Control.Monad.Identity
 import Obelisk.Route.Frontend
 
 import Common.Schema
 import Frontend.Types
 import Templates.Types
+import Frontend.SortSelect
 
 data PuzzleTableConfig t m = PuzzleTableConfig
   { _puzzleTableConfig_results :: Dynamic t (Map (PrimaryKey Puzzle Identity) (PuzzleData t))
-  , _puzzleTableConfig_puzzleLink :: PrimaryKey Puzzle Identity -> m () -> m ()
+  , _puzzleTableConfig_puzzleLink :: Dynamic t (PrimaryKey Puzzle Identity) -> m () -> m ()
   }
 
 data PuzzleTableOut t m = PuzzleTableOut
@@ -48,13 +50,13 @@ backsolve1 = elAttr "span" ("class" =: "tooltip" <> "style" =: "font-family: 'Sy
 puzzlesTable :: forall t m. (Template t m, MonadHold t m, MonadFix m) => 
   PuzzleTableConfig t m -> m ()
 --  Dynamic t (Map (PrimaryKey Puzzle Identity) (Puzzle Identity)) -> m ()
-puzzlesTable PuzzleTableConfig { _puzzleTableConfig_results = puzzles, _puzzleTableConfig_puzzleLink = puzzleLink } = divClass "top-scrollable" $ do
+puzzlesTable PuzzleTableConfig { _puzzleTableConfig_results = puzzles, _puzzleTableConfig_puzzleLink = puzzleLink } = divClass "top-scrollable" $ mdo
           --(tableQueryD :: Dynamic t ([Int]), tableResD) <- 
-          tableDynAttrWithSearch "puzzletable ui celled table"
-            [ ("Title", \puzKey puzDat -> puzzleLink puzKey $ elAttr "div" ("class" =: "" <> "data-tooltip" =: "Open Puzzle") $ dynText $ _puzzle_Title <$> (puzDat >>= _puzzleData_puzzle), return $ (constDyn mempty) :: m (Dynamic t ()))
+          (query :: Dynamic t PuzzleQuery, _) <- tableDynAttrWithSearch "puzzletable ui celled table"
+            [ ("Title", \puzKey puzDat -> puzzleLink (primaryKey <$> (puzDat >>= _puzzleData_puzzle)) $ elAttr "div" ("class" =: "" <> "data-tooltip" =: "Open Puzzle") $ dynText $ _puzzle_Title <$> (puzDat >>= _puzzleData_puzzle), return $ (constDyn mempty))
             , ("Is meta?", \_ puzDat -> dynText $ (\p -> if p then "META" else "") . _puzzle_IsMeta <$> (puzDat >>= _puzzleData_puzzle), return $ constDyn mempty)
             , ("Meta", \_ puzDat -> void $
-                listWithKey (puzDat >>= _puzzleData_metas) $ \k dV -> puzzleLink k $ dynText dV
+                listWithKey (puzDat >>= _puzzleData_metas) $ \k dV -> puzzleLink (constDyn k) $ dynText dV
                 , return $ constDyn mempty)
             , ("Solution(s)", \_ puzDat -> do
                 dyn_ $ ffor (puzDat >>= _puzzleData_solutions) $ \solMap -> forM_ (Map.toList solMap) $ \(solId, sol) -> do
@@ -69,7 +71,7 @@ puzzlesTable PuzzleTableConfig { _puzzleTableConfig_results = puzzles, _puzzleTa
               , return $ constDyn mempty)
             , ("Voice Chat", \_ puzDat -> 
                 let lnkD = _puzzle_voicelink <$> (puzDat >>= _puzzleData_puzzle)
-                in elDynAttr "a" (fromMaybe mempty . fmap ((<> ("class" =: "text-xs voicelink" <> "target" =: "_blank")) . ("href" =:)) <$> lnkD) $ dynText $ fromMaybe "" <$> lnkD
+                in elDynAttr "a" (fromMaybe mempty . fmap ((<> ("class" =: "text-xs voicelink" <> "target" =: "_blank")) . ("href" =:)) <$> lnkD) $ dynText $ fromMaybe "" . ("Voice Chat" <$) <$> lnkD
               , return $ constDyn mempty)
             , ("Tags", \_ puzDat ->
                 void $ listWithKey (puzDat >>= _puzzleData_tags) $ \k _ -> elAttr "span" ("class" =: "ui label" <> "data-tag" =: k) $ text k
@@ -78,6 +80,6 @@ puzzlesTable PuzzleTableConfig { _puzzleTableConfig_results = puzzles, _puzzleTa
                 void $ listWithKey (puzDat >>= _puzzleData_notes) $ \k dV -> elClass "div" "" $ dynText $ _note_Note <$> dV
               , return $ constDyn mempty)
             ]
-            puzzles
+            (toSortKeys (_puzzleQuery_ordering <$> query) $ prunePuzzles (_puzzleQuery_select <$> query) $ puzzles)
             (\k -> pure $ constDyn mempty)
           blank

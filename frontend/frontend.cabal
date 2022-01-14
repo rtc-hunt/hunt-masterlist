@@ -10,6 +10,7 @@ library
                , bytestring
                , common
                , constraints-extras
+               , containers
                , dependent-sum
                , dependent-sum-template
                , dependent-map
@@ -46,6 +47,7 @@ library
     Frontend.ChannelList
     Frontend.Cli
     Frontend.Puzzle
+    Frontend.SortSelect
     Frontend.Types
     Frontend.Utils
     TemplateViewer
