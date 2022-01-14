@@ -200,7 +200,7 @@ buildHunt
      , Monad m
      )
   => m (Dynamic t (Hunt Identity))
-buildHunt = pure $ constDyn $ Hunt { _hunt_id = 1, _hunt_title = "Test Hunt", _hunt_rootpage = "http://hackaday.com", _hunt_channel = ChatroomId 1 }
+buildHunt = pure $ constDyn $ Hunt { _hunt_id = 1, _hunt_title = "Test Hunt", _hunt_rootpage = "https://www.starrats.org/", _hunt_channel = ChatroomId 1 }
   
 
 puzzlePageTabs :: [PuzzlePageTab]
