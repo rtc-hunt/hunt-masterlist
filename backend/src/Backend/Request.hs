@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Werror=missing-fields -Werror=incomplete-patterns #-}
 module Backend.Request where
 
 import Control.Monad.Except
@@ -114,6 +115,7 @@ requestHandler pool csk gsk authAudience = RequestHandler $ \case
           , _puzzle_Channel = val_ $ (ChatroomId . fmap unChatroomId) $ channelId
           , _puzzle_Hunt = val_ $ hunt
           , _puzzle_removed = val_ $ Nothing
+          , _puzzle_voicelink = val_ $ Nothing
           }
         pure $ case puzzle of
           Nothing -> Left "Couldn't create channel"
