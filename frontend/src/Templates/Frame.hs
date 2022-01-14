@@ -7,6 +7,7 @@ import Data.Text (Text)
 import Data.Text as T
 import Obelisk.Route.Frontend
 import Common.Route
+import Frontend.Utils
 
 data TabLayout
   = FullTab
@@ -23,12 +24,6 @@ data Framed m t a = Framed
   , _framed_body :: a -> Event t Text -> Event t Text -> MenuSettings t -> m ()
   , _framed_layout :: MenuSettings t -> a -> Dynamic t TabLayout
   }
-
-semToggle theLabel =
-  divClass "field" $ divClass "ui toggle checkbox" $ do
-    ie <- inputElement $ def & inputElementConfig_elementConfig . elementConfig_initialAttributes .~ ("type" =: "checkbox")
-    el "label" $ text theLabel
-    return $ _inputElement_checked ie
 
 framed :: (Monad m, DomBuilder t m, MonadFix m, SetRoute t (R FrontendRoute) m, RouteToUrl (R FrontendRoute) m, PostBuild t m, MonadHold t m, Prerender js t m) => Framed m t a -> m ()
 framed Framed
@@ -50,8 +45,8 @@ framed Framed
               True -> "active transition visible"
               False -> ""
         menuRes <- elDynAttr "div" (ffor menuItemOpenClass $ \c -> "class" =: ("menu " <> c)) $ do
-          switchLayout <- elClass "div" "item" $ semToggle "Show Chat"
-          muteChat <- elClass "div" "item" $ semToggle "Mute Chat"
+          switchLayout <- elClass "div" "item" $ semToggle "Show Chat" False
+          muteChat <- elClass "div" "item" $ semToggle "Mute Chat" False
           divClass "item" $ text "Settings"
           -- switchLayout <- button "Switch layout" >>= toggle False
           -- muteChat <- button "Mute Chat" >>= toggle False

@@ -161,6 +161,9 @@ iframe { height: 100%; width: 100%; }
   flex: auto !important;
   min-width: 3em;
 }
+
+.min-w-4 { min-width: 1rem; }
+
 .ellipsisShrink {
   white-space: nowrap;
   overflow: hidden;

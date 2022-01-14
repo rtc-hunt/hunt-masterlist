@@ -67,16 +67,20 @@ instance Monoid PuzzleSelect where
 
 data PuzzleOrdering
   = PuzzleOrdering_Any
+  | PuzzleOrdering_ByMeta
   deriving (Eq, Show, Ord, Read)
 
 instance Semigroup PuzzleOrdering where
   PuzzleOrdering_Any <> PuzzleOrdering_Any = PuzzleOrdering_Any
+  a <> PuzzleOrdering_Any = a
+  PuzzleOrdering_Any <> a = a
 
 instance Monoid PuzzleOrdering where
   mempty = PuzzleOrdering_Any
 
 data PuzzleSortKey
   = PuzzleSortKey_Id (Id Puzzle)
+  | PuzzleSortKey_Synthetic Int
   deriving (Eq, Show, Ord)
 
 statusTags :: Set Text

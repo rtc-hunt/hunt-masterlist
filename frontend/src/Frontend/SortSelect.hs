@@ -5,21 +5,42 @@ module Frontend.SortSelect where
 
 import Control.Monad
 import Reflex
+import qualified Data.Array as A
 import Data.Map as Map
+import Data.Graph
+import Data.Tree
+import Data.Foldable as F
 
 import Frontend.Types
 import Common.Schema
 
+import Debug.Trace
 
 toSortKeys
-  :: (Reflex t)
+  :: forall t. (Reflex t)
   => Dynamic t PuzzleOrdering
   -> Dynamic t (Map (Id Puzzle) (PuzzleData t))
   -> Dynamic t (Map (PuzzleSortKey) (PuzzleData t))
 toSortKeys puzzleOrdering puzzleData = join $ toSortKeysInner <$> puzzleOrdering <*> puzzleData
   where
+    toSortKeysInner :: PuzzleOrdering -> Map (Id Puzzle) (PuzzleData t) -> Dynamic t (Map PuzzleSortKey (PuzzleData t))
     toSortKeysInner = \case
       PuzzleOrdering_Any -> pure . Map.mapKeys PuzzleSortKey_Id
+      PuzzleOrdering_ByMeta -> \pdMap -> do
+        rootElems <- fmap (Map.keys . fmapMaybe id) $ sequence $ ffor pdMap (\pd -> do
+          metas <- _puzzleData_metas pd
+          pure $ case Map.null (Map.intersection metas pdMap) of
+             False -> Nothing
+             True -> Just ())
+        qq <- sequence $ (\(i, pd) -> (,,) pd i . Map.keys <$> _puzzleData_metas pd) <$> Map.toAscList pdMap
+        let (g , vertexToData, keyToVertex) = graphFromEdges qq
+            unfoldingFun :: Graph -> Vertex -> (Vertex, [Vertex])
+            unfoldingFun g v = (v, g A.! v)
+            notQuiteDFS gr ve = unfoldForest (unfoldingFun gr) ve
+            theDFS = traceShowId $ dfs (transposeG g) (fmapMaybe keyToVertex (traceShowId rootElems))
+
+        let forest :: Map PuzzleSortKey (PuzzleData t) = Map.fromList $ zipWith (\k v -> (PuzzleSortKey_Synthetic k, (\(pd, _, _) -> pd) $ vertexToData v)) (negate <$> [1..]) $ (theDFS >>= F.toList)
+        pure forest
 
 prunePuzzles
   :: forall t k. (Reflex t, Ord k)
