@@ -18,6 +18,7 @@ data PrivateRequest a where
   PrivateRequest_PuzzleCommand :: PuzzleCommand a -> PrivateRequest (Either Text ())
   PrivateRequest_UpdatePuzzle :: Puzzle Identity -> PrivateRequest (Either Text ())
   PrivateRequest_Renick :: Text -> PrivateRequest (Either Text ())
+  PrivateRequest_NewHunt :: Text -> Text -> PrivateRequest (Either Text (Id Hunt))
 
 data PuzzleCommand a where
   PuzzleCommand_Tag :: Id Puzzle -> Text -> PuzzleCommand (Id Puzzle, Text)
@@ -33,6 +34,7 @@ data PuzzleCommand a where
 -- Public requests are those which do not require the user to already be logged in.
 data PublicRequest a where
   PublicRequest_GoogleLogin :: Text -> PublicRequest (Either Text AuthToken)
+  PublicRequest_ForceLogin :: PublicRequest (Either Text AuthToken)
   -- PublicRequest_Login :: Text -> Text -> PublicRequest (Either Text AuthToken)
   -- PublicRequest_Signup :: Text -> Text -> PublicRequest (Either Text AuthToken)
 

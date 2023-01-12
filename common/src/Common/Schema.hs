@@ -234,6 +234,7 @@ data Hunt f = Hunt
   , _hunt_title :: Columnar f Text
   , _hunt_rootpage :: Columnar f Text
   , _hunt_channel :: PrimaryKey Chatroom f
+  , _hunt_live :: Columnar f Bool
   }
   deriving (Generic, Beamable)
 
@@ -249,6 +250,7 @@ instance ToJSON (PrimaryKey Hunt Identity)
 instance FromJSON (PrimaryKey Hunt Identity)
 instance ToJSONKey (PrimaryKey Hunt Identity)
 instance FromJSONKey (PrimaryKey Hunt Identity)
+deriving instance Eq (Hunt Identity)
 instance ToJSON (Hunt Identity)
 instance FromJSON (Hunt Identity)
 

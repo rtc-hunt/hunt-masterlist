@@ -7,6 +7,7 @@ import Data.Text (Text)
 import Data.Text as T
 import Obelisk.Route.Frontend
 import Common.Route
+import Common.Schema
 import Frontend.Utils
 
 data TabLayout
@@ -23,6 +24,7 @@ data Framed m t a = Framed
   { _framed_headerItems :: m (a)
   , _framed_body :: a -> Event t Text -> Event t Text -> MenuSettings t -> m ()
   , _framed_layout :: MenuSettings t -> a -> Dynamic t TabLayout
+  , _framed_hunt :: Dynamic t (Id Hunt)
   }
 
 framed :: (Monad m, DomBuilder t m, MonadFix m, SetRoute t (R FrontendRoute) m, RouteToUrl (R FrontendRoute) m, PostBuild t m, MonadHold t m, Prerender js t m) => Framed m t a -> m ()
@@ -30,10 +32,12 @@ framed Framed
   { _framed_headerItems = header
   , _framed_body = body
   , _framed_layout = layout
+  , _framed_hunt = huntId
   }
   = mdo
     (menuStuff, a) <- elClass "nav" "app ui fixed inverted menu" $ mdo
-      routeLink (FrontendRoute_Puzzle :/ Nothing) $ divClass "logo header item whitespace-nowrap" $ text "Hunt Master List"
+      dynRouteLink ((\hid -> FrontendRoute_Puzzle :/ (hid, Nothing)) <$> huntId) $ divClass "logo header item whitespace-nowrap" $ text "Hunt Master List"
+
       rv <- header
       (menuElem, (layoutD, menuOpenD)) <- elClass "div" "right menu" $ elDynAttr' "div" (ffor menuOpenD $ \c -> "class" =: ("ui icon top right dropdown button item " <> c)) $ do
         openToggle <- elClass' "i" "dropdown icon p-4" blank
@@ -54,6 +58,8 @@ framed Framed
                 (False, False) -> FullTab
                 (False, True) -> SplitTab
                 (True, _) -> MutedChat
+
+          elClass "div" "item" $ routeLink (FrontendRoute_HuntSelection :/ ()) $ elClass "div" "button huntlist-button-color" $ text "Prior Hunts"
           return $ MenuSettings layoutD
         return (menuRes, menuOpenClass)
       return (layoutD, rv)
