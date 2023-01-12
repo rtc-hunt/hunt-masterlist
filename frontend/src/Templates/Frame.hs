@@ -59,7 +59,7 @@ framed Framed
                 (False, True) -> SplitTab
                 (True, _) -> MutedChat
 
-          routeLink (FrontendRoute_HuntSelection :/ ()) $ text "Prior Hunts"
+          elClass "div" "item" $ routeLink (FrontendRoute_HuntSelection :/ ()) $ elClass "div" "button huntlist-button-color" $ text "Prior Hunts"
           return $ MenuSettings layoutD
         return (menuRes, menuOpenClass)
       return (layoutD, rv)

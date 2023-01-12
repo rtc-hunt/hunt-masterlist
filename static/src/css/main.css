@@ -226,6 +226,9 @@ span[data-tag="done"] {
   margin: 1em;
 }
 
+.huntlist-button-color {
+  color: black !important;
+}
 .voicelink {
   border-radius: 0.5em;
   background-color: #e8e8e8;
