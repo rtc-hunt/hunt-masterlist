@@ -111,6 +111,7 @@ notifyHandler pool nm v = case _dbNotification_message nm of
     V_Metas -> const $ pure emptyV
     V_ActiveUsers -> const $ pure emptyV
     V_Hunts -> const $ pure emptyV
+    V_LiveHunts -> const $ pure emptyV
   Notify_Message :/ mid -> do
     runNoLoggingT $ do
       msgs :: [(Id Chatroom, Int, UTCTime, Text, Text, Maybe Bool)] <- runDb pool $ [iquery|
@@ -149,6 +150,7 @@ notifyHandler pool nm v = case _dbNotification_message nm of
           V_Metas -> const $ pure emptyV
           V_ActiveUsers -> const $ pure emptyV
           V_Hunts -> const $ pure emptyV
+          V_LiveHunts -> const $ pure emptyV
   Notify_Puzzle :/ change@(Change pid theChange) -> buildV v $ \case
     V_Puzzle -> \(MapV cs) -> if Map.member pid cs
       then runDb pool (runSelectReturningOne $ lookup_ (_db_puzzles db) pid) >>= pure . \case
@@ -170,6 +172,7 @@ notifyHandler pool nm v = case _dbNotification_message nm of
     V_Metas -> const $ pure emptyV
     V_ActiveUsers -> const $ pure emptyV
     V_Hunts -> const $ pure emptyV
+    V_LiveHunts -> const $ pure emptyV
   Notify_Solve :/ change -> buildV v $ \case
     V_Solutions -> byForeignKey _solution_Puzzle _db_solves change
     V_Chatroom -> const $ pure emptyV
@@ -184,6 +187,7 @@ notifyHandler pool nm v = case _dbNotification_message nm of
     V_Metas -> const $ pure emptyV
     V_ActiveUsers -> const $ pure emptyV
     V_Hunts -> const $ pure emptyV
+    V_LiveHunts -> const $ pure emptyV
   Notify_Tag :/ change -> buildV v $ \case
     V_Tags -> byForeignKey _tag_Puzzle _db_tags change
     V_Chatroom -> const $ pure emptyV
@@ -198,6 +202,7 @@ notifyHandler pool nm v = case _dbNotification_message nm of
     V_Metas -> const $ pure emptyV
     V_ActiveUsers -> const $ pure emptyV
     V_Hunts -> const $ pure emptyV
+    V_LiveHunts -> const $ pure emptyV
   Notify_Note :/ change -> buildV v $ \case
     V_Notes -> byForeignKey _note_Puzzle _db_notes change
     V_Chatroom -> const $ pure emptyV
@@ -212,6 +217,7 @@ notifyHandler pool nm v = case _dbNotification_message nm of
     V_Metas -> const $ pure emptyV
     V_ActiveUsers -> const $ pure emptyV
     V_Hunts -> const $ pure emptyV
+    V_LiveHunts -> const $ pure emptyV
   Notify_Meta :/ change -> buildV v $ \case
     V_Metas -> setByForeignKey _meta_Puzzle _db_metas change
     V_Chatroom -> const $ pure emptyV
@@ -226,6 +232,7 @@ notifyHandler pool nm v = case _dbNotification_message nm of
     V_Notes -> const $ pure emptyV
     V_ActiveUsers -> const $ pure emptyV
     V_Hunts -> const $ pure emptyV
+    V_LiveHunts -> const $ pure emptyV
   Notify_ActiveUser :/ auid -> buildV v $ \case
     V_Chatroom -> const $ pure emptyV
     V_Chatrooms -> const $ pure emptyV
@@ -239,6 +246,7 @@ notifyHandler pool nm v = case _dbNotification_message nm of
     V_Notes -> const $ pure emptyV
     V_Metas -> const $ pure emptyV
     V_Hunts -> const $ pure emptyV
+    V_LiveHunts -> const $ pure emptyV
     V_ActiveUsers -> \(MapV cids) ->
         runDb pool $ do
           au <- runSelectReturningOne $ lookup_ (_db_activeUsers db) auid

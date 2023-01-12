@@ -105,6 +105,11 @@ privateQueryHandler pool q = (>>= (\a -> print "Passed" >> return a)) $ (print q
       guard_ $ _activeUser_chat au ==. val_ h
       guard_ $ _activeUser_openCount au >. val_ 0
       return $ (primaryKey u, _account_name u)
+  V_LiveHunts -> \(MapV hs) ->
+    fmap MapV $ ifor hs $ \_ _ -> runDb pool $ fmap (Identity . SemiMap_Complete . Map.fromList . fmap (\a -> (a, ()))) $ runSelectReturningList $ select $ nub_ $ do
+      hunt <- all_ (_db_hunt db)
+      guard_ $ _hunt_live hunt ==. val_ True
+      return $ primaryKey hunt
 
 trackActiveUsers
   :: CS.Key

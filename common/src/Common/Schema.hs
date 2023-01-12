@@ -234,6 +234,7 @@ data Hunt f = Hunt
   , _hunt_title :: Columnar f Text
   , _hunt_rootpage :: Columnar f Text
   , _hunt_channel :: PrimaryKey Chatroom f
+  , _hunt_live :: Columnar f Bool
   }
   deriving (Generic, Beamable)
 

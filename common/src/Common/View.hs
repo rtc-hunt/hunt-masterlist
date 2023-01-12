@@ -80,6 +80,7 @@ data V a where
   V_Hunts :: V (MapV (Id Hunt) (First (Id Hunt)))
   V_HuntMetas :: V (MapV (Id Hunt) (SemiMap (Id Puzzle) Text))
   V_ActiveUsers :: V (MapV (Id Chatroom) (SemiMap (Id Account) Text))
+  V_LiveHunts :: V (MapV () (SemiSet (Id Hunt)))
 
 deriving instance Show (V a)
 

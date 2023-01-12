@@ -20,6 +20,8 @@ import Control.Monad.Fix
 import qualified Data.Aeson as A
 import qualified Data.List as L
 import Data.Text (Text)
+import qualified Data.Map as Map
+import qualified Data.Set as Set
 import Data.Maybe
 import qualified Data.Text.Encoding as T
 import qualified Data.Witherable as W
@@ -36,6 +38,11 @@ import Rhyolite.Frontend.App
 import Rhyolite.Frontend.Cookie
 import qualified GHCJS.DOM.Element as JS
 import qualified Language.Javascript.JSaddle as JS
+import Data.Vessel
+import Rhyolite.Vessel.Path
+import Rhyolite.SemiMap
+import Data.Map.Monoidal as MMap hiding (keys)
+import Common.View
 
 import Common.Request
 import Common.Route
@@ -45,6 +52,7 @@ import Frontend.Authentication
 import Frontend.Channel (channel)
 import Frontend.Puzzle (puzzles)
 import Frontend.Types
+import Frontend.Utils
 -- import OldFrontend
 
 import TemplateViewer
@@ -112,8 +120,15 @@ initGauth = do
     prevState <- hold Nothing $ traceEvent "UpdatedUserE" updatedUserE
     return $ attachWithMaybe (\a b -> if a/=b then Just b else Nothing) prevState updatedUserE
 
+-- This is for debugging, because it's inconvenient to use google auth locally.
+  forceLoginEvent :: Event t () <- switchDyn <$> (prerender (pure never) (do
+    allowsForcedDevLogin <- getConfig "common/allows_forced_login"
+    if isJust allowsForcedDevLogin then text "Yep" >> buttonClass "nope" "Force Login" else pure never
+    ))
+  let forcedLoginRequest = (ApiRequest_Public PublicRequest_ForceLogin) <$ forceLoginEvent
+
   let loginRequest = (ApiRequest_Public . PublicRequest_GoogleLogin) <$> fmapMaybe id updatedUserE
-  loginResponse <- requestingIdentity $ loginRequest
+  loginResponse <- requestingIdentity $ leftmost [ loginRequest, forcedLoginRequest ]
   let loginSuccess = fmapMaybe (^? _Right) $ traceEvent "Login Response" $ loginResponse
   return $ traceEvent "Updated Login" loginSuccess
   -- tellEvent $ First <$> loginSuccess
@@ -193,7 +208,9 @@ frontendBody = do
                   requestingIdentity . ffor credentials $ \(user, pw) ->
                     ApiRequest_Public $ PublicRequest_Signup user pw
               let (errors, token)  = fanEither $ switch $ current x -}
-          redirectIfAuthenticated mAuthCookie
+          authenticateWithToken mAuthCookie $ do
+            redirectIfAuthenticated mAuthCookie
+            pure $ never
           pure $ Just <$> token
         FrontendRoute_Main -> do
           pb <- getPostBuild
@@ -206,6 +223,10 @@ frontendBody = do
 redirectIfAuthenticated
   :: ( PostBuild t m
      , SetRoute t (R FrontendRoute) m
+     , Requester t m, Response m ~ Identity, Request m ~ ApiRequest () PublicRequest PrivateRequest
+     , MonadQuery t (Vessel V (Const SelectedCount)) m
+     , MonadHold t m
+     , MonadFix m 
      )
   => Dynamic t (Maybe token)
   -> m ()
@@ -215,7 +236,8 @@ redirectIfAuthenticated mAuthCookie = do
         [ tag (current mAuthCookie) pb
         , updated mAuthCookie
         ]
-  setRoute $ FrontendRoute_Puzzle :/ Nothing <$ hasAuth
+  liveHunts <- fmap (fmap (fromMaybe mempty)) $ watch $ constDyn $ key V_LiveHunts ~> key () ~> postMap (traverse (fmap (Map.keysSet . getMonoidalMap) . getComplete))
+  setRoute $ fmap (\hunt -> FrontendRoute_Puzzle :/ (hunt, Nothing)) `fmapMaybe` (current (Set.lookupMax <$> liveHunts) <@ hasAuth)
 
 runExampleWidget
   :: ( DomBuilder t m

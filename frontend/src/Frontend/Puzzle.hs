@@ -60,8 +60,8 @@ import Templates.PuzzleList as Template
 import Common.Schema
 import Debug.Trace
 
-puzzles :: (Monad m, MonadFix m, Reflex t, Routed t (Maybe (Id Puzzle)) m, Adjustable t m, NotReady t m, PostBuild t m, DomBuilder t m, MonadHold t m
-     , Routed t (Maybe (Id Puzzle)) (Client m)
+puzzles :: (Monad m, MonadFix m, Reflex t, Routed t (Id Hunt, Maybe (Id Puzzle)) m, Adjustable t m, NotReady t m, PostBuild t m, DomBuilder t m, MonadHold t m
+     , Routed t ((Id Hunt, Maybe (Id Puzzle))) (Client m)
      , Requester t m, Response m ~ Identity, Request m ~ ApiRequest () PublicRequest PrivateRequest
      , SetRoute t (R FrontendRoute) m, RouteToUrl (R FrontendRoute) m
      , PerformEvent t m
@@ -76,10 +76,10 @@ puzzles :: (Monad m, MonadFix m, Reflex t, Routed t (Maybe (Id Puzzle)) m, Adjus
      , Request (Client m) ~ ApiRequest () PublicRequest PrivateRequest
   ) => m (Event t ())
 puzzles = do
-  mPuzzle <- join <$> prerender (pure $ constDyn Nothing) askRoute
+  mPuzzle <- join <$> prerender (pure $ constDyn (HuntId 1, Nothing)) askRoute
   dyn $ ffor mPuzzle $ \case
-    Nothing -> masterlist
-    Just i -> puzzle i
+    (hunt, Nothing) -> masterlist hunt
+    (_, Just i) -> puzzle i
   return never
 
 data MasterlistPage
@@ -112,13 +112,14 @@ masterlist :: (Monad m, MonadHold t m, PostBuild t m, Reflex t, DomBuilder t m, 
      , Prerender js t m
      , MonadIO (Performable m)
   )
-  => m ()
-masterlist = do
+  => Id Hunt -> m ()
+masterlist huntId = do
   hunt <- buildHunt
-  knownMetas <- fmap (fmap (fromMaybe mempty)) $ watch $ constDyn $ key V_HuntMetas ~> key (HuntId 1 :: Id Hunt) ~> postMap (traverse (fmap getMonoidalMap . getComplete))
+  knownMetas <- fmap (fmap (fromMaybe mempty)) $ watch $ constDyn $ key V_HuntMetas ~> key huntId ~> postMap (traverse (fmap getMonoidalMap . getComplete))
   knownTags <- getKnownTags
   framed $ Framed
-    { _framed_headerItems = mdo
+    { _framed_hunt = constDyn huntId
+    , _framed_headerItems = mdo
             let tabs = [MasterlistPage_List .. MasterlistPage_Chat]
             evts <- fmap (zipWith (<$) tabs) $ 
              sequence $ ffor tabs $ \tab ->
@@ -147,10 +148,10 @@ masterlist = do
         
         myTabDisplay "ui top attached tabular menu" "activeTab" activeTab $
           MasterlistPage_List =: ("List", do
-            puzzleListD <- puzzleListBuilder
+            puzzleListD <- puzzleListBuilder huntId
             puzzlesTable PuzzleTableConfig
               { _puzzleTableConfig_results = puzzleListD
-              , _puzzleTableConfig_puzzleLink = \id -> dynRouteLink $ (\i -> FrontendRoute_Puzzle :/ Just i) <$> id
+              , _puzzleTableConfig_puzzleLink = \id -> dynRouteLink $ (\i -> FrontendRoute_Puzzle :/ (huntId, Just i)) <$> id
               , _puzzleTableConfig_metas = knownMetas
               , _puzzleTableConfig_tags = knownTags
               }
@@ -178,7 +179,7 @@ masterlist = do
                   return ie
                 url <- labeledField "URL" 
   
-                let curNewPuzzle = current $ PrivateRequest_AddPuzzle <$> _inputElement_value title <*> _inputElement_checked isMeta <*> _inputElement_value url <*> pure (HuntId 1)
+                let curNewPuzzle = current $ PrivateRequest_AddPuzzle <$> _inputElement_value title <*> _inputElement_checked isMeta <*> _inputElement_value url <*> pure huntId
                 
                 pzl <- buttonOneshotClass "ui button" "Add Puzzle" $ () <$ reqDone
                 reqDone <- requestingIdentity $ ApiRequest_Private () <$> curNewPuzzle <@ pzl
@@ -235,12 +236,15 @@ puzzle :: (Monad m, Reflex t, DomBuilder t m
 puzzle puz = do
   puzzleDataDM <- (puzzleBuilder $ constDyn puz) >>= maybeDyn
   knownTags <- getKnownTags
-  knownMetas <- fmap (fmap (fromMaybe mempty)) $ watch $ constDyn $ key V_HuntMetas ~> key (HuntId 1 :: Id Hunt) ~> postMap (traverse (fmap getMonoidalMap . getComplete))
+  -- knownMetas <- fmap (fmap (fromMaybe mempty)) $ watch $ constDyn $ key V_HuntMetas ~> key (HuntId 1 :: Id Hunt) ~> postMap (traverse (fmap getMonoidalMap . getComplete))
   dyn_ $ ffor puzzleDataDM $ \case
     Nothing -> blank
-    Just puzzleData -> framed $ Framed
-        {
-          _framed_headerItems = mdo
+    Just puzzleData -> do
+      let huntId = _puzzle_Hunt <$> (puzzleData >>= _puzzleData_puzzle)
+      knownMetas <- fmap (fmap (fromMaybe mempty)) $ watch $ (\hunt -> key V_HuntMetas ~> key hunt ~> postMap (traverse (fmap getMonoidalMap . getComplete))) <$> huntId
+      framed $ Framed
+        { _framed_hunt = huntId
+        , _framed_headerItems = mdo
             evts <- fmap (zipWith (<$) puzzlePageTabs) $ 
              sequence $ ffor puzzlePageTabs $ \tab ->
               let itemClass = ffor activeTab $ \aTab ->
@@ -346,7 +350,7 @@ puzzleBuilder
   => Dynamic t (Id Puzzle)
   -> m (Dynamic t (Maybe (PuzzleData t)))
 puzzleBuilder puzIdD = do
-  puzzle <- fmap (fmap (fmap getFirst)) $ watch $ (\puz -> key V_Puzzle ~> key puz) <$> puzIdD
+  puzzle <- traceShow "Entered puzzleBuilder" $ fmap (fmap (fmap getFirst)) $ watch $ (\puz -> key V_Puzzle ~> key puz) <$> puzIdD
   metas <- watch $ (\puzId -> key V_Metas ~> key puzId ~> postMap (traverse (fmap getMonoidalMap . getComplete))) <$> puzIdD
 
   metas_puzzles <- fmap (fmap (fmap (fmap getFirst))) $ watch $ (\puz -> key V_Puzzle ~> keys (Map.keysSet puz)) . Map.mapKeys _meta_Metapuzzle . fromMaybe mempty <$> metas
@@ -363,7 +367,7 @@ puzzleBuilder puzIdD = do
   -- currentSolvers <- fromMaybe (constDyn mempty) . watch . 
   -- display puzzles
   return $ ffor puzzle $ \foundPuzD ->
-    ffor foundPuzD $ \puz -> PuzzleData
+    ffor foundPuzD $ \puz -> traceShow "PuzzleData built" $ PuzzleData
     { _puzzleData_puzzle = constDyn puz
     , _puzzleData_metas = metaIdTitle
     , _puzzleData_tags = (() <$) . Map.mapKeys _tagId_Tag <$> fromMaybe mempty <$> tags
@@ -386,9 +390,9 @@ puzzleListBuilder
      , MonadIO (Performable m)
      , Requester t m, Response m ~ Identity, Request m ~ ApiRequest () PublicRequest PrivateRequest
      )
-  => m (Dynamic t (Map (Id Puzzle) (PuzzleData t)))
-puzzleListBuilder = do
-  puzzleIds <- watch $ pure $ key V_HuntPuzzles ~> key (HuntId 1 :: Id Hunt) ~> postMap (traverse (fmap getMonoidalMap . getComplete))
+  => Id Hunt -> m (Dynamic t (Map (Id Puzzle) (PuzzleData t)))
+puzzleListBuilder hunt = do
+  puzzleIds <- watch $ pure $ key V_HuntPuzzles ~> key hunt ~> postMap (traverse (fmap getMonoidalMap . getComplete))
   -- This is a hack. We should be querying it all in batches and rebuilding a map.
   -- I'm lazy.
   rv <- listWithKey (fromMaybe mempty <$> puzzleIds) (\k _ -> puzzleBuilder $ constDyn k)

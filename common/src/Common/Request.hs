@@ -33,6 +33,7 @@ data PuzzleCommand a where
 -- Public requests are those which do not require the user to already be logged in.
 data PublicRequest a where
   PublicRequest_GoogleLogin :: Text -> PublicRequest (Either Text AuthToken)
+  PublicRequest_ForceLogin :: PublicRequest (Either Text AuthToken)
   -- PublicRequest_Login :: Text -> Text -> PublicRequest (Either Text AuthToken)
   -- PublicRequest_Signup :: Text -> Text -> PublicRequest (Either Text AuthToken)
 
