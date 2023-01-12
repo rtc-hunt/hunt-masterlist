@@ -87,7 +87,24 @@ notifyHandler
   -> IO (PrivateChatV Identity)
 notifyHandler pool nm v = case _dbNotification_message nm of
   Notify_Account :/ _ -> pure emptyV
-  Notify_Hunt :/ _ -> pure emptyV
+  Notify_Hunt :/ huntId -> buildV v $ \case
+    V_Chatrooms -> const $ pure emptyV
+    V_Chatroom -> const $ pure emptyV
+    V_Messages -> const $ pure emptyV
+    V_Puzzle -> const $ pure emptyV
+    V_HuntPuzzles -> const $ pure emptyV
+    V_HuntMetas -> const $ pure emptyV
+    V_Solutions -> const $ pure emptyV
+    V_Tags -> const $ pure emptyV
+    V_UniqueTags -> const $ pure emptyV
+    V_Notes -> const $ pure emptyV
+    V_Metas -> const $ pure emptyV
+    V_ActiveUsers -> const $ pure emptyV
+    V_Hunts -> \(MapV _) ->
+      runDb pool (runSelectReturningOne $ lookup_ (_db_hunt db) huntId) >>= pure . \case
+        Nothing -> emptyV
+        Just c -> MapV $ Map.singleton () $ pure (SemiMap_Partial $ Map.singleton huntId $ First $ Just c)
+    V_LiveHunts -> const $ pure emptyV
   Notify_Chatroom :/ cid -> buildV v $ \case
     V_Chatrooms -> \(MapV queries) -> do
       results :: Map.MonoidalMap ChatroomQuery (SemiMap (Id Chatroom) Text) <- runDb pool $ searchForChatroom $ Map.keysSet queries

@@ -27,6 +27,7 @@ data FrontendRoute :: * -> * where
   FrontendRoute_Auth :: FrontendRoute (R AuthRoute)
   FrontendRoute_Channel :: FrontendRoute (Maybe (Id Chatroom))
   FrontendRoute_Puzzle :: FrontendRoute (Id Hunt, Maybe (Id Puzzle))
+  FrontendRoute_HuntSelection :: FrontendRoute ()
   FrontendRoute_Templates :: FrontendRoute (R TemplateRoute)
   -- This type is used to define frontend routes, i.e. ones for which the backend will serve the frontend.
 
@@ -59,6 +60,7 @@ fullRouteEncoder = mkFullRouteEncoder
         AuthRoute_Login -> PathSegment "login" $ unitEncoder mempty
         AuthRoute_Signup -> PathSegment "signup" $ unitEncoder mempty
       FrontendRoute_Main -> PathEnd $ unitEncoder mempty
+      FrontendRoute_HuntSelection -> PathSegment "selecthunt" $ unitEncoder mempty
       FrontendRoute_Puzzle -> PathSegment "hunt" $ pathParamEncoder idEncoder $ maybeEncoder (unitEncoder mempty) (singlePathSegmentEncoder . idEncoder)
       FrontendRoute_Channel -> PathSegment "channel" $ maybeEncoder (unitEncoder mempty) (singlePathSegmentEncoder . idEncoder)
       FrontendRoute_Templates -> PathSegment "templates" $ pathComponentEncoder $ \case 

@@ -250,6 +250,7 @@ instance ToJSON (PrimaryKey Hunt Identity)
 instance FromJSON (PrimaryKey Hunt Identity)
 instance ToJSONKey (PrimaryKey Hunt Identity)
 instance FromJSONKey (PrimaryKey Hunt Identity)
+deriving instance Eq (Hunt Identity)
 instance ToJSON (Hunt Identity)
 instance FromJSON (Hunt Identity)
 

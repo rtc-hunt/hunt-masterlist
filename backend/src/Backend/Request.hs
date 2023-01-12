@@ -128,6 +128,24 @@ requestHandler pool csk gsk authAudience allowForcedLogins = RequestHandler $ \c
         updateAndNotify (_db_account db) user 
           (\u -> _account_name u <-. val_ newNick)
         pure $ Right ()
+      PrivateRequest_NewHunt hunt_title hunt_rootpage -> auth $ \_user -> runDb pool $ do
+        channelId <-  insertAndNotify (_db_chatroom db) Chatroom
+          { _chatroom_id = default_
+          , _chatroom_title = val_ $ hunt_title
+          }
+        case channelId of
+          Nothing -> return $ Left "Couldn't create channel for hunt"
+          Just channelId -> do
+            huntId <- insertAndNotify (_db_hunt db) Hunt
+              { _hunt_id = default_
+              , _hunt_title = val_ $ hunt_title
+              , _hunt_rootpage = val_ $ hunt_rootpage
+              , _hunt_channel = val_ $ channelId
+              , _hunt_live = val_ $ True
+              }
+            pure $ case huntId of
+              Nothing -> Left "Couldn't create hunt"
+              Just cid -> Right cid
       PrivateRequest_PuzzleCommand (PuzzleCommand_Tag pzl tag) -> auth $ \_user -> runDb pool $ do
         insertAndNotifyChange (_db_tags db) $ Tag (val_ pzl) (val_ tag)
         pure $ Right ()

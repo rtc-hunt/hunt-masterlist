@@ -50,7 +50,7 @@ import Common.Schema
 
 import Frontend.Authentication
 import Frontend.Channel (channel)
-import Frontend.Puzzle (puzzles)
+import Frontend.Puzzle (puzzles, huntselect)
 import Frontend.Types
 import Frontend.Utils
 -- import OldFrontend
@@ -190,6 +190,9 @@ frontendBody = do
           pure $ Nothing <$ logout
         FrontendRoute_Puzzle -> authenticateWithToken mAuthCookie $ do
           logout <- puzzles
+          pure $ Nothing <$ logout
+        FrontendRoute_HuntSelection -> authenticateWithToken mAuthCookie $ do
+          logout <- huntselect
           pure $ Nothing <$ logout
         FrontendRoute_Auth -> do
           r <- askRoute

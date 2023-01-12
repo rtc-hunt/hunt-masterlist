@@ -205,6 +205,27 @@ span[data-tag="done"] {
   font-size: 0.75rem;
 }
 
+.text-lg {
+  font-size: 2rem;
+}
+
+.huntlist-title {
+  border-radius: 0.5em;
+  background-color: #FFFFFF;
+  text-align: center;
+  font-weight: bold;
+  padding: 1em;
+  margin: 1em;
+  font-size: 2rem;
+}
+
+.huntlist-button {
+  border-radius: 0.5em;
+  background-color: #e8e8e8;
+  padding: 1em;
+  margin: 1em;
+}
+
 .voicelink {
   border-radius: 0.5em;
   background-color: #e8e8e8;

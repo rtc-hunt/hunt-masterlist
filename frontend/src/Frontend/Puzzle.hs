@@ -114,7 +114,7 @@ masterlist :: (Monad m, MonadHold t m, PostBuild t m, Reflex t, DomBuilder t m, 
   )
   => Id Hunt -> m ()
 masterlist huntId = do
-  hunt <- buildHunt
+  hunt <- buildHunt huntId
   knownMetas <- fmap (fmap (fromMaybe mempty)) $ watch $ constDyn $ key V_HuntMetas ~> key huntId ~> postMap (traverse (fmap getMonoidalMap . getComplete))
   knownTags <- getKnownTags
   framed $ Framed
@@ -196,12 +196,85 @@ masterlist huntId = do
     , _framed_layout = \ (MenuSettings layout) tab -> (\t l -> if t == MasterlistPage_Chat then MutedChat else l) <$> tab <*> layout
     }
 
-buildHunt
-  :: ( Reflex t
-     , Monad m
+huntselect :: (Monad m, MonadHold t m, PostBuild t m, Reflex t, DomBuilder t m, MonadFix m
+     , SetRoute t (R FrontendRoute) m, RouteToUrl (R FrontendRoute) m, Prerender js t m
+     , MonadQuery t (Vessel V (Const SelectedCount)) m
+     , Requester t m, Response m ~ Identity, Request m ~ ApiRequest () PublicRequest PrivateRequest
+     , PerformEvent t m
+     , TriggerEvent t m
+     , MonadHold t m
+     , PostBuild t m
+     , MonadFix m
+     , SetRoute t (R FrontendRoute) (Client m)
+     , MonadQuery t (Vessel V (Const SelectedCount)) m
+     , MonadQuery t (Vessel V (Const SelectedCount)) (Client m)
+     , Response (Client m) ~ Identity
+     , Request (Client m) ~ ApiRequest () PublicRequest PrivateRequest
+     , Requester t (Client m)
+     , Prerender js t m
+     , MonadIO (Performable m)
+  )
+  => m (Event t ())
+huntselect = do
+  elClass "nav" "app ui fixed inverted menu" $ mdo
+    routeLink (FrontendRoute_HuntSelection :/ ()) $ divClass "logo header item whitespace-nowrap" $ text "Hunt Master List"
+
+  hunts <- buildHunts
+  divClass "appMain" $ el "div" $ el "div" $ elClass "ul" "grid h-screen place-items-center" $ el "div" $ do
+    elClass "div" "huntlist-title" $ text "Select a hunt"
+    list hunts $ \dHunt ->
+      el "li" $ dynRouteLink ((\a -> FrontendRoute_Puzzle :/ (HuntId $ _hunt_id a, Nothing)) <$> dHunt) $ elClass "div" "text-lg huntlist-button" $ dynText $ _hunt_title <$> dHunt
+  pure never
+
+
+
+buildHunts
+  :: forall t m js.
+     ( PostBuild t m
+     , DomBuilder t m
+     , MonadHold t m
+     , MonadFix m
+     , Prerender js t m
+     , MonadQuery t (Vessel V (Const SelectedCount)) m
+     , PerformEvent t m
+     , TriggerEvent t m
+     , MonadIO (Performable m)
+     , Requester t m, Response m ~ Identity, Request m ~ ApiRequest () PublicRequest PrivateRequest
      )
-  => m (Dynamic t (Hunt Identity))
-buildHunt = pure $ constDyn $ Hunt { _hunt_id = 1, _hunt_title = "Test Hunt", _hunt_rootpage = "https://www.starrats.org/", _hunt_channel = ChatroomId 1 }
+--  :: ( Reflex t
+--     , Monad m
+--     )
+  =>
+  m (Dynamic t (Map (Id Hunt) (Hunt Identity)))
+buildHunts = do
+  dynHuntMaybe <- watch $ constDyn $ key V_Hunts ~> key () ~> postMap (traverse (fmap getMonoidalMap . getComplete))
+  pure $ fromMaybe mempty <$> dynHuntMaybe
+
+buildHunt
+  :: forall t m js.
+     ( PostBuild t m
+     , DomBuilder t m
+     , MonadHold t m
+     , MonadFix m
+     , Prerender js t m
+     , MonadQuery t (Vessel V (Const SelectedCount)) m
+     , PerformEvent t m
+     , TriggerEvent t m
+     , MonadIO (Performable m)
+     , Requester t m, Response m ~ Identity, Request m ~ ApiRequest () PublicRequest PrivateRequest
+     )
+--  :: ( Reflex t
+--     , Monad m
+--     )
+  =>
+  Id Hunt -> m (Dynamic t (Hunt Identity))
+buildHunt huntId = do 
+  dynHuntMaybe <- watch $ constDyn $ key V_Hunts ~> key () ~> postMap (traverse (fmap getMonoidalMap . getComplete))
+  let terriblePlaceholderHunt = Hunt { _hunt_id = 1, _hunt_title = "Test Hunt", _hunt_rootpage = "https://www.starrats.org/", _hunt_channel = ChatroomId 1 }
+  return $ fromMaybe terriblePlaceholderHunt . ((Map.!? huntId) =<<) <$> dynHuntMaybe
+  -- return $ (<> statusTags) . fromMaybe mempty <$> tags
+  -- hunts <- watch $ pure $ V_Hunts ~> postMap (traverse (fmap getMonoidalMap . getComplete))
+  -- pure $ constDyn $ Hunt { _hunt_id = 1, _hunt_title = "Test Hunt", _hunt_rootpage = "https://www.starrats.org/", _hunt_channel = ChatroomId 1 }
   
 
 puzzlePageTabs :: [PuzzlePageTab]
