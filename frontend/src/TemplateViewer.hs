@@ -43,8 +43,8 @@ templateViewer = do
         templateLink TemplateRoute_Main "Main"
         templateLink TemplateRoute_PuzzleList "PuzzleList"
     TemplateRoute_Channel -> channelTemplateViewer
-    TemplateRoute_PuzzleList -> puzzleListTemplateViewer
-    TemplateRoute_Puzzle -> puzzleTemplateViewer
+    TemplateRoute_PuzzleList -> blank -- puzzleListTemplateViewer
+    TemplateRoute_Puzzle -> blank -- puzzleTemplateViewer
     TemplateRoute_Login -> do
       _ <- Templates.login $ LoginConfig
         { _loginConfig_mode = pure LoginMode_Login
@@ -108,13 +108,14 @@ puzzleTemplateViewer = do
     }
 
 
-
+{-
 puzzleListTemplateViewer
   :: forall t m js. (
     Template t m, MonadHold t m, MonadFix m
   , RouteToUrl (R FrontendRoute) m
   , SetRoute t (R FrontendRoute) m
   , Prerender js t m
+  , PerformEvent t m
   )
   => m ()
 puzzleListTemplateViewer = do
@@ -131,6 +132,7 @@ puzzleListTemplateViewer = do
     _puzzleTableConfig_results = constDyn fakePuzzles,
     _puzzleTableConfig_puzzleLink = \_ -> routeLink (FrontendRoute_Templates :/ TemplateRoute_Puzzle :/ ())
   }
+-}
   
 fakePuzzles :: Reflex t => Map (PrimaryKey Puzzle Identity) (PuzzleData t)
 fakePuzzles = Map.fromList [ (PuzzleId 1, PuzzleData {

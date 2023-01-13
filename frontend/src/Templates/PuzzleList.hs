@@ -12,6 +12,7 @@ import Reflex.Dom.Core
 import Database.Beam
 import Control.Monad.Identity
 import Obelisk.Route.Frontend
+import Data.Time.Clock
 
 import Common.Schema
 import Frontend.Types
@@ -32,19 +33,24 @@ data PuzzleTableOut t m = PuzzleTableOut
 --  }
 
 -- | A widget to display a table with static columns and dynamic rows.
-tableDynAttrWithSearch :: forall t m r k v q. (Ord k, DomBuilder t m, MonadHold t m, PostBuild t m, MonadFix m, Monoid q)
+tableDynAttrWithSearch :: forall t m r k v q. (Ord k, DomBuilder t m, MonadHold t m, PostBuild t m, MonadFix m, Monoid q, PerformEvent t m, TriggerEvent t m, MonadIO (Performable m))
   => Text                                   -- ^ Class applied to <table> element
   -> [(Text, k -> Dynamic t r -> m v, m (Dynamic t q))]      -- ^ Columns of (header, row key -> row value -> child widget)
   -> Dynamic t (Map k r)                      -- ^ Map from row key to row value
+  -> Event t ()
   -> (k -> m (Dynamic t (Map Text Text))) -- ^ Function to compute <tr> element attributes from row key
   -> m (Dynamic t q, Dynamic t (Map k (Element EventResult (DomBuilderSpace m) t, [v])))        -- ^ Map from row key to (El, list of widget return values)
-tableDynAttrWithSearch klass cols dRows rowAttrs = elAttr "div" (Map.singleton "style" "zoom: 1; overflow: auto; background: white;") $
+tableDynAttrWithSearch klass cols dRows resetSoftstart rowAttrs = elAttr "div" (Map.singleton "style" "zoom: 1; overflow: auto; background: white;") $
     elAttr "table" (Map.singleton "class" klass) $ do
       queryEls <- el "thead" $ do
         el "tr" $ mapM_ (\(h, _, _) -> el "th" $ text h) cols
         el "tr" $ mapM (\(_, _, qm) -> el "th" $ qm) cols
+      ticker <- tickLossy 0.5 (UTCTime (toEnum 0) 0)
+      dN <- foldDyn id 10 $ leftmost [(+10) <$ ticker, const 10 <$ resetSoftstart ]
+      display dN
+      let initialRows = Map.take <$> dN <*> dRows
       bodyRes <- el "tbody" $
-        listWithKey dRows (\k r -> do
+        listWithKey initialRows (\k r -> do
           dAttrs <- rowAttrs k
           elDynAttr' "tr" dAttrs $ mapM (\(_, x, _) -> el "td" $ x k r) cols)
       return (mconcat queryEls, bodyRes) 
@@ -56,7 +62,7 @@ backsolve1 = elAttr "span" ("class" =: "tooltip" <> "style" =: "font-family: 'Sy
 headerDropdownSettings :: Reflex t => DropdownConfig t a
 headerDropdownSettings = def & dropdownConfig_attributes .~ (constDyn $ "class" =: "grow shrink w-4/5 max-w-xs min-w-4")
 
-puzzlesTable :: forall t m. (Template t m, MonadHold t m, MonadFix m) => 
+puzzlesTable :: forall t m. (Template t m, MonadHold t m, MonadFix m, PerformEvent t m, TriggerEvent t m, MonadIO (Performable m)) => 
   PuzzleTableConfig t m -> m ()
 --  Dynamic t (Map (PrimaryKey Puzzle Identity) (Puzzle Identity)) -> m ()
 puzzlesTable PuzzleTableConfig { _puzzleTableConfig_results = puzzles, _puzzleTableConfig_puzzleLink = puzzleLink, _puzzleTableConfig_metas = knownMetas, _puzzleTableConfig_tags = knownTags } = divClass "top-scrollable" $ mdo
@@ -108,5 +114,6 @@ puzzlesTable PuzzleTableConfig { _puzzleTableConfig_results = puzzles, _puzzleTa
               , return $ constDyn mempty)
             ]
             (toSortKeys (_puzzleQuery_ordering <$> query) $ prunePuzzles (_puzzleQuery_select <$> query) $ puzzles)
+            (() <$ updated query)
             (\k -> pure $ constDyn mempty)
           blank
