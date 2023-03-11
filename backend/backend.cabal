@@ -44,6 +44,7 @@ library
                , rhyolite-notify-listen-beam
                , psql-simple-class
                , rhyolite-backend
+               , req
                , clientsession
                , beam-core
                , beam-postgres

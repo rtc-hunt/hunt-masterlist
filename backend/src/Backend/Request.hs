@@ -1,13 +1,17 @@
 {-# OPTIONS_GHC -Werror=missing-fields -Werror=incomplete-patterns #-}
+{-# LANGUAGE TypeApplications #-}
 module Backend.Request where
 
 import Control.Monad.Except
 import Control.Lens
 import Crypto.JOSE.JWK (JWKSet)
 import qualified Crypto.JWT as JWT
-import Data.Aeson as Aeson
 import Data.Aeson.Lens (_String)
 import Data.ByteString.Lazy (fromStrict)
+import qualified Data.ByteString.Char8 as C8
+import Data.Monoid (First(..))
+import Text.Read
+import Data.Time.Clock
 import Data.Maybe (fromMaybe)
 import Data.Text.Encoding
 import Data.Pool
@@ -18,14 +22,14 @@ import Database.Beam.Postgres
 import Database.PostgreSQL.Simple
 import Database.PostgreSQL.Simple.Class
 import System.IO (stderr)
--- import Rhyolite.Account
 import Rhyolite.Api
--- import Rhyolite.Backend.Account
 import Rhyolite.Backend.App
 import Rhyolite.DB.NotifyListen.Beam
 import Web.ClientSession as CS
 import Network.Google.Drive (driveFileScope, filesCreate, file, fMimeType, fName, fParents, fId)
 import qualified Network.Google as Google
+import Network.HTTP.Req hiding (req)
+import qualified Network.HTTP.Req as Req
 import System.Directory
 import System.Environment
 
@@ -36,7 +40,7 @@ import Backend.Schema
 import Common.Request
 import Common.Schema
 
-import Debug.Trace
+-- import Debug.Trace
 
 createSheet :: Text -> IO (Maybe Text)
 createSheet name = do
@@ -50,10 +54,9 @@ createSheet name = do
 requestHandler
   :: Pool Connection
   -> CS.Key
-  -> JWKSet
   -> Text
   -> RequestHandler (ApiRequest AuthToken PublicRequest PrivateRequest) IO
-requestHandler pool csk gsk authAudience = RequestHandler $ \case
+requestHandler pool csk authAudience = RequestHandler $ \case
   ApiRequest_Private token req -> do
     let auth
           :: Applicative m
@@ -97,7 +100,6 @@ requestHandler pool csk gsk authAudience = RequestHandler $ \case
           [Only n] -> pure . Right $ (cid, n)
           _ -> pure . Left $ "PrivateRequest_LatestMessage: got more than one row"
       PrivateRequest_AddPuzzle title ismeta url hunt -> auth $ \_user -> runDb pool $ do
-        let sheet = Nothing
         sheet <- liftIO $ do
           createSheet title
         -- Also queue create new puzzle spreadsheet here through job system.
@@ -121,38 +123,38 @@ requestHandler pool csk gsk authAudience = RequestHandler $ \case
           Nothing -> Left "Couldn't create channel"
           Just cid -> Right cid
       PrivateRequest_UpdatePuzzle pzl -> auth $ \_user -> runDb pool $ do
-        updateAndNotifyChange (_db_puzzles db) (primaryKey pzl) $ (<-. val_ pzl)
+        _ <- updateAndNotifyChange (_db_puzzles db) (primaryKey pzl) $ (<-. val_ pzl)
         return $ Right ()
       PrivateRequest_Renick newNick -> auth $ \user -> runDb pool $ do
-        updateAndNotify (_db_account db) user 
+        _ <- updateAndNotify (_db_account db) user 
           (\u -> _account_name u <-. val_ newNick)
         pure $ Right ()
       PrivateRequest_PuzzleCommand (PuzzleCommand_Tag pzl tag) -> auth $ \_user -> runDb pool $ do
-        insertAndNotifyChange (_db_tags db) $ Tag (val_ pzl) (val_ tag)
+        _ <- insertAndNotifyChange (_db_tags db) $ Tag (val_ pzl) (val_ tag)
         pure $ Right ()
       PrivateRequest_PuzzleCommand (PuzzleCommand_Untag pzl tag) -> auth $ \_user -> runDb pool $ do
-        deleteAndNotifyChange (_db_tags db) $ TagId pzl tag
+        _ <- deleteAndNotifyChange (_db_tags db) $ TagId pzl tag
         pure $ Right ()
       PrivateRequest_PuzzleCommand (PuzzleCommand_Note pzl note) -> auth $ \_user -> runDb pool $ do
-        insertAndNotifyChange (_db_notes db) $ Note default_ (val_ pzl) (val_ note)
+        _ <- insertAndNotifyChange (_db_notes db) $ Note default_ (val_ pzl) (val_ note)
         pure $ Right ()
       PrivateRequest_PuzzleCommand (PuzzleCommand_Solve pzl solution isBack) -> auth $ \_user -> runDb pool $ do
-        insertAndNotifyChange (_db_solves db) $ Solution (val_ pzl) (val_ solution) (val_ isBack)
+        _ <- insertAndNotifyChange (_db_solves db) $ Solution (val_ pzl) (val_ solution) (val_ isBack)
         pure $ Right ()
       PrivateRequest_PuzzleCommand (PuzzleCommand_AddMeta pzl meta) -> auth $ \_user -> runDb pool $ do
-        insertAndNotifyChange (_db_metas db) $ Metapuzzle (val_ pzl) (val_ meta)
+        _ <- insertAndNotifyChange (_db_metas db) $ Metapuzzle (val_ pzl) (val_ meta)
         pure $ Right ()
       PrivateRequest_PuzzleCommand (PuzzleCommand_UnSolve slv) -> auth $ \_user -> runDb pool $ do
-        deleteAndNotifyChange (_db_solves db) $ slv
+        _ <- deleteAndNotifyChange (_db_solves db) $ slv
         pure $ Right ()
       PrivateRequest_PuzzleCommand (PuzzleCommand_RemoveMeta meta) -> auth $ \_user -> runDb pool $ do
-        deleteAndNotifyChange (_db_metas db) $ meta
+        _ <- deleteAndNotifyChange (_db_metas db) $ meta
         pure $ Right ()
       PrivateRequest_PuzzleCommand (PuzzleCommand_DeletePuzzle puzId) -> auth $ \_user -> runDb pool $ do
-        updateAndNotifyChange (_db_puzzles db) puzId $ (\p -> _puzzle_removed p <-. val_ (Just True))
+        _ <- updateAndNotifyChange (_db_puzzles db) puzId $ (\p -> _puzzle_removed p <-. val_ (Just True))
         pure $ Right ()
       PrivateRequest_PuzzleCommand (PuzzleCommand_Voice puzId chatUrl) -> auth $ \_user -> runDb pool $ do
-        updateAndNotifyChange (_db_puzzles db) puzId $ (\p -> _puzzle_voicelink p <-. val_ chatUrl)
+        _ <- updateAndNotifyChange (_db_puzzles db) puzId $ (\p -> _puzzle_voicelink p <-. val_ chatUrl)
         pure $ Right ()
 
 
@@ -179,7 +181,25 @@ requestHandler pool csk gsk authAudience = RequestHandler $ \case
         x <- signWithKey csk aid
         pure (Right x) -}
   ApiRequest_Public (PublicRequest_GoogleLogin token) -> do
-      traceM ("TOKEN: " <> show token)
+      let googuri = https "www.googleapis.com" /: "oauth2" /: "v3" /: "certs"
+      lastGSK <- runDb pool $ runSelectReturningOne $ select $ limit_ 1 $ do
+          k <- all_ (_db_googleKeys db)
+          guard_ $ _googleKey_expires k Database.Beam.>. current_timestamp_
+          pure $ _googleKey_keyset k
+      gsk :: JWKSet <- case lastGSK of
+           Just (PgJSON a) -> do
+                return a
+           Nothing -> do
+                current <- getCurrentTime
+                new <- runReq defaultHttpConfig $ Req.req GET googuri NoReqBody jsonResponse mempty
+                let maxAge = fromMaybe 0 $ getFirst $ ((mconcat $ (First . (fmap (fromRational @NominalDiffTime ) .  readMaybe . C8.unpack <=< C8.stripSuffix "," <=< C8.stripPrefix "max-age=")) <$> (C8.words $ fromMaybe "" (responseHeader new "Cache-Control"))))
+                    expires = addUTCTime maxAge current
+                runDb pool $ runInsert $ insert (_db_googleKeys db) $ insertValues [GoogleKey
+                  { _googleKey_fetchedAt = current
+                  , _googleKey_expires = expires
+                  , _googleKey_keyset = PgJSON $ responseBody new
+                  }]
+                return $ responseBody new
       (parsedToken :: Either JWT.JWTError JWT.ClaimsSet) <- runExceptT $ do
          let config = JWT.defaultJWTValidationSettings (const True . (== authAudience) . (^. JWT.string)) -- "570358826294-2ut7bnk6ar7jmqifsef48ljlk0o5m8p4.apps.googleusercontent.com"
          decoded <- JWT.decodeCompact $ fromStrict $ encodeUtf8 token
@@ -191,7 +211,6 @@ requestHandler pool csk gsk authAudience = RequestHandler $ \case
               let subject = claims ^. JWT.claimSub . _Just . JWT.string
               let name = claims ^? JWT.unregisteredClaims . at "name" . _Just . _String
               -- let Just (Aeson.String email) = claims ^. JWT.unregisteredClaims . at "email"
-              traceM $ show $ (subject, name)
               existingUser <- runDb pool $ runSelectReturningOne $ select $ do
                 user <- all_ (_db_account db)
                 guard_ $ _account_guid user ==. val_ subject
@@ -209,6 +228,5 @@ requestHandler pool csk gsk authAudience = RequestHandler $ \case
                     Just uid -> Right <$> signWithKey csk (uid)
       case parsedToken of
         Left _ -> do
-          -- traceM "Bad Token"
           return $ Left "Bad token"
         Right claims -> handleValidClaims claims

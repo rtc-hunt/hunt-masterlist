@@ -16,20 +16,6 @@ import Database.Beam.Schema
 import GHC.Generics
 -- import Rhyolite.Account
 
-data Db f = Db
-  { _db_account :: f (TableEntity Account)
-  , _db_chatroom :: f (TableEntity Chatroom)
-  , _db_message :: f (TableEntity Message)
-  , _db_puzzles :: f (TableEntity Puzzle)
-  , _db_solves :: f (TableEntity Solution)
-  , _db_hunt :: f (TableEntity Hunt)
-  , _db_tags :: f (TableEntity Tag)
-  , _db_notes :: f (TableEntity Note)
-  , _db_metas :: f (TableEntity Metapuzzle)
-  , _db_activeUsers :: f (TableEntity ActiveUser)
-  }
-  deriving (Generic, Database be)
-
 type Id a = PrimaryKey a Identity
 
 type AuthToken = Signed (PrimaryKey Account Identity)
@@ -272,3 +258,4 @@ instance ToJSONKey (PrimaryKey ActiveUser Identity)
 instance FromJSONKey (PrimaryKey ActiveUser Identity)
 instance ToJSON (ActiveUser Identity)
 instance FromJSON (ActiveUser Identity)
+
