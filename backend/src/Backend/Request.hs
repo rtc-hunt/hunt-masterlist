@@ -55,8 +55,9 @@ requestHandler
   :: Pool Connection
   -> CS.Key
   -> Text
+  -> Bool
   -> RequestHandler (ApiRequest AuthToken PublicRequest PrivateRequest) IO
-requestHandler pool csk authAudience = RequestHandler $ \case
+requestHandler pool csk authAudience allowForcedLogins = RequestHandler $ \case
   ApiRequest_Private token req -> do
     let auth
           :: Applicative m
@@ -129,6 +130,24 @@ requestHandler pool csk authAudience = RequestHandler $ \case
         _ <- updateAndNotify (_db_account db) user 
           (\u -> _account_name u <-. val_ newNick)
         pure $ Right ()
+      PrivateRequest_NewHunt hunt_title hunt_rootpage -> auth $ \_user -> runDb pool $ do
+        channelId <-  insertAndNotify (_db_chatroom db) Chatroom
+          { _chatroom_id = default_
+          , _chatroom_title = val_ $ hunt_title
+          }
+        case channelId of
+          Nothing -> return $ Left "Couldn't create channel for hunt"
+          Just channelId -> do
+            huntId <- insertAndNotify (_db_hunt db) Hunt
+              { _hunt_id = default_
+              , _hunt_title = val_ $ hunt_title
+              , _hunt_rootpage = val_ $ hunt_rootpage
+              , _hunt_channel = val_ $ channelId
+              , _hunt_live = val_ $ True
+              }
+            pure $ case huntId of
+              Nothing -> Left "Couldn't create hunt"
+              Just cid -> Right cid
       PrivateRequest_PuzzleCommand (PuzzleCommand_Tag pzl tag) -> auth $ \_user -> runDb pool $ do
         _ <- insertAndNotifyChange (_db_tags db) $ Tag (val_ pzl) (val_ tag)
         pure $ Right ()
@@ -230,3 +249,20 @@ requestHandler pool csk authAudience = RequestHandler $ \case
         Left _ -> do
           return $ Left "Bad token"
         Right claims -> handleValidClaims claims
+  ApiRequest_Public (PublicRequest_ForceLogin) -> do
+      if not allowForcedLogins then return $ Left "Not allowed" else do
+        existingUser <- runDb pool $ runSelectReturningOne $ select $ do
+          user <- all_ (_db_account db)
+          guard_ $ _account_name user ==. val_ "jonored"
+          return user
+        case existingUser of
+          Just someUser -> Right <$> signWithKey csk (AccountId $ _account_id someUser)
+          Nothing -> do
+                  muid <- runDb pool $ insertAndNotify (_db_account db) $ Account
+                    { _account_id = default_
+                    , _account_name = val_ $ "jonored"
+                    , _account_guid = val_ $ ""
+                    }
+                  case muid of
+                    Nothing -> return $ Left "Couldn't create user"
+                    Just uid -> Right <$> signWithKey csk (uid)

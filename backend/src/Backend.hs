@@ -32,6 +32,7 @@ import Rhyolite.Backend.App
 import Rhyolite.Vessel.AuthMapV
 import qualified Web.ClientSession as CS
 import System.Environment
+import System.Directory
 import Control.Concurrent (forkIO, threadDelay)
 import Control.Exception (catch, SomeException)
 
@@ -39,12 +40,14 @@ import Backend.Listen
 import Backend.View
 import Backend.Loadtest
 import Common.Schema
+import Debug.Trace
 
 backend :: Backend BackendRoute FrontendRoute
 backend = Backend
   { _backend_run = \serve -> do
     csk <- CS.getKey "config/backend/clientSessionKey"
     Right cgk <- Aeson.eitherDecodeStrict <$> BS.readFile "config/common/clientGoogleKey"
+    allowForcedLogins <- doesFileExist "config/common/allows_forced_login"
     let checkToken t = do
           let x = readSignedWithKey @(Id Account) csk t
           pure x
@@ -54,7 +57,7 @@ backend = Backend
         runMigrations conn) $ \(e :: SomeException) -> (putStr "Waiting for DB fixes\n" >> threadDelay 100000000)
       (listen, _) <- liftIO $ serveDbOverWebsockets
         (coerce pool)
-        (requestHandler pool csk cgk)
+        (requestHandler pool csk cgk allowForcedLogins)
         (\nm q -> fmap (fromMaybe emptyV) $ mapDecomposedV (handleAuthMapQuery checkToken (notifyHandler pool nm)) q)
         (QueryHandler $ \q -> fromMaybe emptyV <$> mapDecomposedV (handleAuthMapQuery checkToken (privateQueryHandler pool)) q)
         vesselFromWire
