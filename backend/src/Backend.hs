@@ -34,7 +34,7 @@ import qualified Web.ClientSession as CS
 import System.Environment
 import System.Directory
 import Control.Concurrent (forkIO, threadDelay)
-import Control.Exception (catch, SomeException)
+import Control.Exception (catch, SomeException, handle, try)
 
 import Backend.Listen
 import Backend.View
@@ -42,11 +42,20 @@ import Backend.Loadtest
 import Common.Schema
 import Debug.Trace
 
+
+createCSK = do
+  (bytes, key) <- CS.randomKey
+  BS.writeFile "config/backend/clientSessionKey" $ bytes
+  return key
+
 backend :: Backend BackendRoute FrontendRoute
 backend = Backend
   { _backend_run = \serve -> do
-    csk <- CS.getKey "config/backend/clientSessionKey"
-    Right cgk <- Aeson.eitherDecodeStrict <$> BS.readFile "config/common/clientGoogleKey"
+    csk <- handle (\(_ :: SomeException) -> putStr "No config/backend/clientSessionKey, using and saving a random key" >> createCSK) $ CS.getKey "config/backend/clientSessionKey"
+    cgkr <- (fmap Aeson.eitherDecodeStrict) <$> try @SomeException (BS.readFile "config/common/clientGoogleKey")
+    cgk <- case cgkr of
+          Right (Right cgk) -> return cgk
+          _ -> putStr "No google client key, some google features may not work" >> return ""
     allowForcedLogins <- doesFileExist "config/common/allows_forced_login"
     let checkToken t = do
           let x = readSignedWithKey @(Id Account) csk t

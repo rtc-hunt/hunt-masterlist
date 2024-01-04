@@ -16,6 +16,7 @@ import Database.Beam.Backend.SQL.Types
 import Database.Beam.Postgres
 import Database.PostgreSQL.Simple.FromField
 import Database.PostgreSQL.Simple.ToField
+import Database.PostgreSQL.Simple
 import Crypto.JOSE.JWK
 
 import Common.Schema
@@ -42,7 +43,23 @@ dbAnn :: AnnotatedDatabaseSettings Postgres Db
 dbAnn = defaultAnnotatedDbSettings db
 
 runMigrations :: Connection -> IO ()
-runMigrations conn = tryRunMigrationsWithEditUpdate dbAnn conn
+runMigrations conn = do
+  tryRunMigrationsWithEditUpdate dbAnn conn
+  putStrLn "Initial migrations done, running custom"
+  [Only (numChatrooms :: Int64)] <- query_ conn "select count(*) from db_chatroom;"
+  if numChatrooms == 0
+    then do
+      putStrLn "No chatrooms defined, defining one."
+      execute_ conn "insert into db_chatroom values(default, 'first room');"
+    else pure 0
+  [Only (hunts :: Int64)] <- query_ conn "select count(*) from db_hunt;"
+  if hunts == 0
+    then do
+      putStrLn "No hunts defined, defining one."
+      _ <- execute_ conn "insert into db_hunt values(1, default, true, 'http://tcita.com/', 'test hunt');"
+      pure ()
+    else pure ()
+  
 
 instance FromField (SqlSerial Int64) where
   fromField f mbs = fmap SqlSerial $ fromField f mbs

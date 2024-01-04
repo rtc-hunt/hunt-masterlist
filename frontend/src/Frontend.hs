@@ -108,17 +108,19 @@ initGauth = do
     elClass "h1" "font-karla font-bold text-h1 text-copy mt-12" $ text "Login"
     elClass "div" "flex flex-col mt-4" $ elAttr "div" ("href" =: "#" <> "id" =: "signinButton") $ text "GOOGLE"
   updatedUserE <- fmap switchDyn $ prerender (return never) $ do
-    pb <- getPostBuild
-    (updatedUserE :: Event t (Maybe Text), updatedUserT) <- newTriggerEvent
-    void $ JS.liftJSM $ do
-      updatedUserJS <- JS.toJSVal $ JS.fun $ \ _ _ [ipt] -> JS.eval ("prev.getAuthResponse().id_token"::Text) >>= JS.fromJSVal >>= (liftIO . updatedUserT)
-      JS.setProp "fireSigninEvt" updatedUserJS JS.global
-      JS.eval $ ("fireSigninEvtInner = (e) => { /*console.log(prev != e); */ console.log(e.getAuthResponse().id_token); /* if(prev != e)*/ { prev = e; fireSigninEvt([String(e.getAuthResponse().id_token)]);} }" :: Text)
-    -- let client_id = "570358826294-2ut7bnk6ar7jmqifsef48ljlk0o5m8p4.apps.googleusercontent.com";
-    client_id <- fromMaybe "" . (>>= A.decodeStrict') <$> getConfig "common/clientGoogleKey"
-    performEvent_ $ (void $ JS.liftJSM $ JS.eval ("console.log('"<>client_id<>"'); gapi.load('auth2', () => {auth2 = gapi.auth2.init({client_id: '" <> client_id <> "'}); auth2.attachClickHandler('signinButton', {}, fireSigninEvtInner, console.log); gapi.signin2.render('signinButton', {onsuccess: fireSigninEvtInner}); if(gapi.auth2.getAuthInstance().isSignedIn) { /*fireSigninEvtInner(gapi.auth2.getAuthInstance().currentUser.get());*/ }}); " :: Text)) <$ pb
-    prevState <- hold Nothing $ traceEvent "UpdatedUserE" updatedUserE
-    return $ attachWithMaybe (\a b -> if a/=b then Just b else Nothing) prevState updatedUserE
+    allowsForcedDevLogin <- getConfig "common/allows_forced_login"
+    if isJust allowsForcedDevLogin then (return never) else do
+      pb <- getPostBuild
+      (updatedUserE :: Event t (Maybe Text), updatedUserT) <- newTriggerEvent
+      void $ JS.liftJSM $ do
+        updatedUserJS <- JS.toJSVal $ JS.fun $ \ _ _ [ipt] -> JS.eval ("prev.getAuthResponse().id_token"::Text) >>= JS.fromJSVal >>= (liftIO . updatedUserT)
+        JS.setProp "fireSigninEvt" updatedUserJS JS.global
+        JS.eval $ ("fireSigninEvtInner = (e) => { /*console.log(prev != e); */ console.log(e.getAuthResponse().id_token); /* if(prev != e)*/ { prev = e; fireSigninEvt([String(e.getAuthResponse().id_token)]);} }" :: Text)
+      -- let client_id = "570358826294-2ut7bnk6ar7jmqifsef48ljlk0o5m8p4.apps.googleusercontent.com";
+      client_id <- fromMaybe "" . (>>= A.decodeStrict') <$> getConfig "common/clientGoogleKey"
+      performEvent_ $ (void $ JS.liftJSM $ JS.eval ("console.log('"<>client_id<>"'); gapi.load('auth2', () => {auth2 = gapi.auth2.init({client_id: '" <> client_id <> "'}); auth2.attachClickHandler('signinButton', {}, fireSigninEvtInner, console.log); gapi.signin2.render('signinButton', {onsuccess: fireSigninEvtInner}); if(gapi.auth2.getAuthInstance().isSignedIn) { /*fireSigninEvtInner(gapi.auth2.getAuthInstance().currentUser.get());*/ }}); " :: Text)) <$ pb
+      prevState <- hold Nothing $ traceEvent "UpdatedUserE" updatedUserE
+      return $ attachWithMaybe (\a b -> if a/=b then Just b else Nothing) prevState updatedUserE
 
 -- This is for debugging, because it's inconvenient to use google auth locally.
   forceLoginEvent :: Event t () <- switchDyn <$> (prerender (pure never) (do

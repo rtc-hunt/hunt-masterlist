@@ -32,6 +32,7 @@ import Network.HTTP.Req hiding (req)
 import qualified Network.HTTP.Req as Req
 import System.Directory
 import System.Environment
+import Control.Exception (SomeException, handle)
 
 import Backend.Db (runDb, current_timestamp_)
 import Backend.Listen ()
@@ -43,13 +44,14 @@ import Common.Schema
 -- import Debug.Trace
 
 createSheet :: Text -> IO (Maybe Text)
-createSheet name = do
+createSheet name = handle failedCreateSheet $ do
     canonicalizePath "config/backend" >>= setEnv "CLOUDSDK_CONFIG"
     lgr  <- Google.newLogger Google.Debug stderr
     env  <- Google.newEnv <&> (Google.envLogger .~ lgr) . (Google.envScopes .~ driveFileScope) -- (2) (3)
     qqq  <- Google.runResourceT . Google.runGoogle env $
       Google.send $ filesCreate $ file & (fMimeType ?~ "application/vnd.google-apps.spreadsheet") . (fName ?~ name) . (fParents .~ ["1F40xJAGFXFE8Z64xw_gxSR_P8TBYrwsi"])
     return $ qqq ^. fId
+  where failedCreateSheet (e :: SomeException) = putStrLn "Failed to create google sheet, please check configuration." >> pure Nothing
 
 requestHandler
   :: Pool Connection
@@ -253,14 +255,14 @@ requestHandler pool csk authAudience allowForcedLogins = RequestHandler $ \case
       if not allowForcedLogins then return $ Left "Not allowed" else do
         existingUser <- runDb pool $ runSelectReturningOne $ select $ do
           user <- all_ (_db_account db)
-          guard_ $ _account_name user ==. val_ "jonored"
+          guard_ $ _account_name user ==. val_ "testuser"
           return user
         case existingUser of
           Just someUser -> Right <$> signWithKey csk (AccountId $ _account_id someUser)
           Nothing -> do
                   muid <- runDb pool $ insertAndNotify (_db_account db) $ Account
                     { _account_id = default_
-                    , _account_name = val_ $ "jonored"
+                    , _account_name = val_ $ "testuser"
                     , _account_guid = val_ $ ""
                     }
                   case muid of
