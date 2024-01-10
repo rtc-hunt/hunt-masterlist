@@ -43,6 +43,7 @@ import Rhyolite.Vessel.Path
 import Rhyolite.SemiMap
 import Data.Map.Monoidal as MMap hiding (keys)
 import Common.View
+import Web.Cookie
 
 import Common.Request
 import Common.Route
@@ -171,7 +172,7 @@ manageAuthCookie authChange = do
     doc <- currentDocumentUnchecked
     performEvent_ $ ffor authChange $ \newAuth -> do
       cookie <- defaultCookieJson authCookieName newAuth
-      setPermanentCookie doc cookie
+      setPermanentCookie doc (cookie { setCookiePath = Just "/" })
 
 frontendBody
   :: forall js t m.

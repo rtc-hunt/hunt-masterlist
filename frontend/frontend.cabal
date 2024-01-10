@@ -12,6 +12,7 @@ library
                , common
                , constraints-extras
                , containers
+               , cookie
                , dependent-sum
                , dependent-sum-template
                , dependent-map
@@ -40,6 +41,7 @@ library
                , time
                , aeson
                , witherable
+               , unbounded-delays
   exposed-modules:
     Frontend
     Frontend.Authentication

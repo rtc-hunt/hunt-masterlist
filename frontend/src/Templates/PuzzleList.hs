@@ -1,6 +1,8 @@
 {-# Language OverloadedLists #-}
 module Templates.PuzzleList where
 
+import Control.Concurrent
+import Control.Concurrent.Thread.Delay as Concurrent
 import Data.Default
 import Data.Text
 import Data.Text as T
@@ -12,13 +14,15 @@ import Reflex.Dom.Core
 import Database.Beam
 import Control.Monad.Identity
 import Obelisk.Route.Frontend
+import Data.Time.Clock (UTCTime(..))
+import Data.Time
 
 import Common.Schema
 import Frontend.Types
 import Frontend.Utils
 import Templates.Types
 import Frontend.SortSelect
-import Debug.Trace
+import Debug.Trace hiding (traceEvent)
 
 data PuzzleTableConfig t m = PuzzleTableConfig
   { _puzzleTableConfig_results :: Dynamic t (Map (PrimaryKey Puzzle Identity) (PuzzleData t))
@@ -32,7 +36,7 @@ data PuzzleTableOut t m = PuzzleTableOut
 --  }
 
 -- | A widget to display a table with static columns and dynamic rows.
-tableDynAttrWithSearch :: forall t m r k v q. (Ord k, DomBuilder t m, MonadHold t m, PostBuild t m, MonadFix m, Monoid q)
+tableDynAttrWithSearch :: forall t m r k v q. (Ord k, DomBuilder t m, MonadHold t m, PostBuild t m, MonadFix m, Monoid q, Show k, MonadIO (Performable m), TriggerEvent t m, PerformEvent t m)
   => Text                                   -- ^ Class applied to <table> element
   -> [(Text, k -> Dynamic t r -> m v, m (Dynamic t q))]      -- ^ Columns of (header, row key -> row value -> child widget)
   -> Dynamic t (Map k r)                      -- ^ Map from row key to row value
@@ -43,10 +47,24 @@ tableDynAttrWithSearch klass cols dRows rowAttrs = elAttr "div" (Map.singleton "
       queryEls <- el "thead" $ do
         el "tr" $ mapM_ (\(h, _, _) -> el "th" $ text h) cols
         el "tr" $ mapM (\(_, _, qm) -> el "th" $ qm) cols
-      bodyRes <- el "tbody" $
-        listWithKey dRows (\k r -> do
+      bodyRes <- el "tbody" $ mdo
+        let startEvt = (() <$ updated dRows) <> (() <$ updated (mconcat queryEls))
+        let shouldStopD = (>) <$> count <*> (max 24 . Map.size <$> dRows)
+        let stopEvt = () <$ (gate (current shouldStopD) ticks )
+        tickerD :: Dynamic t (m (Event t TickInfo)) <- holdDyn (pure never) $ leftmost [ ((tickLossy 0.5 (UTCTime (toEnum 0) 0)) <$ startEvt), (pure never) <$ traceEvent "stopevent" stopEvt ]
+        -- performEvent_ $ liftIO (putStrLn "Start") <$ startEvt
+        -- performEvent_ $ liftIO (putStrLn "Stop") <$ stopEvt
+        -- ticks <- tickLossyUpTo $ (\c -> (1, (UTCTime (toEnum 0) 0), c)) <$> (( + 1) . ( `div` 25) . Map.size <$> current dRows) <@ startEvt
+        -- performEvent_ $ liftIO (putStrLn "TickLossy") <$ ticks
+        -- display shouldStopD
+        ticks <- ((dyn tickerD >>= switchHold never))
+        -- ticks <- Reflex.Dom.Core.traceEvent "tick" <$> ((dyn tickerD) >>= switchHold never)
+        count <- foldDyn id 25 $ leftmost [ const 25 <$ updated dRows, (+25) <$ ticks ]
+        -- display count
+        listWithKey (Map.take <$> count <*> dRows) (\k r -> do
           dAttrs <- rowAttrs k
-          elDynAttr' "tr" dAttrs $ mapM (\(_, x, _) -> el "td" $ x k r) cols)
+          elDynAttr' "tr" dAttrs $ mapM (\(_, x, _) -> el "td" $ x k r ) cols
+          )
       return (mconcat queryEls, bodyRes) 
 
 backsolve1 :: DomBuilder t m => m ()
@@ -56,7 +74,7 @@ backsolve1 = elAttr "span" ("class" =: "tooltip" <> "style" =: "font-family: 'Sy
 headerDropdownSettings :: Reflex t => DropdownConfig t a
 headerDropdownSettings = def & dropdownConfig_attributes .~ (constDyn $ "class" =: "grow shrink w-4/5 max-w-xs min-w-4")
 
-puzzlesTable :: forall t m. (Template t m, MonadHold t m, MonadFix m) => 
+puzzlesTable :: forall t m. (Template t m, MonadHold t m, MonadFix m, MonadIO (Performable m), TriggerEvent t m, PerformEvent t m) => 
   PuzzleTableConfig t m -> m ()
 --  Dynamic t (Map (PrimaryKey Puzzle Identity) (Puzzle Identity)) -> m ()
 puzzlesTable PuzzleTableConfig { _puzzleTableConfig_results = puzzles, _puzzleTableConfig_puzzleLink = puzzleLink, _puzzleTableConfig_metas = knownMetas, _puzzleTableConfig_tags = knownTags } = divClass "top-scrollable" $ mdo
