@@ -17,7 +17,13 @@ import Obelisk.Route.Frontend
 import Data.Time.Clock (UTCTime(..))
 import Data.Time
 
+import Data.Int
+import Data.Coerce
+import Database.Beam.Backend.SQL.Types
+
 import Common.Schema
+import Common.Route
+import Data.Semigroup (Endo(..))
 import Frontend.Types
 import Frontend.Utils
 import Templates.Types
@@ -25,7 +31,9 @@ import Frontend.SortSelect
 import Debug.Trace hiding (traceEvent)
 
 data PuzzleTableConfig t m = PuzzleTableConfig
-  { _puzzleTableConfig_results :: Dynamic t (Map (PrimaryKey Puzzle Identity) (PuzzleData t))
+  { _puzzleTableConfig_query :: Dynamic t PuzzleQuery
+  , _puzzleTableConfig_modifyQuery :: Event t (Endo PuzzleQuery) -> m ()
+  , _puzzleTableConfig_results :: Dynamic t (Map (PrimaryKey Puzzle Identity) (PuzzleData t))
   , _puzzleTableConfig_puzzleLink :: Dynamic t (PrimaryKey Puzzle Identity) -> m () -> m ()
   , _puzzleTableConfig_metas :: Dynamic t (Map (Id Puzzle) Text)
   , _puzzleTableConfig_tags :: Dynamic t (Set Text)
@@ -74,10 +82,13 @@ backsolve1 = elAttr "span" ("class" =: "tooltip" <> "style" =: "font-family: 'Sy
 headerDropdownSettings :: Reflex t => DropdownConfig t a
 headerDropdownSettings = def & dropdownConfig_attributes .~ (constDyn $ "class" =: "grow shrink w-4/5 max-w-xs min-w-4")
 
-puzzlesTable :: forall t m. (Template t m, MonadHold t m, MonadFix m, MonadIO (Performable m), TriggerEvent t m, PerformEvent t m) => 
+
+puzzlesTable :: forall t m. (Template t m, MonadHold t m, MonadFix m, MonadIO (Performable m), TriggerEvent t m, PerformEvent t m
+     , SetRoute t (R FrontendRoute) m, RouteToUrl (R FrontendRoute) m )
+  =>
   PuzzleTableConfig t m -> m ()
 --  Dynamic t (Map (PrimaryKey Puzzle Identity) (Puzzle Identity)) -> m ()
-puzzlesTable PuzzleTableConfig { _puzzleTableConfig_results = puzzles, _puzzleTableConfig_puzzleLink = puzzleLink, _puzzleTableConfig_metas = knownMetas, _puzzleTableConfig_tags = knownTags } = divClass "top-scrollable" $ mdo
+puzzlesTable PuzzleTableConfig { _puzzleTableConfig_query = query, _puzzleTableConfig_modifyQuery = modifyQuery, _puzzleTableConfig_results = puzzles, _puzzleTableConfig_puzzleLink = puzzleLink, _puzzleTableConfig_metas = knownMetas, _puzzleTableConfig_tags = knownTags } = divClass "top-scrollable" $ mdo
           {-queryEl <- inputElement $ def -- & inputElementConfig_initialValue .~ (T.pack $ show (mempty :: PuzzleQuery))
           el "br" blank
           let queries = fmap fst . (reads :: String -> [(PuzzleQuery, String)]) . T.unpack <$> _inputElement_value queryEl
@@ -86,16 +97,26 @@ puzzlesTable PuzzleTableConfig { _puzzleTableConfig_results = puzzles, _puzzleTa
           display query
           el "br" blank -}
           --(tableQueryD :: Dynamic t ([Int]), tableResD) <- 
-          (query :: Dynamic t PuzzleQuery, _) <- traceShow "Puzzle list started" $ tableDynAttrWithSearch "puzzletable ui celled table"
+          -- setRoute $ (FrontendRoute_Puzzle :/) . ((,) ((coerce :: Int64->Id Hunt) 2)) . Left <$> updated query
+          -- modifyRoute $ id <$ updated query
+          (queryNope :: Dynamic t PuzzleQuery, _) <- traceShow "Puzzle list started" $ tableDynAttrWithSearch "puzzletable ui celled table"
             [ ("Title", \puzKey puzDat -> puzzleLink (primaryKey <$> (puzDat >>= _puzzleData_puzzle)) $ elAttr "div" ("class" =: "" <> "data-tooltip" =: "Open Puzzle") $ dynText $ _puzzle_Title <$> (puzDat >>= _puzzleData_puzzle), return $ (constDyn mempty))
             , ("Is meta?", \_ puzDat -> dynText $ (\p -> if p then "META" else "") . _puzzle_IsMeta <$> (puzDat >>= _puzzleData_puzzle)
-              , fmap (flip PuzzleQuery PuzzleOrdering_Any) . _dropdown_value <$> dropdown mempty (constDyn (mempty =: " - " <> PuzzleSelect_IsMeta =: "Is Meta" <> (PuzzleSelect_Not PuzzleSelect_IsMeta) =: "Not Meta")) headerDropdownSettings
+              , do
+                  startValue <- sample $ current $ ((\a -> fromMaybe mempty $ matchSubSelect a (`elem` ([PuzzleSelect_IsMeta, PuzzleSelect_Not PuzzleSelect_IsMeta] :: [PuzzleSelect]))) . _puzzleQuery_select) <$> query
+                  dropdownValue <- fmap (flip PuzzleQuery PuzzleOrdering_Any) . _dropdown_value <$> dropdown startValue (constDyn (mempty =: " - " <> PuzzleSelect_IsMeta =: "Is Meta" <> (PuzzleSelect_Not PuzzleSelect_IsMeta) =: "Not Meta")) headerDropdownSettings
+                  modifyQuery $ (\(PuzzleQuery old _) (PuzzleQuery new _) -> Endo $ \(PuzzleQuery all ord) -> PuzzleQuery (new <> subPuzzleSelect all old) ord) <$> current dropdownValue <@> updated dropdownValue
+                  pure dropdownValue
               )
             , ("Meta", \_ puzDat -> void $
                 listWithKey (puzDat >>= _puzzleData_metas) $ \k dV -> puzzleLink (constDyn k) $ dynText dV
                 , elClass "span" "flex flex-row" $ do
-                    queryByMeta <- fmap (flip PuzzleQuery PuzzleOrdering_Any) . _dropdown_value <$> dropdown mempty (( (mempty =: " - ") <>) . Map.mapKeys PuzzleSelect_HasMeta <$> knownMetas) headerDropdownSettings
-                    sortByMeta <- elClass "span" "flex-initial max-w-min" $ fmap (PuzzleQuery PuzzleSelect_All . (\a -> if a then PuzzleOrdering_ByMeta else PuzzleOrdering_Any)) <$> semToggle "" True
+                    startValue <- sample $ current $ ((\metas a -> fromMaybe mempty $ matchSubSelect (_puzzleQuery_select a) $ (\case { PuzzleSelect_HasMeta _ -> True; _ -> False }))) <$> knownMetas <*> query
+                    queryByMeta <- fmap (flip PuzzleQuery PuzzleOrdering_Any) . _dropdown_value <$> dropdown startValue (( (mempty =: " - ") <>) . Map.mapKeys PuzzleSelect_HasMeta <$> knownMetas) headerDropdownSettings
+                    startSortValue <- sample $ current $ (\(PuzzleQuery _ ord) -> ord == PuzzleOrdering_ByMeta) <$> query
+                    sortByMeta <- elClass "span" "flex-initial max-w-min" $ fmap (PuzzleQuery PuzzleSelect_All . (\a -> if a then PuzzleOrdering_ByMeta else PuzzleOrdering_Any)) <$> semToggle "" startSortValue
+                    modifyQuery $ (\(PuzzleQuery old _) (PuzzleQuery new _) -> Endo $ \(PuzzleQuery all ord) -> PuzzleQuery (new <> subPuzzleSelect all old) ord) <$> current queryByMeta <@> updated queryByMeta
+                    modifyQuery $ (\(PuzzleQuery _ n) -> Endo $ \(PuzzleQuery all _) -> PuzzleQuery all n) <$> updated sortByMeta
                     pure $ sortByMeta <> queryByMeta
                 )
             , ("Solution(s)", \_ puzDat -> do
@@ -103,23 +124,43 @@ puzzlesTable PuzzleTableConfig { _puzzleTableConfig_results = puzzles, _puzzleTa
                   el "pre" $ do 
                   text $ _solution_Solution sol
                   if _solution_IsBacksolve sol then backsolve1 else blank
-              , fmap (flip PuzzleQuery PuzzleOrdering_Any) . _dropdown_value <$> dropdown mempty (constDyn (mempty =: " - " <> PuzzleSelect_HasSolution =: "Has Solution" <> (PuzzleSelect_Not PuzzleSelect_HasSolution) =: "No Solution")) headerDropdownSettings
+              , do
+                   startValue <- sample $ current $ ((\a -> fromMaybe mempty $ matchSubSelect a (`elem` ([PuzzleSelect_HasSolution, PuzzleSelect_Not PuzzleSelect_HasSolution] :: [PuzzleSelect]))) . _puzzleQuery_select) <$> query
+                   dropdownValue <- fmap (flip PuzzleQuery PuzzleOrdering_Any) . _dropdown_value <$> dropdown startValue (constDyn (mempty =: " - " <> PuzzleSelect_HasSolution =: "Has Solution" <> (PuzzleSelect_Not PuzzleSelect_HasSolution) =: "No Solution")) headerDropdownSettings
+                   modifyQuery $ (\(PuzzleQuery old _) (PuzzleQuery new _) -> Endo $ \(PuzzleQuery all ord) -> PuzzleQuery (new <> subPuzzleSelect all old) ord) <$> current dropdownValue <@> updated dropdownValue
+                   pure dropdownValue
               )
             , ("Status", \_ puzData -> dynText $ (puzData >>= _puzzleData_status)
-            , fmap (flip PuzzleQuery PuzzleOrdering_Any) . _dropdown_value <$> dropdown mempty (( (mempty =: " - ") <>) . Map.mapKeys PuzzleSelect_WithTag . Map.fromSet (id) <$> constDyn statusTags) headerDropdownSettings
+            , do
+                   startValue <- sample $ current $ ((\a -> fromMaybe mempty $ matchSubSelect a (`elem` ((PuzzleSelect_WithTag <$> ["done", "extraction", "in-progress", "solved", "stalled"]) :: [PuzzleSelect]))) . _puzzleQuery_select) <$> query
+                   dropdownValue <- fmap (flip PuzzleQuery PuzzleOrdering_Any) . _dropdown_value <$> dropdown startValue (( (mempty =: " - ") <>) . Map.mapKeys PuzzleSelect_WithTag . Map.fromSet (id) <$> constDyn statusTags) headerDropdownSettings
+                   modifyQuery $ (\(PuzzleQuery old _) (PuzzleQuery new _) -> Endo $ \(PuzzleQuery all ord) -> PuzzleQuery (new <> subPuzzleSelect all old) ord) <$> current dropdownValue <@> updated dropdownValue
+                   pure dropdownValue
               )
             , ("Current Solvers", \_ puzDat -> 
                 void $ listWithKey (puzDat >>= _puzzleData_currentSolvers) $ \k u -> el "span" $ dynText u
-              , fmap (flip PuzzleQuery PuzzleOrdering_Any) . _dropdown_value <$> dropdown mempty (constDyn (mempty =: " - " <> PuzzleSelect_HasSolvers =: "Has Current Solvers" <> (PuzzleSelect_Not PuzzleSelect_HasSolvers) =: "No Current Solvers")) headerDropdownSettings
+              , do
+                  startValue <- sample $ current $ ((\a -> fromMaybe mempty $ matchSubSelect a (`elem` ([PuzzleSelect_HasSolvers, PuzzleSelect_Not PuzzleSelect_HasSolvers] :: [PuzzleSelect]))) . _puzzleQuery_select) <$> query
+                  dropdownValue <- fmap (flip PuzzleQuery PuzzleOrdering_Any) . _dropdown_value <$> dropdown startValue (constDyn (mempty =: " - " <> PuzzleSelect_HasSolvers =: "Has Current Solvers" <> (PuzzleSelect_Not PuzzleSelect_HasSolvers) =: "No Current Solvers")) headerDropdownSettings
+                  modifyQuery $ (\(PuzzleQuery old _) (PuzzleQuery new _) -> Endo $ \(PuzzleQuery all ord) -> PuzzleQuery (new <> subPuzzleSelect all old) ord) <$> current dropdownValue <@> updated dropdownValue
+                  pure dropdownValue
               )
             , ("Voice Chat", \_ puzDat -> 
                 let lnkD = _puzzle_voicelink <$> (puzDat >>= _puzzleData_puzzle)
                 in elDynAttr "a" (fromMaybe mempty . fmap ((<> ("class" =: "text-xs voicelink" <> "target" =: "_blank")) . ("href" =:)) <$> lnkD) $ dynText $ fromMaybe "" . ("Voice Chat" <$) <$> lnkD
-              , fmap (flip PuzzleQuery PuzzleOrdering_Any) . _dropdown_value <$> dropdown mempty (constDyn (mempty =: " - " <> PuzzleSelect_HasVoice =: "Has Voice Chat" <> (PuzzleSelect_Not PuzzleSelect_HasVoice) =: "No Voice Chat")) headerDropdownSettings
+              , do
+                  startValue <- sample $ current $ ((\a -> fromMaybe mempty $ matchSubSelect a (`elem` ([PuzzleSelect_HasVoice, PuzzleSelect_Not PuzzleSelect_HasVoice] :: [PuzzleSelect]))) . _puzzleQuery_select) <$> query
+                  dropdownValue <- fmap (flip PuzzleQuery PuzzleOrdering_Any) . _dropdown_value <$> dropdown startValue (constDyn (mempty =: " - " <> PuzzleSelect_HasVoice =: "Has Voice Chat" <> (PuzzleSelect_Not PuzzleSelect_HasVoice) =: "No Voice Chat")) headerDropdownSettings
+                  modifyQuery $ (\(PuzzleQuery old _) (PuzzleQuery new _) -> Endo $ \(PuzzleQuery all ord) -> PuzzleQuery (new <> subPuzzleSelect all old) ord) <$> current dropdownValue <@> updated dropdownValue
+                  pure dropdownValue
               )
             , ("Tags", \_ puzDat ->
                 void $ listWithKey (puzDat >>= _puzzleData_tags) $ \k _ -> elAttr "span" ("class" =: "ui label" <> "data-tag" =: k) $ text k
-              , fmap (flip PuzzleQuery PuzzleOrdering_Any) . _dropdown_value <$> dropdown mempty (( (mempty =: " - ") <>) . Map.mapKeys PuzzleSelect_WithTag . Map.fromSet (id) <$> knownTags) headerDropdownSettings
+              , do
+                  startValue <- sample $ current $ ((\a -> fromMaybe mempty $ matchSubSelect a (\case { PuzzleSelect_WithTag _ -> True; _ -> False })) . _puzzleQuery_select) <$> query
+                  dropdownValue <- fmap (flip PuzzleQuery PuzzleOrdering_Any) . _dropdown_value <$> dropdown startValue (( (mempty =: " - ") <>) . Map.mapKeys PuzzleSelect_WithTag . Map.fromSet (id) <$> knownTags) headerDropdownSettings
+                  modifyQuery $ (\(PuzzleQuery old _) (PuzzleQuery new _) -> Endo $ \(PuzzleQuery all ord) -> PuzzleQuery (new <> subPuzzleSelect all old) ord) <$> current dropdownValue <@> updated dropdownValue
+                  pure dropdownValue
               )
             , ("Notes", \_ puzDat ->
                 void $ listWithKey (puzDat >>= _puzzleData_notes) $ \k dV -> elClass "div" "" $ dynText $ _note_Note <$> dV

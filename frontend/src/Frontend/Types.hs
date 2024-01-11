@@ -32,56 +32,6 @@ data PuzzleData t = PuzzleData
   , _puzzleData_currentSolvers :: Dynamic t (Map (PrimaryKey Account Identity) Text)
   }
 
-data PuzzleQuery = PuzzleQuery 
-  { _puzzleQuery_select :: PuzzleSelect
-  , _puzzleQuery_ordering :: PuzzleOrdering
-  }
-  deriving (Eq, Show, Ord, Read)
-
-instance Semigroup PuzzleQuery where
-  PuzzleQuery sa oa <> PuzzleQuery sb ob = PuzzleQuery (sa <> sb) (oa <> ob)
-
-instance Monoid PuzzleQuery where
-  mempty = PuzzleQuery PuzzleSelect_All PuzzleOrdering_Any
-
-data PuzzleSelect
-  = PuzzleSelect_All
-  | PuzzleSelect_And PuzzleSelect PuzzleSelect
-  | PuzzleSelect_Not PuzzleSelect
-  | PuzzleSelect_WithTag Text
-  | PuzzleSelect_HasVoice
-  | PuzzleSelect_IsMeta
-  | PuzzleSelect_HasSolution
-  | PuzzleSelect_HasSolvers
-  | PuzzleSelect_HasMeta (Id Puzzle)
-  deriving (Eq, Show, Ord, Read)
-
-instance Semigroup PuzzleSelect where
-  PuzzleSelect_All <> PuzzleSelect_All = PuzzleSelect_All
-  PuzzleSelect_All <> a = a
-  a <> PuzzleSelect_All = a
-  a <> b = PuzzleSelect_And a b
-
-instance Monoid PuzzleSelect where
-  mempty = PuzzleSelect_All
-
-data PuzzleOrdering
-  = PuzzleOrdering_Any
-  | PuzzleOrdering_ByMeta
-  deriving (Eq, Show, Ord, Read)
-
-instance Semigroup PuzzleOrdering where
-  PuzzleOrdering_Any <> PuzzleOrdering_Any = PuzzleOrdering_Any
-  a <> PuzzleOrdering_Any = a
-  PuzzleOrdering_Any <> a = a
-
-instance Monoid PuzzleOrdering where
-  mempty = PuzzleOrdering_Any
-
-data PuzzleSortKey
-  = PuzzleSortKey_Id (Id Puzzle)
-  | PuzzleSortKey_Synthetic Int
-  deriving (Eq, Show, Ord)
 
 statusTags :: Set Text
 statusTags = [ "solved", "in-progress", "stalled", "extraction", "done" ]

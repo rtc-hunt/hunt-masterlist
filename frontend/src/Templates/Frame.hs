@@ -36,7 +36,7 @@ framed Framed
   }
   = mdo
     (menuStuff, a) <- elClass "nav" "app ui fixed inverted menu" $ mdo
-      dynRouteLink ((\hid -> FrontendRoute_Puzzle :/ (hid, Nothing)) <$> huntId) $ divClass "logo header item whitespace-nowrap" $ text "Hunt Master List"
+      dynRouteLink ((\hid -> FrontendRoute_Puzzle :/ (hid, Left mempty)) <$> huntId) $ divClass "logo header item whitespace-nowrap" $ text "Hunt Master List"
 
       rv <- header
       (menuElem, (layoutD, menuOpenD)) <- elClass "div" "right menu" $ elDynAttr' "div" (ffor menuOpenD $ \c -> "class" =: ("ui icon top right dropdown button item " <> c)) $ do

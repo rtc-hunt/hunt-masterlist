@@ -7,8 +7,11 @@ module Frontend.Puzzle where
 import Control.Monad
 import Control.Monad.Fix
 import Control.Monad.IO.Class
+import Control.Lens
+import Data.Semigroup (Endo(..))
 import Data.Functor.Identity
 import Data.Map (Map)
+import qualified Data.Either
 import qualified Data.Map as Map
 import Data.Maybe
 import Data.Sequence (ViewR(..))
@@ -60,8 +63,8 @@ import Templates.PuzzleList as Template
 import Common.Schema
 import Debug.Trace
 
-puzzles :: (Monad m, MonadFix m, Reflex t, Routed t (Id Hunt, Maybe (Id Puzzle)) m, Adjustable t m, NotReady t m, PostBuild t m, DomBuilder t m, MonadHold t m
-     , Routed t ((Id Hunt, Maybe (Id Puzzle))) (Client m)
+puzzles :: (Monad m, MonadFix m, Reflex t, Routed t (Id Hunt, Either PuzzleQuery (Id Puzzle)) m, Adjustable t m, NotReady t m, PostBuild t m, DomBuilder t m, MonadHold t m
+     , Routed t ((Id Hunt, Either PuzzleQuery (Id Puzzle))) (Client m)
      , Requester t m, Response m ~ Identity, Request m ~ ApiRequest () PublicRequest PrivateRequest
      , SetRoute t (R FrontendRoute) m, RouteToUrl (R FrontendRoute) m
      , PerformEvent t m
@@ -76,9 +79,10 @@ puzzles :: (Monad m, MonadFix m, Reflex t, Routed t (Id Hunt, Maybe (Id Puzzle))
      , Request (Client m) ~ ApiRequest () PublicRequest PrivateRequest
   ) => m (Event t ())
 puzzles = do
-  mPuzzle <- join <$> prerender (pure $ constDyn (HuntId 1, Nothing)) askRoute
-  dyn $ ffor mPuzzle $ \case
-    (hunt, Nothing) -> masterlist hunt
+  routeD <- join <$> prerender (pure $ constDyn (HuntId 1, Left mempty)) askRoute
+  isMainList <- holdUniqDyn $ fmap (Data.Either.fromRight Nothing . fmap Just) <$> routeD
+  dyn $ ffor isMainList $ \case
+    (hunt, Nothing) -> masterlist hunt $ Data.Either.fromLeft mempty . snd <$> routeD
     (_, Just i) -> puzzle i
   return never
 
@@ -112,8 +116,8 @@ masterlist :: (Monad m, MonadHold t m, PostBuild t m, Reflex t, DomBuilder t m, 
      , Prerender js t m
      , MonadIO (Performable m)
   )
-  => Id Hunt -> m ()
-masterlist huntId = do
+  => Id Hunt -> Dynamic t PuzzleQuery -> m ()
+masterlist huntId queryD = do
   hunt <- buildHunt huntId
   knownMetas <- fmap (fmap (fromMaybe mempty)) $ watch $ constDyn $ key V_HuntMetas ~> key huntId ~> postMap (traverse (fmap getMonoidalMap . getComplete))
   knownTags <- getKnownTags
@@ -150,8 +154,13 @@ masterlist huntId = do
           MasterlistPage_List =: ("List", do
             puzzleListD <- puzzleListBuilder huntId
             puzzlesTable PuzzleTableConfig
-              { _puzzleTableConfig_results = puzzleListD
-              , _puzzleTableConfig_puzzleLink = \id -> dynRouteLink $ (\i -> FrontendRoute_Puzzle :/ (huntId, Just i)) <$> id
+              { _puzzleTableConfig_query = queryD
+              , _puzzleTableConfig_modifyQuery = \e -> do
+                   modifyRoute $ (\(Endo mod) -> \case
+                      FrontendRoute_Puzzle :/ (hunt, currentQuery) -> FrontendRoute_Puzzle :/ (hunt, over _Left mod $ currentQuery)
+                      a -> a) <$> e
+              , _puzzleTableConfig_results = puzzleListD
+              , _puzzleTableConfig_puzzleLink = \id -> dynRouteLink $ (\i -> FrontendRoute_Puzzle :/ (huntId, Right i)) <$> id
               , _puzzleTableConfig_metas = knownMetas
               , _puzzleTableConfig_tags = knownTags
               }
@@ -223,7 +232,7 @@ huntselect = do
   divClass "appMain" $ el "div" $ el "div" $ elClass "ul" "grid h-screen place-items-center" $ el "div" $ do
     elClass "div" "huntlist-title" $ text "Select a hunt"
     list hunts $ \dHunt ->
-      el "li" $ dynRouteLink ((\a -> FrontendRoute_Puzzle :/ (HuntId $ _hunt_id a, Nothing)) <$> dHunt) $ elClass "div" "text-lg huntlist-button" $ dynText $ _hunt_title <$> dHunt
+      el "li" $ dynRouteLink ((\a -> FrontendRoute_Puzzle :/ (HuntId $ _hunt_id a, Left mempty)) <$> dHunt) $ elClass "div" "text-lg huntlist-button" $ dynText $ _hunt_title <$> dHunt
   pure never
 
 

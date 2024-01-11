@@ -13,6 +13,7 @@ library
                , constraints-extras
                , data-default
                , dependent-sum-template
+               , lens
                , mtl
                , obelisk-route
                , patch
@@ -26,6 +27,7 @@ library
                , vessel
                , witherable
                , rhyolite-account-types
+               , megaparsec
   exposed-modules:
     Common.Request
     Common.Route

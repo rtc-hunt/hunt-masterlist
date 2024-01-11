@@ -11,6 +11,8 @@ import Data.Graph
 import Data.Tree
 import Data.Foldable as F
 
+import Common.Route
+
 import Frontend.Types
 import Common.Schema
 
