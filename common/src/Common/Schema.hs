@@ -56,6 +56,7 @@ instance Table Chatroom where
 
 deriving instance Eq (PrimaryKey Chatroom Identity)
 deriving instance Ord (PrimaryKey Chatroom Identity)
+deriving instance Ord (PrimaryKey Chatroom (Nullable Identity))
 deriving instance Show (PrimaryKey Chatroom Identity)
 deriving instance Show (PrimaryKey Chatroom (Nullable Identity))
 instance ToJSON (PrimaryKey Chatroom Identity)

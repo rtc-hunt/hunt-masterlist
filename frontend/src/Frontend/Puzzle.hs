@@ -29,7 +29,7 @@ import Obelisk.Route.Frontend
 import Reflex.Dom.Core hiding (El)
 import Rhyolite.Api (ApiRequest(..))
 import Rhyolite.Frontend.App
-import Rhyolite.Vessel.Path
+import Rhyolite.Vessel.Path as Path
 import Data.Map.Monoidal as MMap hiding (keys)
 import Rhyolite.SemiMap
 
@@ -472,8 +472,68 @@ puzzleListBuilder
      , MonadIO (Performable m)
      , Requester t m, Response m ~ Identity, Request m ~ ApiRequest () PublicRequest PrivateRequest
      )
-  => Id Hunt -> m (Dynamic t (Map (Id Puzzle) (PuzzleData t)))
-puzzleListBuilder hunt = do
+  => Id Hunt -> m (Dynamic t (Map (Id Puzzle) (PuzzleDataT Identity)))
+puzzleListBuilder huntIdD = do
+  huntpuzzles <- traceShow "Entered puzzleListBuilder" $ fmap (fmap (fmap id)) $ watch $ (\hunt -> key V_HuntPuzzles ~> key hunt) <$> constDyn huntIdD
+  puzzles_initial <- fmap (fromMaybe (SemiMap_Complete mempty)) $ sample $ current huntpuzzles
+  huntpuzzlesDyn <- fmap (fmap knownKeysSet) $ foldDyn (<>) puzzles_initial $ fromMaybe mempty <$> updated huntpuzzles
+
+  -- puzzle <- traceShow "Entered puzzleListBuilder" $ fmap (fmap (fmap getFirst)) $ 
+  puzzlesD <- fmap (fmap (fmap getFirst . fromMaybe mempty)) $ watch $ (\puz -> key V_Puzzle ~> keys puz) <$> huntpuzzlesDyn
+  let channelsD = ffor puzzlesD $ \puzMap ->
+        Set.fromList $ Map.elems $ fmap _puzzle_Channel puzMap
+  metasD <- fmap (fmap (fromMaybe mempty)) $ watch $ (( (\puz -> key V_Metas ~> keys puz) <$> huntpuzzlesDyn ))
+
+  tagsD <- fmap (fmap (fromMaybe mempty)) $ watch $ (\puz -> key V_Tags ~> keys puz) <$> huntpuzzlesDyn
+  solutionsD <- fmap (fmap (fromMaybe mempty)) $ watch $ (\puz -> key V_Solutions ~> keys puz)  <$> huntpuzzlesDyn
+  notesD <- fmap (fmap (fromMaybe mempty)) $ watch $ (\puz -> key V_Notes ~> keys puz)  <$> huntpuzzlesDyn
+  -- currentSolversD <- fmap (fmap (fromMaybe Map.empty)) $ watch $ (\chan -> key V_ActiveUsers ~> keys chan) <$> channelsD
+
+  let combine puzzles metas tags solutions notes {- currentSolvers -} = ffor puzzles $ \puz -> -- id @(PuzzleDataT Identity) $
+        let 
+         puz_id = primaryKey puz
+         puz_metas = Map.fromList $ fmap (\(mp, v) -> (_meta_Metapuzzle mp, fromMaybe "" $ fmap _puzzle_Title $ Map.lookup (_meta_Metapuzzle mp) puzzles)) $ MMap.toList $ fromMaybe mempty $ (>>= getComplete) $ Map.lookup puz_id metas
+         puz_tags = Map.fromList $ fmap (\(k, _) -> (_tagId_Tag k, ())) $ MMap.toList $ fromMaybe MMap.empty $ (>>= getComplete) $ Map.lookup puz_id tags
+         puz_sols = MMap.getMonoidalMap $ fromMaybe MMap.empty $ (>>= getComplete) $ Map.lookup puz_id solutions
+         puz_notes = MMap.getMonoidalMap $ fromMaybe MMap.empty $ (>>= getComplete) $ Map.lookup puz_id notes
+         -- puz_solvers = MMap.getMonoidalMap $ fromMaybe MMap.empty $ (>>= getComplete) $ Map.lookup (_puzzle_Channel puz) currentSolvers
+        in PuzzleData
+         { _puzzleData_puzzle = puz
+         , _puzzleData_metas = puz_metas
+         , _puzzleData_tags = puz_tags
+         , _puzzleData_solutions = puz_sols
+         , _puzzleData_notes = puz_notes
+         , _puzzleData_status = "" -- FIXME
+         , _puzzleData_currentSolvers = Map.empty -- FIXME
+         }
+      
+    {- PuzzleData { _puzzleData_puzzle = puz
+    , _puzzleData_metas = metaIdTitle
+    , _puzzleData_tags = (() <$) . Map.mapKeys _tagId_Tag <$> fromMaybe mempty <$> tags
+    , _puzzleData_solutions = fromMaybe mempty <$> solutions
+    , _puzzleData_notes = fromMaybe mempty <$> notes
+    , _puzzleData_status = constDyn ""
+    , _puzzleData_currentSolvers = fromMaybe mempty <$> currentSolvers
+    } -}
+
+  pure $ combine <$> puzzlesD <*> metasD <*> tagsD <*> solutionsD <*> notesD -- <*> currentSolversD
+
+{-
+puzzleListBuilderOld
+  :: forall t m js.
+     ( PostBuild t m
+     , DomBuilder t m
+     , MonadHold t m
+     , MonadFix m
+     , Prerender js t m
+     , MonadQuery t (Vessel V (Const SelectedCount)) m
+     , PerformEvent t m
+     , TriggerEvent t m
+     , MonadIO (Performable m)
+     , Requester t m, Response m ~ Identity, Request m ~ ApiRequest () PublicRequest PrivateRequest
+     )
+  => Id Hunt -> m (Dynamic t (Map (Id Puzzle) (Dynamic t (PuzzleDataT Identity))))
+puzzleListBuilderOld hunt = do
   puzzleIds <- watch $ pure $ key V_HuntPuzzles ~> key hunt ~> postMap (traverse (fmap getMonoidalMap . getComplete))
   -- This is a hack. We should be querying it all in batches and rebuilding a map.
   -- I'm lazy.
@@ -537,3 +597,4 @@ puzzleListBuilder hunt = do
     }
 -}
  -}
+-}
