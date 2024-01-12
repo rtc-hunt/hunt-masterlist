@@ -331,7 +331,18 @@ puzzle puz = do
              sequence $ ffor puzzlePageTabs $ \tab ->
               let itemClass = ffor activeTab $ \aTab ->
                      "class" =: if aTab == tab then "item active" else "item"
-              in fmap (domEvent Click . fst) $ elDynAttr' "div" itemClass $ text $ tabToText tab
+              in fmap (domEvent Click . fst) $ case tab of
+                    PuzzlePageTab_Puzzle -> elDynAttr' "div" itemClass $ do
+                        text $ tabToText tab
+                        let lnk = _puzzle_URI <$> (puzzleData >>= _puzzleData_puzzle)
+                            lattr = ((\l -> ("target":: Text) =: "_blank" <> "href" =: l) <$> lnk)
+                        elDynAttr "a" lattr $ elClass "i" "external alternate icon px-4" $ blank
+                    PuzzlePageTab_Sheet -> elDynAttr' "div" itemClass $ do
+                        text $ tabToText tab
+                        let lnk = _puzzle_SheetURI <$> (puzzleData >>= _puzzleData_puzzle)
+                            lattr = ((\l -> ("target":: Text) =: "_blank" <> "href" =: (fromMaybe "" l)) <$> lnk)
+                        elDynAttr "a" lattr $ elClass "i" "external alternate icon px-4" $ blank
+                    tab -> elDynAttr' "div" itemClass $ text $ tabToText tab
             activeTab <- holdDyn (PuzzlePageTab_Sheet) $ leftmost evts
             divClass "item menuShrink" $ divClass "ellipsisShrink" $ do
               text "Title: "

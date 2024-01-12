@@ -71,9 +71,8 @@ puzzleQueryStringOrPuzzle_prism = prism' fromInput toQuery
     toText_sel PuzzleSelect_HasSolvers = "hasSolvers"
     toText_sel (PuzzleSelect_HasMeta meta) = "hasMeta(" <> (T.pack $ show $ (coerce :: PrimaryKey Puzzle Identity -> Int64) meta) <> ")"
 
-    toText_ord PuzzleOrdering_Any = ""
-    toText_ord PuzzleOrdering_ByMeta = " byMeta"
-
+    toText_ord PuzzleOrdering_Any = "unordered"
+    toText_ord PuzzleOrdering_ByMeta = ""
 
     toQuery = parseMaybe puzzleOrIdQueryParser
     puzzleOrIdQueryParser :: Parsec () Text (Either PuzzleQuery (Id Puzzle))
@@ -89,7 +88,7 @@ puzzleQueryStringOrPuzzle_prism = prism' fromInput toQuery
       , PuzzleSelect_WithTag . T.pack <$> (string "tag(" >> someTill printChar (string ")"))
       , PuzzleSelect_Not . mconcat <$> (string "not(" >> someTill puzzleSelParser (string ")"))
       ]
-    puzzleOrdParser = choice [ PuzzleOrdering_ByMeta <$ string "byMeta", pure PuzzleOrdering_Any ]
+    puzzleOrdParser = choice [ PuzzleOrdering_Any <$ string "unordered", pure PuzzleOrdering_ByMeta ]
 
 data PuzzleSelect
   = PuzzleSelect_All
