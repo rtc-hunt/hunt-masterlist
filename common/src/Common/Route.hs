@@ -50,7 +50,7 @@ instance Semigroup PuzzleQuery where
   PuzzleQuery sa oa <> PuzzleQuery sb ob = PuzzleQuery (sa <> sb) (oa <> ob)
 
 instance Monoid PuzzleQuery where
-  mempty = PuzzleQuery PuzzleSelect_All PuzzleOrdering_Any
+  mempty = PuzzleQuery PuzzleSelect_All PuzzleOrdering_ByMeta
 
 puzzleQueryStringOrPuzzle_prism :: Prism' Text (Either PuzzleQuery (Id Puzzle))
 puzzleQueryStringOrPuzzle_prism = prism' fromInput toQuery

@@ -243,7 +243,7 @@ redirectIfAuthenticated mAuthCookie = do
         , updated mAuthCookie
         ]
   liveHunts <- fmap (fmap (fromMaybe mempty)) $ watch $ constDyn $ key V_LiveHunts ~> key () ~> postMap (traverse (fmap (Map.keysSet . getMonoidalMap) . getComplete))
-  setRoute $ fmap (\hunt -> FrontendRoute_Puzzle :/ (hunt, Left mempty)) `fmapMaybe` (current (Set.lookupMax <$> liveHunts) <@ hasAuth)
+  setRoute $ fmap (\hunt -> FrontendRoute_Puzzle :/ (hunt, Left mempty)) $ (fromMaybe (HuntId 3) <$> current (Set.lookupMax <$> liveHunts) <@ hasAuth)
 
 runExampleWidget
   :: ( DomBuilder t m
