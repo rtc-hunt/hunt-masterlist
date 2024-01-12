@@ -33,7 +33,7 @@ data PuzzleDataT f = PuzzleData
   , _puzzleData_tags :: HKD f (Map Text ())
   , _puzzleData_solutions :: HKD f (Map (PrimaryKey Solution Identity) (Solution Identity))
   , _puzzleData_notes :: HKD f (Map (PrimaryKey Note Identity) (Note Identity))
-  , _puzzleData_status :: HKD f Text
+  , _puzzleData_status :: HKD f [Text]
   , _puzzleData_currentSolvers :: HKD f (Map (PrimaryKey Account Identity) Text)
   }
 

@@ -57,18 +57,18 @@ tableDynAttrWithSearch klass cols dRows rowAttrs = elAttr "div" (Map.singleton "
         el "tr" $ mapM_ (\(h, _, _) -> el "th" $ text h) cols
         el "tr" $ mapM (\(_, _, qm) -> el "th" $ qm) cols
       bodyRes <- el "tbody" $ mdo
-        --let startEvt = (() <$ updated dRows) <> (() <$ updated (mconcat queryEls))
-        --let shouldStopD = (>) <$> count <*> (max 24 . Map.size <$> dRows)
-        --let stopEvt = () <$ (gate (current shouldStopD) ticks )
-        --tickerD :: Dynamic t (m (Event t TickInfo)) <- holdDyn (pure never) $ leftmost [ ((tickLossy 0.5 (UTCTime (toEnum 0) 0)) <$ startEvt), (pure never) <$ traceEvent "stopevent" stopEvt ]
+        let startEvt = (() <$ updated dRows) <> (() <$ updated (mconcat queryEls))
+        let shouldStopD = (>) <$> count <*> (max 24 . Map.size <$> dRows)
+        let stopEvt = () <$ (gate (current shouldStopD) ticks )
+        tickerD :: Dynamic t (m (Event t TickInfo)) <- holdDyn (pure never) $ leftmost [ ((tickLossy 0.5 (UTCTime (toEnum 0) 0)) <$ startEvt), (pure never) <$ traceEvent "stopevent" stopEvt ]
         -- performEvent_ $ liftIO (putStrLn "Start") <$ startEvt
         -- performEvent_ $ liftIO (putStrLn "Stop") <$ stopEvt
         -- ticks <- tickLossyUpTo $ (\c -> (1, (UTCTime (toEnum 0) 0), c)) <$> (( + 1) . ( `div` 25) . Map.size <$> current dRows) <@ startEvt
         -- performEvent_ $ liftIO (putStrLn "TickLossy") <$ ticks
         -- display shouldStopD
-        -- ticks <- ((dyn tickerD >>= switchHold never))
+        ticks <- ((dyn tickerD >>= switchHold never))
         -- ticks <- Reflex.Dom.Core.traceEvent "tick" <$> ((dyn tickerD) >>= switchHold never)
-        count <- pure $ constDyn 1000 -- foldDyn id 25 $ leftmost [ const 25 <$ updated dRows, (+25) <$ ticks ]
+        count <- foldDyn id 25 $ leftmost [ const 25 <$ updated dRows, (+25) <$ ticks ]
         -- display count
         listWithKey (Map.take <$> count <*> dRows) (\k r -> do
           dAttrs <- rowAttrs k
@@ -131,7 +131,7 @@ puzzlesTable PuzzleTableConfig { _puzzleTableConfig_query = query, _puzzleTableC
                    modifyQuery $ (\(PuzzleQuery old _) (PuzzleQuery new _) -> Endo $ \(PuzzleQuery all ord) -> PuzzleQuery (new <> subPuzzleSelect all old) ord) <$> current dropdownValue <@> updated dropdownValue
                    pure dropdownValue
               )
-            , ("Status", \_ puzDat -> dynText $ (_puzzleData_status <$> puzDat)
+            , ("Status", \_ puzDat -> void $ simpleList (_puzzleData_status <$> puzDat) $ \v -> elDynAttr "span" ((\k -> "class" =: "ui label" <> "data-tag" =: k) <$> v) $ dynText v
             , do
                    startValue <- sample $ current $ ((\a -> fromMaybe mempty $ matchSubSelect a (`elem` ((PuzzleSelect_WithTag <$> ["done", "extraction", "in-progress", "solved", "stalled"]) :: [PuzzleSelect]))) . _puzzleQuery_select) <$> query
                    dropdownValue <- fmap (flip PuzzleQuery PuzzleOrdering_Any) . _dropdown_value <$> dropdown startValue (( (mempty =: " - ") <>) . Map.mapKeys PuzzleSelect_WithTag . Map.fromSet (id) <$> constDyn statusTags) headerDropdownSettings
@@ -156,7 +156,7 @@ puzzlesTable PuzzleTableConfig { _puzzleTableConfig_query = query, _puzzleTableC
                   pure dropdownValue
               )
             , ("Tags", \_ puzDat ->
-                void $ listWithKey (_puzzleData_tags <$> puzDat) $ \k _ -> elAttr "span" ("class" =: "ui label" <> "data-tag" =: k) $ text k
+                void $ listWithKey ((\pd -> _puzzleData_tags pd Map.\\ Map.fromList ((\a -> (a, ())) <$> _puzzleData_status pd)) <$> puzDat) $ \k _ -> elAttr "span" ("class" =: "ui label" <> "data-tag" =: k) $ text k
               , do
                   startValue <- sample $ current $ ((\a -> fromMaybe mempty $ matchSubSelect a (\case { PuzzleSelect_WithTag _ -> True; _ -> False })) . _puzzleQuery_select) <$> query
                   dropdownValue <- fmap (flip PuzzleQuery PuzzleOrdering_Any) . _dropdown_value <$> dropdown startValue (( (mempty =: " - ") <>) . Map.mapKeys PuzzleSelect_WithTag . Map.fromSet (id) <$> knownTags) headerDropdownSettings

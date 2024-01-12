@@ -455,7 +455,7 @@ puzzleBuilder puzIdD = do
     , _puzzleData_tags = (() <$) . Map.mapKeys _tagId_Tag <$> fromMaybe mempty <$> tags
     , _puzzleData_solutions = fromMaybe mempty <$> solutions
     , _puzzleData_notes = fromMaybe mempty <$> notes
-    , _puzzleData_status = constDyn ""
+    , _puzzleData_status = constDyn [""]
     , _puzzleData_currentSolvers = fromMaybe mempty <$> currentSolvers
     }
 
@@ -480,31 +480,36 @@ puzzleListBuilder huntIdD = do
 
   -- puzzle <- traceShow "Entered puzzleListBuilder" $ fmap (fmap (fmap getFirst)) $ 
   puzzlesD <- fmap (fmap (fmap getFirst . fromMaybe mempty)) $ watch $ (\puz -> key V_Puzzle ~> keys puz) <$> huntpuzzlesDyn
-  let channelsD = ffor puzzlesD $ \puzMap ->
-        Set.fromList $ Map.elems $ fmap _puzzle_Channel puzMap
+  -- let channelsD = ffor puzzlesD $ \puzMap ->
+  --       Set.fromList $ Map.elems $ fmap ((ChatroomId . unChatroomId) . _puzzle_Channel) puzMap
+  let channelsD :: Dynamic t (Set (Id Chatroom)) = ffor puzzlesD $ \puzMap -> Set.fromList $ Map.elems $ fmapMaybe id $ fmap (fmap ChatroomId . unChatroomId . _puzzle_Channel) puzMap
   metasD <- fmap (fmap (fromMaybe mempty)) $ watch $ (( (\puz -> key V_Metas ~> keys puz) <$> huntpuzzlesDyn ))
 
   tagsD <- fmap (fmap (fromMaybe mempty)) $ watch $ (\puz -> key V_Tags ~> keys puz) <$> huntpuzzlesDyn
   solutionsD <- fmap (fmap (fromMaybe mempty)) $ watch $ (\puz -> key V_Solutions ~> keys puz)  <$> huntpuzzlesDyn
   notesD <- fmap (fmap (fromMaybe mempty)) $ watch $ (\puz -> key V_Notes ~> keys puz)  <$> huntpuzzlesDyn
-  -- currentSolversD <- fmap (fmap (fromMaybe Map.empty)) $ watch $ (\chan -> key V_ActiveUsers ~> keys chan) <$> channelsD
+  currentSolversDF :: Dynamic t (Maybe (Map (Id Chatroom) (SemiMap (Id Account) Text))) <- watch $ (\chan -> key V_ActiveUsers ~> keys chan) <$> channelsD
+  let currentSolversD = fmap (MMap.getMonoidalMap . fromMaybe mempty . getComplete) . fromMaybe mempty <$> currentSolversDF
+  -- let curSD :: _ = fmap (fromMaybe mempty . fmap (fromMaybe mempty . getComplete)) <$> currentSolversDF
+  -- let currentSolversD :: Dynamic t (Map (Id Chatroom) (Map (Id Account) Text)) = fmap (fmap getComplete) <$> currentSolversDF
 
-  let combine puzzles metas tags solutions notes {- currentSolvers -} = ffor puzzles $ \puz -> -- id @(PuzzleDataT Identity) $
+  let combine puzzles metas tags solutions notes currentSolvers = ffor puzzles $ \puz -> -- id @(PuzzleDataT Identity) $
         let 
          puz_id = primaryKey puz
          puz_metas = Map.fromList $ fmap (\(mp, v) -> (_meta_Metapuzzle mp, fromMaybe "" $ fmap _puzzle_Title $ Map.lookup (_meta_Metapuzzle mp) puzzles)) $ MMap.toList $ fromMaybe mempty $ (>>= getComplete) $ Map.lookup puz_id metas
          puz_tags = Map.fromList $ fmap (\(k, _) -> (_tagId_Tag k, ())) $ MMap.toList $ fromMaybe MMap.empty $ (>>= getComplete) $ Map.lookup puz_id tags
          puz_sols = MMap.getMonoidalMap $ fromMaybe MMap.empty $ (>>= getComplete) $ Map.lookup puz_id solutions
          puz_notes = MMap.getMonoidalMap $ fromMaybe MMap.empty $ (>>= getComplete) $ Map.lookup puz_id notes
-         -- puz_solvers = MMap.getMonoidalMap $ fromMaybe MMap.empty $ (>>= getComplete) $ Map.lookup (_puzzle_Channel puz) currentSolvers
+         puz_solvers = fromMaybe Map.empty $ (fmap ChatroomId $ unChatroomId $ _puzzle_Channel puz) >>= flip Map.lookup currentSolvers
+         puz_status = [k | k <- Set.toList statusTags, Just () == Map.lookup k puz_tags ]
         in PuzzleData
          { _puzzleData_puzzle = puz
          , _puzzleData_metas = puz_metas
          , _puzzleData_tags = puz_tags
          , _puzzleData_solutions = puz_sols
          , _puzzleData_notes = puz_notes
-         , _puzzleData_status = "" -- FIXME
-         , _puzzleData_currentSolvers = Map.empty -- FIXME
+         , _puzzleData_status = puz_status
+         , _puzzleData_currentSolvers = puz_solvers
          }
       
     {- PuzzleData { _puzzleData_puzzle = puz
@@ -512,11 +517,11 @@ puzzleListBuilder huntIdD = do
     , _puzzleData_tags = (() <$) . Map.mapKeys _tagId_Tag <$> fromMaybe mempty <$> tags
     , _puzzleData_solutions = fromMaybe mempty <$> solutions
     , _puzzleData_notes = fromMaybe mempty <$> notes
-    , _puzzleData_status = constDyn ""
+    , _puzzleData_status = constDyn [""]
     , _puzzleData_currentSolvers = fromMaybe mempty <$> currentSolvers
     } -}
 
-  pure $ combine <$> puzzlesD <*> metasD <*> tagsD <*> solutionsD <*> notesD -- <*> currentSolversD
+  pure $ combine <$> puzzlesD <*> metasD <*> tagsD <*> solutionsD <*> notesD <*> currentSolversD
 
 {-
 puzzleListBuilderOld
@@ -571,7 +576,7 @@ puzzleListBuilderOld hunt = do
       , _puzzleData_tags = constDyn mempty -- (() <$) . Map.mapKeys _tagId_Tag <$> fromJust <$> tags
       , _puzzleData_solutions = constDyn mempty -- fromJust <$> solutions
       , _puzzleData_notes = constDyn mempty -- fromJust <$> notes
-      , _puzzleData_status = constDyn ""
+      , _puzzleData_status = constDyn [""]
       , _puzzleData_currentSolvers = constDyn mempty
       }
   {-

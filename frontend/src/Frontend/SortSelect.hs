@@ -63,8 +63,8 @@ prunePuzzles puzzleSelect puzzleData = prunePuzzlesInner <$> puzzleSelect <*> pu
              True -> Just pd
              False -> Nothing)
       PuzzleSelect_HasSolution -> fmap (fmapMaybe id) $ (Map.map $ \pd -> case (Map.null $ _puzzleData_solutions pd) of
-             True -> Just pd
-             False -> Nothing)
+             True -> Nothing
+             False -> Just pd)
       PuzzleSelect_HasSolvers -> fmap (fmapMaybe id) $ (Map.map $ \pd -> case (Map.null $ _puzzleData_currentSolvers pd) of
-             True -> Just pd
-             False -> Nothing)
+             True -> Nothing
+             False -> Just pd)
