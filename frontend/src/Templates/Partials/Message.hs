@@ -5,10 +5,12 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time
 import Reflex.Dom.Core
+import Control.Monad.IO.Class
+import System.IO.Unsafe
 import Templates.Types
 
 message
-  :: Template t m
+  :: (Template t m)
   => Dynamic t Msg
   -> m ()
 message mView = do
@@ -24,5 +26,7 @@ message mView = do
           elClass "div" "font-bold text-label text-light" $ dynText $ timestamp . _msg_timestamp <$> mView
         elClass "div" "p-4 rounded border border-metaline bg-white w-auto italic" $ dynText (fmap (\a -> _msg_handle a <> " " <> _msg_text a) mView)
 
+-- withTZ :: UTCTime -> LocalTime
+
 timestamp :: UTCTime -> Text
-timestamp = T.pack . formatTime defaultTimeLocale "%R"
+timestamp = T.pack . formatTime defaultTimeLocale "%R" . unsafePerformIO . utcToLocalZonedTime

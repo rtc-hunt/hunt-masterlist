@@ -19,4 +19,4 @@ runDbTrace pool a = liftIO $ withResource pool $ \conn ->
 
 -- | Postgres @current_timestamp()@ function. Returns the server's timestamp
 current_timestamp_ :: QExpr Postgres s UTCTime
-current_timestamp_ = QExpr (\_ -> PgExpressionSyntax (emit "current_timestamp at time zone 'UTC'"))
+current_timestamp_ = QExpr (\_ -> PgExpressionSyntax (emit "(current_timestamp at time zone 'UTC')::timestamp at time zone 'UTC'"))
