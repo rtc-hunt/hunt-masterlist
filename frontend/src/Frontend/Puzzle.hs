@@ -45,6 +45,9 @@ import Common.Schema
 import Common.View
 import Database.Beam.Schema
 
+import GHCJS.DOM
+import GHCJS.DOM.Document
+
 import Frontend.Chat
 import Frontend.ChannelList
 import Frontend.Channel
@@ -75,6 +78,7 @@ puzzles :: (Monad m, MonadFix m, Reflex t, Routed t (Id Hunt, Either PuzzleQuery
      , Requester t (Client m)
      , SetRoute t (R FrontendRoute) (Client m)
      , MonadIO (Performable m)
+     , MonadJSM (Performable (Client m))
      , Response (Client m) ~ Identity
      , Request (Client m) ~ ApiRequest () PublicRequest PrivateRequest
   ) => m (Event t ())
@@ -121,6 +125,7 @@ masterlist huntId queryD = do
   hunt <- buildHunt huntId
   knownMetas <- fmap (fmap (fromMaybe mempty)) $ watch $ constDyn $ key V_HuntMetas ~> key huntId ~> postMap (traverse (fmap getMonoidalMap . getComplete))
   knownTags <- getKnownTags
+  manageDocumentTitle $ ("Hunt Master List " <>) . review puzzleQueryStringOrPuzzle_prism . Left <$> queryD
   framed $ Framed
     { _framed_hunt = constDyn huntId
     , _framed_headerItems = mdo
@@ -297,6 +302,21 @@ tabToText = \case
   PuzzlePageTab_Chat -> "Chat"
   PuzzlePageTab_Config -> "Puzzle Config"
 
+manageDocumentTitle
+   :: ( MonadJSM (Performable (Client m))
+      , Prerender js t m
+      , PerformEvent t m
+      , Reflex t
+      , PostBuild t m
+      )
+   => Dynamic t Text
+   -> m ()
+manageDocumentTitle titleD = do
+      pb <- getPostBuild
+      prerender_ blank $ performEvent_ $ ffor (leftmost [updated titleD, current titleD <@ pb ]) $ \title -> do
+        doc <- currentDocumentUnchecked
+        setTitle doc title
+
 puzzle :: (Monad m, Reflex t, DomBuilder t m
      , MonadQuery t (Vessel V (Const SelectedCount)) m
      , Requester t m, Response m ~ Identity, Request m ~ ApiRequest () PublicRequest PrivateRequest
@@ -312,6 +332,7 @@ puzzle :: (Monad m, Reflex t, DomBuilder t m
      , Response (Client m) ~ Identity
      , Request (Client m) ~ ApiRequest () PublicRequest PrivateRequest
      , Requester t (Client m)
+     , MonadJSM (Performable (Client m))
      , Prerender js t m
      , MonadIO (Performable m)
   ) => Id Puzzle -> m ()
@@ -324,6 +345,7 @@ puzzle puz = do
     Just puzzleData -> do
       let huntId = _puzzle_Hunt <$> (puzzleData >>= _puzzleData_puzzle)
       knownMetas <- fmap (fmap (fromMaybe mempty)) $ watch $ (\hunt -> key V_HuntMetas ~> key hunt ~> postMap (traverse (fmap getMonoidalMap . getComplete))) <$> huntId
+      manageDocumentTitle $ ("H.M.L.: " <>) . _puzzle_Title <$> (puzzleData >>= _puzzleData_puzzle)
       framed $ Framed
         { _framed_hunt = huntId
         , _framed_headerItems = mdo
