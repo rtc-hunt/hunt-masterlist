@@ -62,6 +62,7 @@ import Templates.Login
 authCookieName :: Text
 authCookieName = "auth"
 
+
 -- This runs in a monad that can be run on the client or the server.
 -- To run code in a pure client or pure server context, use one of the
 -- `prerender` functions.
@@ -177,6 +178,7 @@ manageAuthCookie authChange = do
 frontendBody
   :: forall js t m.
      ( ObeliskWidget js t (R FrontendRoute) m
+     , MountableDomBuilder t m
      )
   => RoutedT t (R FrontendRoute) (ExampleWidget t m) ()
 frontendBody = do
@@ -247,6 +249,7 @@ redirectIfAuthenticated mAuthCookie = do
 
 runExampleWidget
   :: ( DomBuilder t m
+     , MountableDomBuilder t m
      , HasConfigs m
      , TriggerEvent t m
      , PerformEvent t m

@@ -1,8 +1,8 @@
 {
-  "owner": "obsidiansystems",
+  "owner": "rtc-hunt",
   "repo": "obelisk",
-  "branch": "develop",
+  "branch": "speed-experimentation",
   "private": false,
-  "rev": "51f9c759f7e2182daae8d7725840ca0dd30fd771",
-  "sha256": "05mjqmycbwvimff78ccw0x53ay17njkmjzkiwlj5mk0w1a89airz"
+  "rev": "f82198cbcbcfc92559fa4f2fae265e6d7e3a7e0d",
+  "sha256": "1z2gza13hfy7nw0j991fwq9p1avzyjs4r7gxv2222lr6djhh3dpa"
 }

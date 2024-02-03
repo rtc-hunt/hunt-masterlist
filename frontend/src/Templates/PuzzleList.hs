@@ -45,7 +45,7 @@ data PuzzleTableOut t m = PuzzleTableOut
 --  }
 
 -- | A widget to display a table with static columns and dynamic rows.
-tableDynAttrWithSearch :: forall t m r k v q. (Ord k, DomBuilder t m, MonadHold t m, PostBuild t m, MonadFix m, Monoid q, Show k, MonadIO (Performable m), TriggerEvent t m, PerformEvent t m)
+tableDynAttrWithSearch :: forall t m r k v q js. (Ord k, DomBuilder t m, MonadHold t m, PostBuild t m, MonadFix m, Monoid q, Show k, MonadIO (Performable m), TriggerEvent t m, PerformEvent t m, MountableDomBuilder t m)
   => Text                                   -- ^ Class applied to <table> element
   -> [(Text, k -> Dynamic t r -> m v, m (Dynamic t q))]      -- ^ Columns of (header, row key -> row value -> child widget)
   -> Dynamic t (Map k r)                      -- ^ Map from row key to row value
@@ -70,10 +70,18 @@ tableDynAttrWithSearch klass cols dRows rowAttrs = elAttr "div" (Map.singleton "
         -- ticks <- Reflex.Dom.Core.traceEvent "tick" <$> ((dyn tickerD) >>= switchHold never)
         count <- foldDyn id 25 $ leftmost [ const 25 <$ updated dRows, (+25) <$ ticks ]
         -- display count
-        listWithKey (Map.take <$> count <*> dRows) (\k r -> do
+        
+        frag <- fmap (fmap fst) $ dyn $ ffor dRows $ \rows -> buildDomFragment $ listWithKey (constDyn rows) (\k r -> do
+                dAttrs <- rowAttrs k
+                elDynAttr' "tr" dAttrs $ mapM (\(_, x, _) -> el "td" $ x k r ) cols)
+        emt <- fmap fst $ buildDomFragment $ blank
+        mountDomFragment emt frag
+        {- listWithKey (Map.take <$> count <*> dRows) (\k r -> do
           dAttrs <- rowAttrs k
           elDynAttr' "tr" dAttrs $ mapM (\(_, x, _) -> el "td" $ x k r ) cols
-          )
+          ) -}
+        -- undefined
+        pure undefined
       return (mconcat queryEls, bodyRes) 
 
 backsolve1 :: DomBuilder t m => m ()
@@ -84,8 +92,8 @@ headerDropdownSettings :: Reflex t => DropdownConfig t a
 headerDropdownSettings = def & dropdownConfig_attributes .~ (constDyn $ "class" =: "grow shrink w-4/5 max-w-xs min-w-4")
 
 
-puzzlesTable :: forall t m. (Template t m, MonadHold t m, MonadFix m, MonadIO (Performable m), TriggerEvent t m, PerformEvent t m
-     , SetRoute t (R FrontendRoute) m, RouteToUrl (R FrontendRoute) m )
+puzzlesTable :: forall js t m. (Template t m, MonadHold t m, MonadFix m, MonadIO (Performable m), TriggerEvent t m, PerformEvent t m
+     , SetRoute t (R FrontendRoute) m, RouteToUrl (R FrontendRoute) m , MountableDomBuilder t m, Prerender js t m)
   =>
   PuzzleTableConfig t m -> m ()
 --  Dynamic t (Map (PrimaryKey Puzzle Identity) (Puzzle Identity)) -> m ()

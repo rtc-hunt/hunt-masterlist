@@ -81,6 +81,7 @@ puzzles :: (Monad m, MonadFix m, Reflex t, Routed t (Id Hunt, Either PuzzleQuery
      , MonadJSM (Performable (Client m))
      , Response (Client m) ~ Identity
      , Request (Client m) ~ ApiRequest () PublicRequest PrivateRequest
+     , MountableDomBuilder t m
   ) => m (Event t ())
 puzzles = do
   routeD <- join <$> prerender (pure $ constDyn (HuntId 1, Left mempty)) askRoute
@@ -119,6 +120,7 @@ masterlist :: (Monad m, MonadHold t m, PostBuild t m, Reflex t, DomBuilder t m, 
      , Requester t (Client m)
      , Prerender js t m
      , MonadIO (Performable m)
+     , MountableDomBuilder t m
   )
   => Id Hunt -> Dynamic t PuzzleQuery -> m ()
 masterlist huntId queryD = do
