@@ -71,6 +71,11 @@ puzzlesTable PuzzleTableConfig { _puzzleTableConfig_results = puzzles, _puzzleTa
           let query = constDyn mempty
           let puzzleDataDynamic = traceDynWith (\t -> show ("puzzleDataDynamic updated", Map.keys t)) $ (toSortKeys mempty {-(_puzzleQuery_ordering <$> query)-} $ prunePuzzles (_puzzleQuery_select <$> query) $ puzzles)
           display $ Map.keys <$> puzzleDataDynamic
+          display $ join $ (sequenceA . fmap _puzzleData_puzzle) <$> puzzleDataDynamic
+          display $ join $ (sequenceA . fmap _puzzleData_metas) <$> puzzleDataDynamic
+          -- display $ join $ (sequenceA . fmap _puzzleData_solutions) <$> puzzleDataDynamic
+          display $ join $ (sequenceA . fmap _puzzleData_tags) <$> puzzleDataDynamic
+          -- display $ join $ (sequenceA . fmap _puzzleData_notes) <$> puzzleDataDynamic
           {-
           -- Reflex.Dom.Core.traceEvent $ "puzzleDataDynamic updated" <$ updated puzzleDataDynamic
           (query :: Dynamic t PuzzleQuery, _) <- traceShow "Puzzle list started" $ tableDynAttrWithSearch "puzzletable ui celled table"
