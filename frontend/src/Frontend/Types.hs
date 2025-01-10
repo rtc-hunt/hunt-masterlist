@@ -28,7 +28,6 @@ data PuzzleData t = PuzzleData
   , _puzzleData_tags :: Dynamic t (Map Text ())
   , _puzzleData_solutions :: Dynamic t (Map (PrimaryKey Solution Identity) (Solution Identity))
   , _puzzleData_notes :: Dynamic t (Map (PrimaryKey Note Identity) (Note Identity))
-  , _puzzleData_status :: Dynamic t Text
   , _puzzleData_currentSolvers :: Dynamic t (Map (PrimaryKey Account Identity) Text)
   }
 

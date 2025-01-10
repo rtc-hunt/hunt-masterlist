@@ -87,7 +87,9 @@ puzzlesTable PuzzleTableConfig { _puzzleTableConfig_results = puzzles, _puzzleTa
                   if _solution_IsBacksolve sol then backsolve1 else blank
               , fmap (flip PuzzleQuery PuzzleOrdering_Any) . _dropdown_value <$> dropdown mempty (constDyn (mempty =: " - " <> PuzzleSelect_HasSolution =: "Has Solution" <> (PuzzleSelect_Not PuzzleSelect_HasSolution) =: "No Solution")) headerDropdownSettings
               )
-            , ("Status", \_ puzData -> dynText $ (puzData >>= _puzzleData_status)
+            , ("Status", \_ puzDat -> 
+                void $ listWithKey (Map.filterWithKey (\k _ -> k `elem` statusTags) <$> (puzDat >>= _puzzleData_tags)) $ \k _ -> elAttr "span" ("class" =: "ui label" <> "data-tag" =: k) $ text k
+               
             , fmap (flip PuzzleQuery PuzzleOrdering_Any) . _dropdown_value <$> dropdown mempty (( (mempty =: " - ") <>) . Map.mapKeys PuzzleSelect_WithTag . Map.fromSet (id) <$> constDyn statusTags) headerDropdownSettings
               )
             , ("Current Solvers", \_ puzDat -> 
@@ -100,13 +102,13 @@ puzzlesTable PuzzleTableConfig { _puzzleTableConfig_results = puzzles, _puzzleTa
               , fmap (flip PuzzleQuery PuzzleOrdering_Any) . _dropdown_value <$> dropdown mempty (constDyn (mempty =: " - " <> PuzzleSelect_HasVoice =: "Has Voice Chat" <> (PuzzleSelect_Not PuzzleSelect_HasVoice) =: "No Voice Chat")) headerDropdownSettings
               )
             , ("Tags", \_ puzDat ->
-                void $ listWithKey (puzDat >>= _puzzleData_tags) $ \k _ -> elAttr "span" ("class" =: "ui label" <> "data-tag" =: k) $ text k
+                void $ listWithKey (Map.filterWithKey (\k _ -> not $ k `elem` statusTags) <$> (puzDat >>= _puzzleData_tags)) $ \k _ -> elAttr "span" ("class" =: "ui label" <> "data-tag" =: k) $ text k
               , fmap (flip PuzzleQuery PuzzleOrdering_Any) . _dropdown_value <$> dropdown mempty (( (mempty =: " - ") <>) . Map.mapKeys PuzzleSelect_WithTag . Map.fromSet (id) <$> knownTags) headerDropdownSettings
               )
             , ("Notes", \_ puzDat ->
                 void $ listWithKey (puzDat >>= _puzzleData_notes) $ \k dV -> elClass "div" "" $ dynText $ _note_Note <$> dV
               , return $ constDyn mempty)
             ]
-            (toSortKeys (_puzzleQuery_ordering <$> query) $ prunePuzzles (_puzzleQuery_select <$> query) $ puzzles)
+            (toSortKeys mempty {-(_puzzleQuery_ordering <$> query)-} $ prunePuzzles (_puzzleQuery_select <$> query) $ puzzles)
             (\k -> pure $ constDyn mempty)
           blank
