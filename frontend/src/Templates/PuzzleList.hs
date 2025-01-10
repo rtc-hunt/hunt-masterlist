@@ -68,6 +68,11 @@ puzzlesTable PuzzleTableConfig { _puzzleTableConfig_results = puzzles, _puzzleTa
           display query
           el "br" blank -}
           --(tableQueryD :: Dynamic t ([Int]), tableResD) <- 
+          let query = constDyn mempty
+          let puzzleDataDynamic = traceDynWith (\t -> show ("puzzleDataDynamic updated", Map.keys t)) $ (toSortKeys mempty {-(_puzzleQuery_ordering <$> query)-} $ prunePuzzles (_puzzleQuery_select <$> query) $ puzzles)
+          display $ Map.keys <$> puzzleDataDynamic
+          {-
+          -- Reflex.Dom.Core.traceEvent $ "puzzleDataDynamic updated" <$ updated puzzleDataDynamic
           (query :: Dynamic t PuzzleQuery, _) <- traceShow "Puzzle list started" $ tableDynAttrWithSearch "puzzletable ui celled table"
             [ ("Title", \puzKey puzDat -> puzzleLink (primaryKey <$> (puzDat >>= _puzzleData_puzzle)) $ elAttr "div" ("class" =: "" <> "data-tooltip" =: "Open Puzzle") $ dynText $ _puzzle_Title <$> (puzDat >>= _puzzleData_puzzle), return $ (constDyn mempty))
             , ("Is meta?", \_ puzDat -> blank -- dynText $ (\p -> if p then "META" else "") . _puzzle_IsMeta <$> (puzDat >>= _puzzleData_puzzle)
@@ -110,6 +115,8 @@ puzzlesTable PuzzleTableConfig { _puzzleTableConfig_results = puzzles, _puzzleTa
               blank  -- void $ listWithKey (puzDat >>= _puzzleData_notes) $ \k dV -> elClass "div" "" $ dynText $ _note_Note <$> dV
               , return $ constDyn mempty)
             ]
-            (toSortKeys mempty {-(_puzzleQuery_ordering <$> query)-} $ prunePuzzles (_puzzleQuery_select <$> query) $ puzzles)
+            puzzleDataDynamic
             (\k -> pure $ constDyn mempty)
+          blank
+          -}
           blank
