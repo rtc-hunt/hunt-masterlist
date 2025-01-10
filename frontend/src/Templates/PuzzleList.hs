@@ -32,7 +32,7 @@ data PuzzleTableOut t m = PuzzleTableOut
 --  }
 
 -- | A widget to display a table with static columns and dynamic rows.
-tableDynAttrWithSearch :: forall t m r k v q. (Ord k, DomBuilder t m, MonadHold t m, PostBuild t m, MonadFix m, Monoid q)
+tableDynAttrWithSearch :: forall t m r k v q. (Ord k, Adjustable t m, DomBuilder t m, MonadHold t m, PostBuild t m, MonadFix m, Monoid q)
   => Text                                   -- ^ Class applied to <table> element
   -> [(Text, k -> Dynamic t r -> m v, m (Dynamic t q))]      -- ^ Columns of (header, row key -> row value -> child widget)
   -> Dynamic t (Map k r)                      -- ^ Map from row key to row value
@@ -43,10 +43,14 @@ tableDynAttrWithSearch klass cols dRows rowAttrs = elAttr "div" (Map.singleton "
       queryEls <- el "thead" $ do
         el "tr" $ mapM_ (\(h, _, _) -> el "th" $ text h) cols
         el "tr" $ mapM (\(_, _, qm) -> el "th" $ qm) cols
-      bodyRes <- el "tbody" $
-        listWithKey dRows (\k r -> do
-          dAttrs <- rowAttrs k
-          elDynAttr' "tr" dAttrs $ mapM (\(_, x, _) -> el "td" $ x k r) cols)
+      initRows <- sample $ current dRows
+      let updateddRows = fmap Just <$> updated dRows
+      bodyRes <- el "tbody" $ do
+        listWithKeyShallowDiff initRows updateddRows $ (\k r er -> do
+        -- listWithKey dRows (\k r -> do
+           dAttrs <- rowAttrs k
+           rowData <- holdDyn r er
+           elDynAttr' "tr" dAttrs $ mapM (\(_, x, _) -> el "td" $ x k rowData) cols)
       return (mconcat queryEls, bodyRes) 
 
 backsolve1 :: DomBuilder t m => m ()
@@ -70,15 +74,15 @@ puzzlesTable PuzzleTableConfig { _puzzleTableConfig_results = puzzles, _puzzleTa
           --(tableQueryD :: Dynamic t ([Int]), tableResD) <- 
           let query = constDyn mempty
           let puzzleDataDynamic = traceDynWith (\t -> show ("puzzleDataDynamic updated", Map.keys t)) $ (toSortKeys mempty {-(_puzzleQuery_ordering <$> query)-} $ prunePuzzles (_puzzleQuery_select <$> query) $ puzzles)
-          display $ Map.keys <$> puzzleDataDynamic
+          {-display $ Map.keys <$> puzzleDataDynamic
           display $ join $ (sequenceA . fmap _puzzleData_puzzle) <$> puzzleDataDynamic
           display $ join $ (sequenceA . fmap _puzzleData_metas) <$> puzzleDataDynamic
           -- display $ join $ (sequenceA . fmap _puzzleData_solutions) <$> puzzleDataDynamic
           display $ join $ (sequenceA . fmap _puzzleData_tags) <$> puzzleDataDynamic
+          -}
           -- display $ join $ (sequenceA . fmap _puzzleData_notes) <$> puzzleDataDynamic
-          {-
           -- Reflex.Dom.Core.traceEvent $ "puzzleDataDynamic updated" <$ updated puzzleDataDynamic
-          (query :: Dynamic t PuzzleQuery, _) <- traceShow "Puzzle list started" $ tableDynAttrWithSearch "puzzletable ui celled table"
+          (query_ :: Dynamic t PuzzleQuery, _) <- traceShow "Puzzle list started" $ tableDynAttrWithSearch "puzzletable ui celled table"
             [ ("Title", \puzKey puzDat -> puzzleLink (primaryKey <$> (puzDat >>= _puzzleData_puzzle)) $ elAttr "div" ("class" =: "" <> "data-tooltip" =: "Open Puzzle") $ dynText $ _puzzle_Title <$> (puzDat >>= _puzzleData_puzzle), return $ (constDyn mempty))
             , ("Is meta?", \_ puzDat -> blank -- dynText $ (\p -> if p then "META" else "") . _puzzle_IsMeta <$> (puzDat >>= _puzzleData_puzzle)
               , fmap (flip PuzzleQuery PuzzleOrdering_Any) . _dropdown_value <$> dropdown mempty (constDyn (mempty =: " - " <> PuzzleSelect_IsMeta =: "Is Meta" <> (PuzzleSelect_Not PuzzleSelect_IsMeta) =: "Not Meta")) headerDropdownSettings
@@ -91,10 +95,10 @@ puzzlesTable PuzzleTableConfig { _puzzleTableConfig_results = puzzles, _puzzleTa
                     pure $ sortByMeta <> queryByMeta
                 )
             , ("Solution(s)", \_ puzDat -> do
-                blank {- dyn_ $ ffor (puzDat >>= _puzzleData_solutions) $ \solMap -> forM_ (Map.toList solMap) $ \(solId, sol) -> do
+                dyn_ $ ffor (puzDat >>= _puzzleData_solutions) $ \solMap -> forM_ (Map.toList solMap) $ \(solId, sol) -> do
                   el "pre" $ do 
                   text $ _solution_Solution sol
-                  if _solution_IsBacksolve sol then backsolve1 else blank -}
+                  if _solution_IsBacksolve sol then backsolve1 else blank
               , fmap (flip PuzzleQuery PuzzleOrdering_Any) . _dropdown_value <$> dropdown mempty (constDyn (mempty =: " - " <> PuzzleSelect_HasSolution =: "Has Solution" <> (PuzzleSelect_Not PuzzleSelect_HasSolution) =: "No Solution")) headerDropdownSettings
               )
             , ("Status", \_ puzDat -> 
@@ -122,6 +126,4 @@ puzzlesTable PuzzleTableConfig { _puzzleTableConfig_results = puzzles, _puzzleTa
             ]
             puzzleDataDynamic
             (\k -> pure $ constDyn mempty)
-          blank
-          -}
           blank
