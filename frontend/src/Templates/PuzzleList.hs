@@ -73,7 +73,8 @@ puzzlesTable PuzzleTableConfig { _puzzleTableConfig_results = puzzles, _puzzleTa
           el "br" blank -}
           --(tableQueryD :: Dynamic t ([Int]), tableResD) <- 
           -- jlet query = constDyn mempty
-          let puzzleDataDynamic = traceDynWith (\t -> show ("puzzleDataDynamic updated", Map.keys t)) $ (toSortKeys (_puzzleQuery_ordering <$> query) $ prunePuzzles (_puzzleQuery_select <$> query) $ puzzles)
+          uniqQuery <- holdDyn mempty $ updated query
+          let puzzleDataDynamic = traceDynWith (\t -> show ("puzzleDataDynamic updated", Map.keys t)) $ (toSortKeys (_puzzleQuery_ordering <$> uniqQuery) $ prunePuzzles (_puzzleQuery_select <$> uniqQuery) $ puzzles)
           {-display $ Map.keys <$> puzzleDataDynamic
           display $ join $ (sequenceA . fmap _puzzleData_puzzle) <$> puzzleDataDynamic
           display $ join $ (sequenceA . fmap _puzzleData_metas) <$> puzzleDataDynamic
