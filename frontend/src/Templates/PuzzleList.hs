@@ -13,6 +13,8 @@ import Database.Beam
 import Control.Monad.Identity
 import Obelisk.Route.Frontend
 
+import Data.Patch.MapWithMove
+
 import Common.Schema
 import Frontend.Types
 import Frontend.Utils
@@ -35,23 +37,27 @@ data PuzzleTableOut t m = PuzzleTableOut
 tableDynAttrWithSearch :: forall t m r k v q. (Ord k, Adjustable t m, DomBuilder t m, MonadHold t m, PostBuild t m, MonadFix m, Monoid q)
   => Text                                   -- ^ Class applied to <table> element
   -> [(Text, k -> r -> Event t r -> m v, m (Dynamic t q))]      -- ^ Columns of (header, row key -> row value -> child widget)
-  -> Dynamic t (Map k r)                      -- ^ Map from row key to row value
+  -> Incremental t (PatchMapWithMove k r)                      -- ^ Map from row key to row value
   -> (k -> m (Dynamic t (Map Text Text))) -- ^ Function to compute <tr> element attributes from row key
   -> m (Dynamic t q, Dynamic t (Map k (Element EventResult (DomBuilderSpace m) t, [v])))        -- ^ Map from row key to (El, list of widget return values)
-tableDynAttrWithSearch klass cols dRows rowAttrs = elAttr "div" (Map.singleton "style" "zoom: 1; overflow: auto; background: white;") $
+tableDynAttrWithSearch klass cols iRows rowAttrs = elAttr "div" (Map.singleton "style" "zoom: 1; overflow: auto; background: white;") $
     elAttr "table" (Map.singleton "class" klass) $ do
       queryEls <- el "thead" $ do
         el "tr" $ mapM_ (\(h, _, _) -> el "th" $ text h) cols
         el "tr" $ mapM (\(_, _, qm) -> el "th" $ qm) cols
-      initRows <- sample $ current dRows
-      let updateddRows = fmap Just <$> updated dRows
+      initRows <- sample $ currentIncremental iRows
+      --let qq :: _
+      --     qq = fmap (fmap Nothing) $ Map.difference <$> current dRows <@> updated dRows
+      -- let updateddRows = (fmap (fmap $ const Nothing) $ Map.difference <$> current dRows <@> updated dRows) <> (fmap Just <$> updatedIncremental dRows)
       bodyRes <- el "tbody" $ do
-        listWithKeyShallowDiff initRows updateddRows $ (\k r er -> do
+        let lster ir ur fun = mapMapWithAdjustWithMove fun ir ur
+        -- listWithKeyShallowDiff initRows updateddRows $ (\k r er -> do
+        lster initRows (updatedIncremental iRows) $ (\k r -> do
         -- listWithKey dRows (\k r -> do
            dAttrs <- rowAttrs k
            -- rowData <- holdDyn r er
-           elDynAttr' "tr" dAttrs $ mapM (\(_, x, _) -> el "td" $ x k r er) cols)
-      return (mconcat queryEls, bodyRes) 
+           elDynAttr' "tr" dAttrs $ mapM (\(_, x, _) -> el "td" $ x k r undefined) cols)
+      return (mconcat queryEls, undefined) -- bodyRes) 
 
 backsolve1 :: DomBuilder t m => m ()
 backsolve1 = elAttr "span" ("class" =: "tooltip" <> "style" =: "font-family: 'SymbolaRegular'" <> "data-tooltip" =: "This solution was backsolved.") $ do
@@ -75,6 +81,11 @@ puzzlesTable PuzzleTableConfig { _puzzleTableConfig_results = puzzles, _puzzleTa
           -- jlet query = constDyn mempty
           uniqQuery <- holdDyn mempty $ updated query
           let puzzleDataDynamic = traceDynWith (\t -> show ("puzzleDataDynamic updated", Map.keys t)) $ (toSortKeys (_puzzleQuery_ordering <$> uniqQuery) $ prunePuzzles (_puzzleQuery_select <$> uniqQuery) $ puzzles)
+
+          initialPuzzles <- sample $ current puzzleDataDynamic
+--          let puzzleIdsD = imap (\i _ -> i) <$> puzzleDataDynamic
+          puzzleIncremental <- holdIncremental initialPuzzles $ patchThatChangesMap <$> currentIncremental puzzleIncremental <@> updated puzzleDataDynamic
+          
           {-display $ Map.keys <$> puzzleDataDynamic
           display $ join $ (sequenceA . fmap _puzzleData_puzzle) <$> puzzleDataDynamic
           display $ join $ (sequenceA . fmap _puzzleData_metas) <$> puzzleDataDynamic
@@ -124,6 +135,6 @@ puzzlesTable PuzzleTableConfig { _puzzleTableConfig_results = puzzles, _puzzleTa
               void $ listWithKey (_puzzleData_notes puzDat) $ \k dV -> elClass "div" "" $ dynText $ _note_Note <$> dV
               , return $ constDyn mempty)
             ]
-            puzzleDataDynamic
+            puzzleIncremental
             (\k -> pure $ constDyn mempty)
           blank

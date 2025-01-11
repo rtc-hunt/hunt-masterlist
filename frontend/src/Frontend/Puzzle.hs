@@ -446,7 +446,8 @@ puzzleBuilder puzIdD = do
   -- display puzzles
   return $ ffor puzzle $ \foundPuzD ->
     ffor foundPuzD $ \puz -> traceShow "PuzzleData built" $ PuzzleData
-    { _puzzleData_puzzle = constDyn puz
+    { _puzzleData_id = primaryKey puz
+    , _puzzleData_puzzle = constDyn puz
     , _puzzleData_metas = metaIdTitle
     , _puzzleData_tags = (() <$) . Map.mapKeys _tagId_Tag <$> fromMaybe mempty <$> tags
     , _puzzleData_solutions = fromMaybe mempty <$> solutions
@@ -570,7 +571,8 @@ puzzleListBuilder hunt = do
   -}
   return $ ffor puzzles $ \puzzles -> (flip Map.mapWithKey) (fromMaybe mempty puzzles) $ \puzId puz ->
     PuzzleData
-      { _puzzleData_puzzle = constDyn puz
+      { _puzzleData_id = puzId
+      , _puzzleData_puzzle = constDyn puz
       , _puzzleData_metas = fannedIndex fannedMetas puzId -- metaIdTitle >>= \metas ->  -- (StrictMap.! puzId) <$> metaIdTitle -- fmap _puzzle_Title <$> ((StrictMap.! puzId) <$> metaIdTitle) <*> intermed
       , _puzzleData_tags = fannedIndex tagsFanned puzId -- (() <$) . Map.mapKeys _tagId_Tag <$> fromJust <$> tags
       , _puzzleData_solutions = fannedIndex solutionsFanned puzId -- constDyn mempty -- fromJust <$> solutions

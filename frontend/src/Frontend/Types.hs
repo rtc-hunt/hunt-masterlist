@@ -23,13 +23,22 @@ type ExampleWidget = RhyoliteWidget
   (ApiRequest AuthToken PublicRequest PrivateRequest)
 
 data PuzzleData t = PuzzleData
-  { _puzzleData_puzzle :: Dynamic t (Puzzle Identity)
+  { _puzzleData_id :: Id Puzzle
+  , _puzzleData_puzzle :: Dynamic t (Puzzle Identity)
   , _puzzleData_metas :: Dynamic t (Map (PrimaryKey Puzzle Identity) Text)
   , _puzzleData_tags :: Dynamic t (Map Text ())
   , _puzzleData_solutions :: Dynamic t (Map (PrimaryKey Solution Identity) (Solution Identity))
   , _puzzleData_notes :: Dynamic t (Map (PrimaryKey Note Identity) (Note Identity))
   , _puzzleData_currentSolvers :: Dynamic t (Map (PrimaryKey Account Identity) Text)
   }
+
+-- Slightly terrible, but practical?
+instance Eq (PuzzleData t) where
+  a == b = _puzzleData_id a == _puzzleData_id b
+instance Ord (PuzzleData t) where
+  compare a b = compare (_puzzleData_id a) (_puzzleData_id b)
+instance Show (PuzzleData t) where
+  show a = "<PuzzleData For " <> show (_puzzleData_id a) <> ">"
 
 data PuzzleQuery = PuzzleQuery 
   { _puzzleQuery_select :: PuzzleSelect
