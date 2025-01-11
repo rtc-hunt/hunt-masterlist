@@ -29,6 +29,7 @@ library
                , data-default
                , lens
                , mtl
+               , patch
                , rhyolite-common
                , signed-data
                , rhyolite-groundhog-legacy-types
