@@ -34,7 +34,7 @@ data PuzzleTableOut t m = PuzzleTableOut
 -- | A widget to display a table with static columns and dynamic rows.
 tableDynAttrWithSearch :: forall t m r k v q. (Ord k, Adjustable t m, DomBuilder t m, MonadHold t m, PostBuild t m, MonadFix m, Monoid q)
   => Text                                   -- ^ Class applied to <table> element
-  -> [(Text, k -> Dynamic t r -> m v, m (Dynamic t q))]      -- ^ Columns of (header, row key -> row value -> child widget)
+  -> [(Text, k -> r -> Event t r -> m v, m (Dynamic t q))]      -- ^ Columns of (header, row key -> row value -> child widget)
   -> Dynamic t (Map k r)                      -- ^ Map from row key to row value
   -> (k -> m (Dynamic t (Map Text Text))) -- ^ Function to compute <tr> element attributes from row key
   -> m (Dynamic t q, Dynamic t (Map k (Element EventResult (DomBuilderSpace m) t, [v])))        -- ^ Map from row key to (El, list of widget return values)
@@ -49,8 +49,8 @@ tableDynAttrWithSearch klass cols dRows rowAttrs = elAttr "div" (Map.singleton "
         listWithKeyShallowDiff initRows updateddRows $ (\k r er -> do
         -- listWithKey dRows (\k r -> do
            dAttrs <- rowAttrs k
-           rowData <- holdDyn r er
-           elDynAttr' "tr" dAttrs $ mapM (\(_, x, _) -> el "td" $ x k rowData) cols)
+           -- rowData <- holdDyn r er
+           elDynAttr' "tr" dAttrs $ mapM (\(_, x, _) -> el "td" $ x k r er) cols)
       return (mconcat queryEls, bodyRes) 
 
 backsolve1 :: DomBuilder t m => m ()
@@ -83,45 +83,44 @@ puzzlesTable PuzzleTableConfig { _puzzleTableConfig_results = puzzles, _puzzleTa
           -- display $ join $ (sequenceA . fmap _puzzleData_notes) <$> puzzleDataDynamic
           -- Reflex.Dom.Core.traceEvent $ "puzzleDataDynamic updated" <$ updated puzzleDataDynamic
           (query_ :: Dynamic t PuzzleQuery, _) <- traceShow "Puzzle list started" $ tableDynAttrWithSearch "puzzletable ui celled table"
-            [ ("Title", \puzKey puzDat -> puzzleLink (primaryKey <$> (puzDat >>= _puzzleData_puzzle)) $ elAttr "div" ("class" =: "" <> "data-tooltip" =: "Open Puzzle") $ dynText $ _puzzle_Title <$> (puzDat >>= _puzzleData_puzzle), return $ (constDyn mempty))
-            , ("Is meta?", \_ puzDat -> blank -- dynText $ (\p -> if p then "META" else "") . _puzzle_IsMeta <$> (puzDat >>= _puzzleData_puzzle)
+            [ ("Title", \puzKey puzDat _ -> puzzleLink (primaryKey <$> (_puzzleData_puzzle puzDat)) $ elAttr "div" ("class" =: "" <> "data-tooltip" =: "Open Puzzle") $ dynText $ _puzzle_Title <$> (_puzzleData_puzzle puzDat), return $ (constDyn mempty))
+            , ("Is meta?", \_ puzDat _ -> blank -- dynText $ (\p -> if p then "META" else "") . _puzzle_IsMeta <$> (puzDat >>= _puzzleData_puzzle)
               , fmap (flip PuzzleQuery PuzzleOrdering_Any) . _dropdown_value <$> dropdown mempty (constDyn (mempty =: " - " <> PuzzleSelect_IsMeta =: "Is Meta" <> (PuzzleSelect_Not PuzzleSelect_IsMeta) =: "Not Meta")) headerDropdownSettings
               )
-            , ("Meta", \_ puzDat -> void $
-                blank -- listWithKey (puzDat >>= _puzzleData_metas) $ \k dV -> puzzleLink (constDyn k) $ dynText dV
+            , ("Meta", \_ puzDat _ -> void $
+                listWithKey (_puzzleData_metas puzDat) $ \k dV -> puzzleLink (constDyn k) $ dynText dV
                 , elClass "span" "flex flex-row" $ do
                     queryByMeta <- fmap (flip PuzzleQuery PuzzleOrdering_Any) . _dropdown_value <$> dropdown mempty (( (mempty =: " - ") <>) . Map.mapKeys PuzzleSelect_HasMeta <$> knownMetas) headerDropdownSettings
                     sortByMeta <- elClass "span" "flex-initial max-w-min" $ fmap (PuzzleQuery PuzzleSelect_All . (\a -> if a then PuzzleOrdering_ByMeta else PuzzleOrdering_Any)) <$> semToggle "" True
                     pure $ sortByMeta <> queryByMeta
                 )
-            , ("Solution(s)", \_ puzDat -> do
-                dyn_ $ ffor (puzDat >>= _puzzleData_solutions) $ \solMap -> forM_ (Map.toList solMap) $ \(solId, sol) -> do
+            , ("Solution(s)", \_ puzDat _ -> do
+                dyn_ $ ffor (_puzzleData_solutions puzDat) $ \solMap -> forM_ (Map.toList solMap) $ \(solId, sol) -> do
                   el "pre" $ do 
                   text $ _solution_Solution sol
                   if _solution_IsBacksolve sol then backsolve1 else blank
               , fmap (flip PuzzleQuery PuzzleOrdering_Any) . _dropdown_value <$> dropdown mempty (constDyn (mempty =: " - " <> PuzzleSelect_HasSolution =: "Has Solution" <> (PuzzleSelect_Not PuzzleSelect_HasSolution) =: "No Solution")) headerDropdownSettings
               )
-            , ("Status", \_ puzDat -> 
-                blank -- void $ listWithKey (Map.filterWithKey (\k _ -> k `elem` statusTags) <$> (puzDat >>= _puzzleData_tags)) $ \k _ -> elAttr "span" ("class" =: "ui label" <> "data-tag" =: k) $ text k
+            , ("Status", \_ puzDat _ -> 
+                void $ listWithKey (Map.filterWithKey (\k _ -> k `elem` statusTags) <$> (_puzzleData_tags puzDat)) $ \k _ -> elAttr "span" ("class" =: "ui label" <> "data-tag" =: k) $ text k
                
             , fmap (flip PuzzleQuery PuzzleOrdering_Any) . _dropdown_value <$> dropdown mempty (( (mempty =: " - ") <>) . Map.mapKeys PuzzleSelect_WithTag . Map.fromSet (id) <$> constDyn statusTags) headerDropdownSettings
               )
-            , ("Current Solvers", \_ puzDat -> 
-                blank -- void $ listWithKey (puzDat >>= _puzzleData_currentSolvers) $ \k u -> el "span" $ dynText u
+            , ("Current Solvers", \_ puzDat _ -> 
+                void $ listWithKey (_puzzleData_currentSolvers puzDat) $ \k u -> el "span" $ dynText u
               , fmap (flip PuzzleQuery PuzzleOrdering_Any) . _dropdown_value <$> dropdown mempty (constDyn (mempty =: " - " <> PuzzleSelect_HasSolvers =: "Has Current Solvers" <> (PuzzleSelect_Not PuzzleSelect_HasSolvers) =: "No Current Solvers")) headerDropdownSettings
               )
-            , ("Voice Chat", \_ puzDat -> 
-                blank {- let lnkD = _puzzle_voicelink <$> (puzDat >>= _puzzleData_puzzle)
+            , ("Voice Chat", \_ puzDat _ -> 
+                let lnkD = _puzzle_voicelink <$> (_puzzleData_puzzle puzDat)
                 in elDynAttr "a" (fromMaybe mempty . fmap ((<> ("class" =: "text-xs voicelink" <> "target" =: "_blank")) . ("href" =:)) <$> lnkD) $ dynText $ fromMaybe "" . ("Voice Chat" <$) <$> lnkD
-                -}
               , fmap (flip PuzzleQuery PuzzleOrdering_Any) . _dropdown_value <$> dropdown mempty (constDyn (mempty =: " - " <> PuzzleSelect_HasVoice =: "Has Voice Chat" <> (PuzzleSelect_Not PuzzleSelect_HasVoice) =: "No Voice Chat")) headerDropdownSettings
               )
-            , ("Tags", \_ puzDat ->
-              blank  -- void $ listWithKey (Map.filterWithKey (\k _ -> not $ k `elem` statusTags) <$> (puzDat >>= _puzzleData_tags)) $ \k _ -> elAttr "span" ("class" =: "ui label" <> "data-tag" =: k) $ text k
+            , ("Tags", \_ puzDat _ ->
+              void $ listWithKey (Map.filterWithKey (\k _ -> not $ k `elem` statusTags) <$> (_puzzleData_tags puzDat)) $ \k _ -> elAttr "span" ("class" =: "ui label" <> "data-tag" =: k) $ text k
               , fmap (flip PuzzleQuery PuzzleOrdering_Any) . _dropdown_value <$> dropdown mempty (( (mempty =: " - ") <>) . Map.mapKeys PuzzleSelect_WithTag . Map.fromSet (id) <$> knownTags) headerDropdownSettings
               )
-            , ("Notes", \_ puzDat ->
-              blank  -- void $ listWithKey (puzDat >>= _puzzleData_notes) $ \k dV -> elClass "div" "" $ dynText $ _note_Note <$> dV
+            , ("Notes", \_ puzDat _ ->
+              void $ listWithKey (_puzzleData_notes puzDat) $ \k dV -> elClass "div" "" $ dynText $ _note_Note <$> dV
               , return $ constDyn mempty)
             ]
             puzzleDataDynamic
