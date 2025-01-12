@@ -468,7 +468,7 @@ puzzleListBuilder
      , MonadIO (Performable m)
      , Requester t m, Response m ~ Identity, Request m ~ ApiRequest () PublicRequest PrivateRequest
      )
-  => Id Hunt -> m (Dynamic t (StrictMap.Map (Id Puzzle) (PuzzleData t)))
+  => Id Hunt -> m (Dynamic t (StrictMap.Map (Id Puzzle) (StaticPuzzleData)))
 puzzleListBuilder hunt = do
   puzzleIds <- watch $ pure $ key V_HuntPuzzles ~> key hunt ~> postMap (traverse (fmap getMonoidalMap . getComplete))
   {- -- This is a hack. We should be querying it all in batches and rebuilding a map.
@@ -569,7 +569,7 @@ puzzleListBuilder hunt = do
   notes <- watch $ (\puzId -> key V_Notes ~> key puzId ~> postMap (traverse (fmap getMonoidalMap . getComplete))) <$> puzIdD
   -- display puzzles
   -}
-  return $ ffor puzzles $ \puzzles -> (flip Map.mapWithKey) (fromMaybe mempty puzzles) $ \puzId puz ->
+  {- return $ ffor puzzles $ \puzzles -> (flip Map.mapWithKey) (fromMaybe mempty puzzles) $ \puzId puz ->
     PuzzleData
       { _puzzleData_id = puzId
       , _puzzleData_puzzle = constDyn puz
@@ -578,7 +578,9 @@ puzzleListBuilder hunt = do
       , _puzzleData_solutions = fannedIndex solutionsFanned puzId -- constDyn mempty -- fromJust <$> solutions
       , _puzzleData_notes = fannedIndex notesFanned puzId --  constDyn mempty -- fromJust <$> notes
       , _puzzleData_currentSolvers = fannedIndex solversOnPuzzles puzId
-      }
+      } -}
+  return $ join $ ffor puzzles $ \puzzles -> sequenceA $ (flip Map.mapWithKey) (fromMaybe mempty puzzles) $ \puzId puz ->
+      (StaticPuzzleData puzId puz) <$> fannedIndex fannedMetas puzId <*> fannedIndex tagsFanned puzId <*> fannedIndex solutionsFanned puzId <*> fannedIndex notesFanned puzId <*> fannedIndex solversOnPuzzles puzId
   {-
   return $ ffor (Map.lookup <$> puzIdD <*> (fromMaybe mempty <$> puzzles)) $ \foundPuzD ->
     ffor foundPuzD $ \puz -> PuzzleData

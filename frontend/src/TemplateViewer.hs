@@ -128,7 +128,7 @@ puzzleListTemplateViewer = do
     _puzzleData_status = constDyn "InProgress"
     }) ] -}
   puzzlesTable PuzzleTableConfig {
-    _puzzleTableConfig_results = constDyn fakePuzzles,
+    _puzzleTableConfig_results = constDyn undefined,  -- fakePuzzles,
     _puzzleTableConfig_puzzleLink = \_ -> routeLink (FrontendRoute_Templates :/ TemplateRoute_Puzzle :/ ())
   }
   

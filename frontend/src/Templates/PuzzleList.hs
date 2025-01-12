@@ -22,9 +22,10 @@ import Frontend.Utils
 import Templates.Types
 import Frontend.SortSelect
 import Debug.Trace
+import Reflex.Dom.Builder.Static
 
 data PuzzleTableConfig t m = PuzzleTableConfig
-  { _puzzleTableConfig_results :: Dynamic t (Map (PrimaryKey Puzzle Identity) (PuzzleData t))
+  { _puzzleTableConfig_results :: Dynamic t (Map (PrimaryKey Puzzle Identity) (StaticPuzzleData))
   , _puzzleTableConfig_puzzleLink :: Dynamic t (PrimaryKey Puzzle Identity) -> m () -> m ()
   , _puzzleTableConfig_metas :: Dynamic t (Map (Id Puzzle) Text)
   , _puzzleTableConfig_tags :: Dynamic t (Set Text)
@@ -85,13 +86,16 @@ puzzlesTable PuzzleTableConfig { _puzzleTableConfig_results = puzzles, _puzzleTa
           display query
           el "br" blank -}
           --(tableQueryD :: Dynamic t ([Int]), tableResD) <- 
-          -- jlet query = constDyn mempty
-          uniqQuery <- holdDyn mempty $ updated query
-          let puzzleDataDynamic = traceDynWith (\t -> show ("puzzleDataDynamic updated", Map.keys t)) $ (toSortKeys (_puzzleQuery_ordering <$> uniqQuery) $ prunePuzzles (_puzzleQuery_select <$> uniqQuery) $ puzzles)
+          -- let query = constDyn mempty
+          -- uniqQuery <- holdDyn mempty $ updated query
+          -- let puzzleDataDynamic = traceDynWith (\t -> show ("puzzleDataDynamic updated", Map.keys t)) $ (toSortKeys (_puzzleQuery_ordering <$> uniqQuery) $ prunePuzzles (_puzzleQuery_select <$> uniqQuery) $ puzzles)
+          display puzzles
 
-          initialPuzzles <- sample $ current puzzleDataDynamic
+          -- display $ Map.size <$> puzzleDataDynamic
+
+          -- initialPuzzles <- sample $ current puzzleDataDynamic
 --          let puzzleIdsD = imap (\i _ -> i) <$> puzzleDataDynamic
-          puzzleIncremental <- holdIncremental initialPuzzles $ patchThatChangesMap <$> currentIncremental puzzleIncremental <@> updated puzzleDataDynamic
+          -- puzzleIncremental <- holdIncremental initialPuzzles $ patchThatChangesMap <$> currentIncremental puzzleIncremental <@> updated puzzleDataDynamic
           
           {-display $ Map.keys <$> puzzleDataDynamic
           display $ join $ (sequenceA . fmap _puzzleData_puzzle) <$> puzzleDataDynamic
@@ -101,6 +105,7 @@ puzzlesTable PuzzleTableConfig { _puzzleTableConfig_results = puzzles, _puzzleTa
           -}
           -- display $ join $ (sequenceA . fmap _puzzleData_notes) <$> puzzleDataDynamic
           -- Reflex.Dom.Core.traceEvent $ "puzzleDataDynamic updated" <$ updated puzzleDataDynamic
+          {-
           (query :: Dynamic t PuzzleQuery, _) <- traceShow "Puzzle list started" $ tableDynAttrWithSearch "puzzletable ui celled table"
             [ ("Title", \puzKey puzDat _ -> puzzleLink (primaryKey <$> (_puzzleData_puzzle puzDat)) $ elAttr "div" ("class" =: "" <> "data-tooltip" =: "Open Puzzle") $ dynText $ _puzzle_Title <$> (_puzzleData_puzzle puzDat), return $ (constDyn mempty))
             , ("Is meta?", \_ puzDat _ -> blank -- dynText $ (\p -> if p then "META" else "") . _puzzle_IsMeta <$> (puzDat >>= _puzzleData_puzzle)
@@ -144,4 +149,5 @@ puzzlesTable PuzzleTableConfig { _puzzleTableConfig_results = puzzles, _puzzleTa
             ]
             puzzleIncremental
             (\k -> pure $ constDyn mempty)
+           -}
           blank

@@ -40,6 +40,24 @@ instance Ord (PuzzleData t) where
 instance Show (PuzzleData t) where
   show a = "<PuzzleData For " <> show (_puzzleData_id a) <> ">"
 
+data StaticPuzzleData = StaticPuzzleData
+  { _staticPuzzleData_id :: Id Puzzle
+  , _staticPuzzleData_puzzle :: Puzzle Identity
+  , _staticPuzzleData_metas :: Map (PrimaryKey Puzzle Identity) Text
+  , _staticPuzzleData_tags :: Map Text ()
+  , _staticPuzzleData_solutions :: Map (PrimaryKey Solution Identity) (Solution Identity)
+  , _staticPuzzleData_notes :: Map (PrimaryKey Note Identity) (Note Identity)
+  , _staticPuzzleData_currentSolvers :: Map (PrimaryKey Account Identity) Text
+  } deriving (Show)
+
+-- Slightly terrible, but practical?
+instance Eq (StaticPuzzleData) where
+  a == b = _staticPuzzleData_id a == _staticPuzzleData_id b
+instance Ord (StaticPuzzleData) where
+  compare a b = compare (_staticPuzzleData_id a) (_staticPuzzleData_id b)
+-- instance Show (StaticPuzzleData) where
+--   show a = "<StaticPuzzleData For " <> show (_staticPuzzleData_id a) <> ">"
+
 data PuzzleQuery = PuzzleQuery 
   { _puzzleQuery_select :: PuzzleSelect
   , _puzzleQuery_ordering :: PuzzleOrdering
