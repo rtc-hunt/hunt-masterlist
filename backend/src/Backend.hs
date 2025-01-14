@@ -23,6 +23,7 @@ import Data.Coerce
 import Data.Maybe
 import Data.Pool
 import Data.Signed.ClientSession
+import Data.IORef
 import Data.Vessel
 import Gargoyle.PostgreSQL.Connect
 import Obelisk.Backend
@@ -64,11 +65,13 @@ backend = Backend
     withDb "db" $ \pool -> do
       catch (withResource pool $ \conn -> withTransactionSerializable conn $
         runMigrations conn) $ \(e :: SomeException) -> (putStr "Waiting for DB fixes\n" >> threadDelay 100000000)
+      let queryHandlerFn = \q -> fromMaybe emptyV <$> mapDecomposedV (handleAuthMapQuery checkToken (privateQueryHandler pool)) q
+      atomicWriteIORef Common.View.globalMagicQueryHandler $ Just (fmap (head . Data.Map.Monoidal.elems . disperseV) . queryHandlerFn . condenseV . Data.Map.Monoidal.singleton (ClientKey 0))
       (listen, _) <- liftIO $ serveDbOverWebsockets
         (coerce pool)
         (requestHandler pool csk cgk allowForcedLogins)
         (\nm q -> fmap (fromMaybe emptyV) $ mapDecomposedV (handleAuthMapQuery checkToken (notifyHandler pool nm)) q)
-        (QueryHandler $ \q -> fromMaybe emptyV <$> mapDecomposedV (handleAuthMapQuery checkToken (privateQueryHandler pool)) q)
+        (QueryHandler $ queryHandlerFn)-- fromMaybe emptyV <$> mapDecomposedV (handleAuthMapQuery checkToken (privateQueryHandler pool)) q)
         vesselFromWire
         (vesselPipeline . observePipelineQuery (trackActiveUsers csk pool))
       serve $ \case
@@ -76,7 +79,6 @@ backend = Backend
         BackendRoute_Missing :/ () -> return ()
   , _backend_routeEncoder = fullRouteEncoder
   }
-
 
 observePipelineQuery :: (q -> IO ()) -> Pipeline IO q q
 observePipelineQuery f = Pipeline $ \qh r -> do

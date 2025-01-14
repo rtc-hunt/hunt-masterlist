@@ -9,6 +9,7 @@ library
                , array
                , beam-core
                , bytestring
+               , base64-bytestring
                , common
                , constraints-extras
                , containers
@@ -29,6 +30,7 @@ library
                , data-default
                , lens
                , mtl
+               , patch
                , rhyolite-common
                , signed-data
                , rhyolite-groundhog-legacy-types
@@ -40,6 +42,7 @@ library
                , time
                , aeson
                , witherable
+               , transformers
   exposed-modules:
     Frontend
     Frontend.Authentication

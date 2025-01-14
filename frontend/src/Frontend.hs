@@ -21,11 +21,18 @@ import qualified Data.Aeson as A
 import qualified Data.List as L
 import Data.Text (Text)
 import qualified Data.Map as Map
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Set as Set
 import Data.Maybe
 import qualified Data.Text.Encoding as T
 import qualified Data.Witherable as W
-import GHCJS.DOM (currentDocumentUnchecked)
+import GHCJS.DOM (currentDocumentUnchecked, currentDocument)
+import GHCJS.DOM.Document (getBody)
+import GHCJS.DOM.Node (Node)
+import GHCJS.DOM.NodeList (IsNodeList, item, getLength)
+import GHCJS.DOM.ParentNode (querySelectorAll)
+import Control.Monad.Trans.Maybe
 import Obelisk.Configs
 import Obelisk.Frontend
 import Obelisk.Generated.Static
@@ -47,19 +54,28 @@ import Common.View
 import Common.Request
 import Common.Route
 import Common.Schema
+import Data.IORef
+import qualified Data.ByteString.Base64 as B64
 
 import Frontend.Authentication
 import Frontend.Channel (channel)
 import Frontend.Puzzle (puzzles, huntselect)
 import Frontend.Types
 import Frontend.Utils
+import Frontend.ViewCache
 -- import OldFrontend
+import Debug.Trace hiding (traceEvent)
 
 import TemplateViewer
 import Templates.Login
 
 authCookieName :: Text
 authCookieName = "auth"
+
+{-j
+frontend :: Frontend (R FrontendRoute)
+frontend = frontendInner $ Just (\q -> traceM "In the ob run query handler" >> return mempty)
+-}
 
 -- This runs in a monad that can be run on the client or the server.
 -- To run code in a pure client or pure server context, use one of the
@@ -180,7 +196,11 @@ frontendBody
   => RoutedT t (R FrontendRoute) (ExampleWidget t m) ()
 frontendBody = do
   cookies <- askCookies
-  let mAuthCookie0 = A.decodeStrict =<< L.lookup (T.encodeUtf8 authCookieName) cookies
+  -- display $ constDyn cookies
+  let mAuthCookie0 = A.decodeStrict . (\t -> if BS.head t == 34 then t else (34 `cons` t) `snoc` 34) =<< L.lookup (T.encodeUtf8 authCookieName) cookies
+  -- display $ constDyn mAuthCookie0
+  -- text $ Data.Text.pack $ show mAuthCookie0
+  -- sample (current mAuthCookie0) >>= text
   rec mAuthCookie <- holdDyn mAuthCookie0 authChange
   -- We have to give a type signature to the argument of subRoute because
   -- (at least on GHC 8.6.5) the compiler cannot properly infer that
@@ -190,7 +210,7 @@ frontendBody = do
         FrontendRoute_Channel -> authenticateWithToken mAuthCookie $ do
           logout <- channel
           pure $ Nothing <$ logout
-        FrontendRoute_Puzzle -> authenticateWithToken mAuthCookie $ do
+        FrontendRoute_Puzzle ->  authenticateWithToken mAuthCookie $ do
           logout <- puzzles
           pure $ Nothing <$ logout
         FrontendRoute_HuntSelection -> authenticateWithToken mAuthCookie $ do
@@ -253,6 +273,10 @@ runExampleWidget
      , PostBuild t m
      , MonadFix m
      , Prerender x t m
+     , MonadIO (Performable m)
+     , Adjustable t m
+     , A.ToJSON MyQueryResultType
+     -- , A.ToJSON MyQueryType
      )
   => RoutedT t
       (R FrontendRoute)
@@ -260,9 +284,39 @@ runExampleWidget
       a
   -- ^ Child widget
   -> RoutedT t (R FrontendRoute) m a
-runExampleWidget = fmap snd . runObeliskRhyoliteWidget
+runExampleWidget = fmap snd . runObeliskRhyoliteWidget (\a -> do
+  let queryAction av = do
+        let avKey = A.encode $ _queryMorphism_mapQuery vesselToWire av
+        handler <- liftIO $ readIORef Common.View.globalMagicQueryHandler
+        case handler of
+          Nothing -> do
+              getCachedViews >>= \case
+                Just cache -> do
+                    let v = (Map.lookup (show avKey) cache)
+                    pure (Nothing, fromMaybe mempty v)
+                Nothing -> pure (Nothing, mempty)
+          Just handler -> do
+              traceM "Running the handler"
+              rv <- liftIO $ handler av
+              traceM $ "Handler ran"
+              return (Just (show avKey), rv)
+  lastQuery <- holdDyn mempty a
+  nubbedLastQuery <- holdUniqDyn lastQuery
+  values <- performEvent $ queryAction . (Data.Vessel.mapV (const (Const 1))) <$> updated nubbedLastQuery
+  lastValue <- holdDyn mempty values
+  nubbedValueUpdates <- holdUniqDyn lastValue
+  stored <- foldDyn (<>) mempty $ flip fmapMaybe values (\case
+              (Nothing, _) -> Nothing
+              (Just key, v) -> Just $ Map.singleton key v
+              )
+  elAttr "script" ("data-hydration-skip" =: "" <> "data-rhyolite-saved-views" =: "" <> "data-ssr" =: "" <> "type" =: "text/plain") $ dynText $ T.decodeUtf8 . B64.encode . LBS.toStrict . A.encode <$> stored
+  performEvent_ $ traceM "nubbedValueUpdates updated" <$ updated nubbedValueUpdates
+  pure $ snd <$> updated nubbedValueUpdates
+  )
+
+
+--(fromMaybe (\a -> pure mempty) $ fmap (liftIO .) $ liftIO $ readIORef Common.View.globalMagicQueryHandler)--pure mempty) -- (liftIO . fromMaybe (\q -> traceM "In the magic query handler" >> return mempty) magicQueryHandler)
   vesselToWire
   "common/route"
   checkedFullRouteEncoder
   (BackendRoute_Listen :/ ())
-

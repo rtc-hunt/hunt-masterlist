@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
 
 module Frontend.Puzzle where
 
@@ -8,6 +9,9 @@ import qualified Data.Time.Clock
 
 import Control.Monad
 import Control.Monad.Fix
+import Control.Lens.Indexed
+import Data.Coerce
+import Control.Applicative
 import Control.Monad.IO.Class
 import Data.Functor.Identity
 import Data.Map (Map)
@@ -29,10 +33,12 @@ import Obelisk.Route.Frontend
 import Reflex.Dom.Core hiding (El)
 import Rhyolite.Api (ApiRequest(..))
 import Rhyolite.Frontend.App
-import Rhyolite.Vessel.Path
+import Rhyolite.Vessel.Path as P
 import Data.Map.Monoidal as MMap hiding (keys)
 import Data.Functor.Misc (Const2(..))
 import Rhyolite.SemiMap
+
+import Control.Monad.Zip
 
 import Templates (ChannelConfig(..), ChannelOut(..), MessagesConfig(..))
 import qualified Templates as Templates
@@ -80,7 +86,7 @@ puzzles :: (Monad m, MonadFix m, Reflex t, Routed t (Id Hunt, Maybe (Id Puzzle))
      , Request (Client m) ~ ApiRequest () PublicRequest PrivateRequest
   ) => m (Event t ())
 puzzles = do
-  mPuzzle <- join <$> prerender (pure $ constDyn (HuntId 1, Nothing)) askRoute
+  mPuzzle <- askRoute
   dyn $ ffor mPuzzle $ \case
     (hunt, Nothing) -> masterlist hunt
     (_, Just i) -> puzzle i
@@ -138,7 +144,7 @@ masterlist huntId = do
         let mcid = (Just) <$> (_hunt_channel <$> hunt)
             chatWidget cls = do
                    channelView <- channelBuilder mcid
-                   void $ prerender blank $ do
+                   void $ do -- prerender blank $ do
                     rec (msgs, _) <- elAttr' "div" ("class" =: cls <> "style" =: "height: 100%; flex-direction: column-reverse; display: flex;") $ divClass "flex-grow flex flex-col" $ do
                           dyn_ $ ffor (_channelView_messages channelView) $ \case
                             Nothing -> text "No messages"
@@ -153,7 +159,7 @@ masterlist huntId = do
         myTabDisplay "ui top attached tabular menu" "activeTab" activeTab $
           MasterlistPage_List =: ("List", do
             puzzleListD <- puzzleListBuilder huntId
-            performEvent_ $ (liftIO (Data.Time.Clock.getCurrentTime >>= print)) <$ updated puzzleListD
+            performEvent_ $ (liftIO (Data.Time.Clock.getCurrentTime >>= (print . ((,) "puzzleListD updated: ")))) <$ updated puzzleListD
             puzzlesTable PuzzleTableConfig
               { _puzzleTableConfig_results = puzzleListD
               , _puzzleTableConfig_puzzleLink = \id -> dynRouteLink $ (\i -> FrontendRoute_Puzzle :/ (huntId, Just i)) <$> id
@@ -171,7 +177,7 @@ masterlist huntId = do
               MasterlistPage_List -> "class" =: "bottomwidget"
               _ -> "class" =: "hidden"
         elDynAttr "div" (showAddPuzzle <$> activeTab) $ do
-              elClass "form" "ui form" $ divClass "inline fields" $ prerender_ (return ()) $ mdo
+              elClass "form" "ui form" $ divClass "inline fields" $ {- prerender_ (return ()) $ -} mdo
                 let labeledField label = divClass "field" $ do
                       el "label" $ text label
                       inputElement $ def & inputElementConfig_setValue .~ ("" <$ reqDone)
@@ -341,7 +347,7 @@ puzzle puz = do
             let mcid = (fmap ChatroomId . unChatroomId . _puzzle_Channel) <$> (puzzleData >>= _puzzleData_puzzle)
                 chatWidget cls = do
                        channelView <- channelBuilder mcid
-                       void $ prerender blank $ do
+                       void $ {- prerender blank $ -} do
                         rec (msgs, _) <- elAttr' "div" ("class" =: cls <> "style" =: "height: 100%; flex-direction: column-reverse; display: flex;") $ divClass "flex-grow flex flex-col" $ do
                               dyn_ $ ffor (_channelView_messages channelView) $ \case
                                 Nothing -> text "No messages"
@@ -469,115 +475,55 @@ puzzleListBuilder
      , Requester t m, Response m ~ Identity, Request m ~ ApiRequest () PublicRequest PrivateRequest
      )
   => Id Hunt -> m (Dynamic t (StrictMap.Map (Id Puzzle) (PuzzleData t)))
+  -- => Id Hunt -> Incremental t (PatchMapWithPatchingMove (Id Puzzle) PuzzleDataPatch)-- m (Dynamic t (StrictMap.Map (Id Puzzle) (PuzzleData t)))
 puzzleListBuilder hunt = do
   puzzleIds <- watch $ pure $ key V_HuntPuzzles ~> key hunt ~> postMap (traverse (fmap getMonoidalMap . getComplete))
-  {- -- This is a hack. We should be querying it all in batches and rebuilding a map.
-  -- I'm lazy.
-  rv <- listWithKey (fromMaybe mempty <$> puzzleIds) (\k _ -> puzzleBuilder $ constDyn k)
-  let rv2 = fmapMaybe id <$> joinDynThroughMap rv
-  performEvent_ $ liftIO (print "Passing out of puzzleListBuilder") <$ updated rv2
-  return $ rv2
-  -}
-  
-  puzzles <- watch $ (\puzs -> key V_Puzzle ~> keys puzs ~> postMap (pure . fmap (fmap getFirst))) . Map.keysSet . fromMaybe mempty <$> puzzleIds
-  
-  metas :: Dynamic t (Map (Id Puzzle) (SemiMap (Metapuzzle Identity) ())) <- fmap (fmap (fromMaybe mempty)) $ watch $ (\puzIds -> key V_Metas ~> keys puzIds) . Map.keysSet . (fromMaybe mempty) <$> puzzleIds
 
+  puzzleIds2 <- fmap (fmap (Map.keysSet . fromMaybe mempty)) $ watch $ pure $ key V_HuntPuzzles ~> key hunt ~> postMap (traverse (fmap getMonoidalMap . getComplete))
+  channels <- fmap (fmap $ fromMaybe mempty) $ watch $ ffor puzzleIds2 $ \puzs -> key V_Puzzle ~> keys puzs ~> postMap (Just . fmap (Set.fromList . fmapMaybe (\case { ChatroomId Nothing -> Nothing; ChatroomId (Just k) -> Just $ (ChatroomId k :: Id Chatroom) }) . Map.elems . fmap (_puzzle_Channel . getFirst))) -- (Map.keysSet (fromMaybe mempty puzs))
 
-  let fanDynamicMap :: (Ord k, Eq k) => Dynamic t (Map k a) -> m (Dynamic t (Map k (Dynamic t (Maybe a))))
-      fanDynamicMap mD = do
-         uniqKeys <- holdUniqDyn $ Map.keys <$> mD
-         let updatedFan = fanMap $ updated mD
-         let newDyn = ffor uniqKeys $ \ks -> Map.fromAscList $ ffor ks $ \k ->
-                (k, unsafeDynamic ((Map.!? k) <$> current mD) $ Just <$> (select updatedFan $ Const2 k))
-         pure newDyn
+  let bzip :: (Coercible a a', Semigroup c) => Path a c c' d -> Path a' c c' d' -> Path a c c' (d, d')
+      bzip (Path to from) (Path to' from') = Path (\x -> to x <> to' (coerce x)) (\c -> liftA2 (,) (from c) (from' c))
+      infixr 9 `zz`
+      zz :: (Coercible a a', Semigroup c) => Path a c c' (Identity d) -> Path a' c c' (Identity d') -> Path a c c' (Identity (d, d'))
+      a `zz` b = bzip a b ~> postMap (Just . uncurry mzip)
+      infixr 9 `zz2`
+      zz2 :: (Coercible a a', Semigroup c, Ord k) => Path a c c' (Identity (Map k d)) -> Path a' c c' (Identity (Map k d')) -> Path a c c' (Identity (Map k (d, d')))
+      a `zz2` b = bzip a b ~> postMap (Just . fmap (uncurry (Map.intersectionWith (,))) . uncurry mzip)
+      -- allTheThingsQuery :: Dynamic t (Set (Id Puzzle)) -> Dynamic t (Set (Id Chatroom)) -> Path (Const SelectedCount _) _ _ _
+      allTheThingsQuery puzs chans = 
+       (
+        ((key V_Puzzle ~> keys puzs)
+        `zz2` (key V_Metas ~> keys puzs)
+        `zz2` (key V_Tags ~> keys puzs)
+        `zz2` (key V_Solutions ~> keys puzs)
+        `zz2` (key V_Notes ~> keys puzs))
+        `zz` ((key V_ActiveUsers ~> keys chans))
+        ) ~> postMap (Just . fmap (\(puzs, users) ->
+           ffor puzs $ \(puz, (metas, (tags, (sols, notes)))) ->
+              let activeUsers = case _puzzle_Channel $ getFirst puz of
+                    ChatroomId Nothing -> Nothing
+                    ChatroomId (Just c) -> Map.lookup (ChatroomId c) users
+              in (puz, Map.mapKeys (_meta_Metapuzzle) $ imap (\k _ -> fromMaybe "ERROR GETTING META TITLE" $ fmap (_puzzle_Title . getFirst . fst) $ Map.lookup (_meta_Metapuzzle k) puzs) $ getMonoidalMap $ fromMaybe mempty $ getComplete metas, tags, sols, notes, fromMaybe mempty $ activeUsers)
+        ))
+  let queryD = allTheThingsQuery <$> puzzleIds2 <*> channels
+  puzDataD <- watch $ queryD
 
-         {-
-
-
-         let onlyKeyUpdates = ffilter (\(a, b) -> Map.keys a /= Map.keys b) $ attach (current mD) (updated mD)
-
-
-         unsafeDynamic ( do
-            currentMap <- sample $ current mD
-            pure Map.mapWithKeys currentMap $ \k v -> unsafeDynamic 
-            ) ()
-
-         -}
-         {-
-
-         initialValues <- sample $ current mD
-         uniqKeys <- holdDyn initialValues $ updated mD
-         -- uniqKeys <- holdUniqDyn $ (() <$) <$> mD
-         let updatedFan = fanMap $ updated mD
-         listWithKey uniqKeys $ \k _ ->
-            holdDyn (initialValues Map.! k) $ select updatedFan $ Const2 k
-         -- undefined
-         -}
-         {-
-         initialDelayed <- sample $ current mD
-         delayed <- holdDyn initialDelayed (updated mD)
-         let updatedFan = fanMap $ updated delayed
-         let newDyn = ffor uniqKeys $ \ks -> Map.fromAscList $ ffor ks $ \k ->
-                (k, unsafeDynamic ((Map.! k) <$> current delayed) $ select updatedFan $ Const2 k)
-         pure newDyn
-         -}
-      fannedIndex mD k = mD >>= \ma -> fromMaybe mempty $ ma Map.!? k
-
-  -- Crazy stuff to join Puzzle, Meta, Puzzle on the frontend
-  let metaSomething :: Dynamic t (Map (Id Puzzle) (Map (Id Puzzle) ())) = fmap (Map.mapKeys _meta_Metapuzzle . fromMaybe mempty . fmap getMonoidalMap . getComplete) <$> metas
-  let metaIdTitle :: Dynamic t (Map (Id Puzzle) (Map (Id Puzzle) Text)) = fmap . Map.intersection . fromMaybe mempty <$> (fmap (fmap _puzzle_Title) <$> puzzles) <*> metaSomething
-  fannedMetas <- fmap (fmap (fmap (fmap (fromMaybe mempty)))) $ fanDynamicMap metaIdTitle
-
-
-  let fromSemimap :: (Ord k, Eq k) => SemiMap k a -> Map k a 
-      fromSemimap = fromMaybe mempty . fmap getMonoidalMap . getComplete -- undefined -- traverse (fmap getMonoidalMap . getComplete)
-  --metas_puzzles <- fmap (fmap (fmap (fmap getFirst))) $ watch $ (\puz -> key V_Puzzle ~> keys (Map.keysSet puz)) . Map.mapKeys _meta_Metapuzzle . fromMaybe mempty <$> metas
-  --let metaIdTitle = fmap (fmap _puzzle_Title) $ fromMaybe mempty <$> metas_puzzles
-  tags :: Dynamic t (Maybe (Map (Id Puzzle) (SemiMap (Id Tag) (Tag Identity))))  <- watch $ (\puzIds -> key V_Tags ~> keys puzIds) . Map.keysSet . fromMaybe (mempty) <$> puzzleIds -- postMap (traverse (fmap getMonoidalMap . getComplete))) <$> puzzleIds
-  -- tagsFanned :: Dynamic t (Map (Id Puzzle) (Dynamic t (Map Text ()))) <- fanDynamicMap $ fmap fromSemimap <$> fromMaybe mempty <$> tags
-  let fanSimpleTable :: (Ord k, Eq k, Ord j, Eq j) => Dynamic t (Maybe (Map j (SemiMap k a))) -> m (Dynamic t (Map j (Dynamic t (Map k a))))
-      fanSimpleTable tab = fmap (fmap (fmap (fmap (fromMaybe mempty)))) $ fanDynamicMap $ fmap fromSemimap <$> fromMaybe mempty <$> tab
-  tagsFanned :: Dynamic t (Map (Id Puzzle) (Dynamic t (Map Text ()))) <- fmap (fmap (fmap ((() <$) . Map.mapKeysMonotonic _tagId_Tag))) <$> fanSimpleTable tags
-
-  
-  solutions :: Dynamic t (Maybe (Map (Id Puzzle) (SemiMap (Id Solution) (Solution Identity))))  <- watch $ (\puzIds -> key V_Solutions ~> keys puzIds) . Map.keysSet . fromMaybe (mempty) <$> puzzleIds -- postMap (traverse (fmap getMonoidalMap . getComplete))) <$> puzzleIds
-  solutionsFanned <- fanSimpleTable solutions
-  
-  notes :: Dynamic t (Maybe (Map (Id Puzzle) (SemiMap (Id Note) (Note Identity))))  <- watch $ (\puzIds -> key V_Notes ~> keys puzIds) . Map.keysSet . fromMaybe (mempty) <$> puzzleIds -- postMap (traverse (fmap getMonoidalMap . getComplete))) <$> puzzleIds
-  notesFanned <- fanSimpleTable notes
-
-
-  let puzzleChannels :: Dynamic t (Map (Id Puzzle) (Id Chatroom)) = fmapMaybe id <$> fmap (fmap (ChatroomId @Identity) . unChatroomId . _puzzle_Channel) . fromMaybe mempty <$> puzzles
-  currentSolversInChannels <- watch $ (\chanIds -> key V_ActiveUsers ~> keys chanIds) . Set.fromList . Map.elems <$> puzzleChannels
-  solversInChannelsFanned :: Dynamic t (Map (Id Chatroom) (Dynamic t (Map (Id Account) Text))) <- fanSimpleTable currentSolversInChannels
-  let solversOnPuzzles :: Dynamic t (Map (Id Puzzle) (Dynamic t (Map (Id Account) Text))) = ffor puzzleChannels $ \chans -> ffor chans $ \(chan) -> solversInChannelsFanned >>= (fromMaybe mempty . Map.lookup chan)
-  -- fmap (fmap ((\chanIds -> key V_ActiveUsers ~> keys chanIds))) <$> Map.keys <$> puzzleChannels
-  -- let watcher = fmap watch <$> currentSolverQuery
-  -- dynRes <- dyn $ fromMaybe (return $ constDyn mempty) <$> watcher
-  -- currentSolvers <- join <$> holdDyn (constDyn mempty) dynRes
-  
-  -- fmap (fmap (fmap fromSemimap)) $ tags
-  --solutions <- watch $ (\puzId -> key V_Solutions ~> key puzId ~> postMap (traverse (fmap getMonoidalMap . getComplete))) <$> puzIdD
-  --notes <- watch $ (\puzId -> key V_Notes ~> key puzId ~> postMap (traverse (fmap getMonoidalMap . getComplete))) <$> puzIdD
-  
-
-  {- metas <- watch $ (\puzId -> key V_Metas ~> key puzId ~> postMap (traverse (fmap getMonoidalMap . getComplete))) <$> puzIdD
-  let metaIdTitle = Map.intersection <$> (fromMaybe mempty <$> puzzles) <*> (Map.mapKeys _meta_Metapuzzle . fromMaybe mempty <$> metas)
-  tags <- watch $ (\puzId -> key V_Tags ~> key puzId ~> postMap (traverse (fmap getMonoidalMap . getComplete))) <$> puzIdD
-  solutions <- watch $ (\puzId -> key V_Solutions ~> key puzId ~> postMap (traverse (fmap getMonoidalMap . getComplete))) <$> puzIdD
-  notes <- watch $ (\puzId -> key V_Notes ~> key puzId ~> postMap (traverse (fmap getMonoidalMap . getComplete))) <$> puzIdD
-  -- display puzzles
-  -}
-  return $ ffor puzzles $ \puzzles -> (flip Map.mapWithKey) (fromMaybe mempty puzzles) $ \puzId puz ->
+  return $ ffor puzDataD $ \puzzles -> (flip Map.mapWithKey) (fromMaybe mempty puzzles) $ \puzId (puz, metas, tags, solutions, notes, currentSolvers) ->
     PuzzleData
       { _puzzleData_id = puzId
-      , _puzzleData_puzzle = constDyn puz
+      , _puzzleData_puzzle = constDyn $ getFirst puz
+      , _puzzleData_metas = constDyn metas -- (constDyn $ getMonoidalMap $ fromMaybe mempty $ getComplete metas)
+      , _puzzleData_tags = constDyn $ Map.mapKeys _tagId_Tag $ fmap (const ()) $ fromMaybe mempty $ fmap getMonoidalMap $ getComplete $ tags
+      , _puzzleData_solutions = constDyn $ fromMaybe mempty $ fmap getMonoidalMap $ getComplete $ solutions
+      , _puzzleData_notes = constDyn $ fromMaybe mempty $ fmap getMonoidalMap $ getComplete $ notes
+      , _puzzleData_currentSolvers = constDyn $ fromMaybe mempty $ fmap getMonoidalMap $ getComplete $ currentSolvers
+      {-
       , _puzzleData_metas = fannedIndex fannedMetas puzId -- metaIdTitle >>= \metas ->  -- (StrictMap.! puzId) <$> metaIdTitle -- fmap _puzzle_Title <$> ((StrictMap.! puzId) <$> metaIdTitle) <*> intermed
       , _puzzleData_tags = fannedIndex tagsFanned puzId -- (() <$) . Map.mapKeys _tagId_Tag <$> fromJust <$> tags
       , _puzzleData_solutions = fannedIndex solutionsFanned puzId -- constDyn mempty -- fromJust <$> solutions
       , _puzzleData_notes = fannedIndex notesFanned puzId --  constDyn mempty -- fromJust <$> notes
-      , _puzzleData_currentSolvers = fannedIndex solversOnPuzzles puzId
+      , _puzzleData_currentSolvers = fannedIndex solversOnPuzzles puzId -}
       }
   {-
   return $ ffor (Map.lookup <$> puzIdD <*> (fromMaybe mempty <$> puzzles)) $ \foundPuzD ->

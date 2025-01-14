@@ -70,6 +70,7 @@ puzzlesTable :: forall t m. (Template t m, MonadHold t m, MonadFix m) =>
   PuzzleTableConfig t m -> m ()
 --  Dynamic t (Map (PrimaryKey Puzzle Identity) (Puzzle Identity)) -> m ()
 puzzlesTable PuzzleTableConfig { _puzzleTableConfig_results = puzzles, _puzzleTableConfig_puzzleLink = puzzleLink, _puzzleTableConfig_metas = knownMetas, _puzzleTableConfig_tags = knownTags } = divClass "top-scrollable" $ mdo
+          traceM "Starting puzzle table"
           {-queryEl <- inputElement $ def -- & inputElementConfig_initialValue .~ (T.pack $ show (mempty :: PuzzleQuery))
           el "br" blank
           let queries = fmap fst . (reads :: String -> [(PuzzleQuery, String)]) . T.unpack <$> _inputElement_value queryEl
@@ -80,7 +81,7 @@ puzzlesTable PuzzleTableConfig { _puzzleTableConfig_results = puzzles, _puzzleTa
           --(tableQueryD :: Dynamic t ([Int]), tableResD) <- 
           -- jlet query = constDyn mempty
           uniqQuery <- holdDyn mempty $ updated query
-          let puzzleDataDynamic = traceDynWith (\t -> show ("puzzleDataDynamic updated", Map.keys t)) $ (toSortKeys (_puzzleQuery_ordering <$> uniqQuery) $ prunePuzzles (_puzzleQuery_select <$> uniqQuery) $ puzzles)
+          let puzzleDataDynamic = traceDynWith (\t -> show ("puzzleDataDynamic updated", Map.keys t)) $ puzzles -- (toSortKeys (_puzzleQuery_ordering <$> uniqQuery) $ prunePuzzles (_puzzleQuery_select <$> uniqQuery) $ puzzles)
 
           initialPuzzles <- sample $ current puzzleDataDynamic
 --          let puzzleIdsD = imap (\i _ -> i) <$> puzzleDataDynamic
