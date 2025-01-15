@@ -27,4 +27,5 @@ project ./. ({ pkgs, hackGet, ... }@args: {
   android.displayName = "Rhyolite Example App";
   ios.bundleIdentifier = "systems.obsidian.obelisk.examples.rhyolite";
   ios.bundleName = "Rhyolite Example App";
+  __closureCompilerOptimizationLevel = null; # Set this to `null` to skip the closure-compiler step
 })

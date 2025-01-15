@@ -9,10 +9,12 @@ library
                , array
                , beam-core
                , bytestring
+               , base64-bytestring
                , common
                , constraints-extras
                , containers
                , cookie
+               , semialign
                , dependent-sum
                , dependent-sum-template
                , dependent-map
@@ -22,6 +24,7 @@ library
                , ghcjs-dom
                , reflex-dom-core
                , ref-tf
+               , these
                , rhyolite-frontend
                , optparse-applicative
                , obelisk-executable-config-lookup
@@ -30,6 +33,7 @@ library
                , data-default
                , lens
                , mtl
+               , patch
                , rhyolite-common
                , signed-data
                , rhyolite-groundhog-legacy-types
@@ -42,6 +46,7 @@ library
                , aeson
                , witherable
                , unbounded-delays
+               , transformers
   exposed-modules:
     Frontend
     Frontend.Authentication

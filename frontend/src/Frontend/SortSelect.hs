@@ -16,6 +16,7 @@ import Common.Route
 import Frontend.Types
 import Common.Schema
 import Data.Functor.Identity
+import Data.Maybe
 
 import Debug.Trace
 
@@ -68,3 +69,60 @@ prunePuzzles puzzleSelect puzzleData = prunePuzzlesInner <$> puzzleSelect <*> pu
       PuzzleSelect_HasSolvers -> fmap (fmapMaybe id) $ (Map.map $ \pd -> case (Map.null $ _puzzleData_currentSolvers pd) of
              True -> Nothing
              False -> Just pd)
+
+shouldShowPuzzle ::
+  PuzzleSelect -> PuzzleDataT Identity -> Bool
+shouldShowPuzzle puzzleSelect puzzleData = prunePuzzlesInner puzzleSelect puzzleData
+  where
+    prunePuzzlesInner :: PuzzleSelect -> PuzzleDataT Identity -> Bool
+    prunePuzzlesInner = \case
+      PuzzleSelect_All -> const True
+      PuzzleSelect_And f1 f2 -> \a -> prunePuzzlesInner f2 a && prunePuzzlesInner f1 a
+      PuzzleSelect_WithTag tag -> Map.member tag . _puzzleData_tags
+      PuzzleSelect_Not f -> not . prunePuzzlesInner f
+      PuzzleSelect_HasVoice -> isJust . _puzzle_voicelink . _puzzleData_puzzle
+      PuzzleSelect_HasMeta meta -> Map.member meta . _puzzleData_metas
+      PuzzleSelect_IsMeta -> _puzzle_IsMeta . _puzzleData_puzzle
+      PuzzleSelect_HasSolution -> not . Map.null . _puzzleData_solutions
+      PuzzleSelect_HasSolvers -> not . Map.null . _puzzleData_currentSolvers
+
+{-
+includePuzzle
+  :: forall t k. (Reflex t)
+  => PuzzleSelect
+  -> PuzzleData t
+  -> Bool
+includePuzzle puzzleSelect puzzleData = join $ prunePuzzlesInner <$> puzzleSelect <*> puzzleData
+  where
+    prunePuzzlesInner :: PuzzleSelect -> Map k (PuzzleData t) -> Dynamic t (Map k (PuzzleData t))
+    prunePuzzlesInner = \case
+      PuzzleSelect_All -> constDyn
+      PuzzleSelect_And f1 f2 -> \a -> prunePuzzlesInner f1 a >>= prunePuzzlesInner f2
+      PuzzleSelect_WithTag tag -> fmap (fmapMaybe id) . sequence . (Map.map $ \pd -> do
+         tags <- _puzzleData_tags pd
+         pure $ pd <$ Map.lookup tag tags)
+      PuzzleSelect_Not f -> \a -> Map.difference a <$> prunePuzzlesInner f a
+      PuzzleSelect_HasVoice -> fmap (fmapMaybe id) . sequence . (Map.map $ \pd -> do
+         vcs <- _puzzle_voicelink <$> _puzzleData_puzzle pd
+         pure $ pd <$ vcs)
+      PuzzleSelect_HasMeta meta -> fmap (fmapMaybe id) . sequence . (Map.map $ \pd -> do
+         metas <- _puzzleData_metas pd
+         pure $ pd <$ Map.lookup meta metas)
+      PuzzleSelect_IsMeta -> fmap (fmapMaybe id) . sequence . (Map.map $ \pd -> do
+         vcs <- _puzzle_IsMeta <$> _puzzleData_puzzle pd
+         pure $ case vcs of 
+             True -> Just pd
+             False -> Nothing )
+      PuzzleSelect_HasSolution -> fmap (fmapMaybe id) . sequence . (Map.map $ \pd -> do
+         vcs <- _puzzleData_solutions pd
+         pure $ case Map.null vcs of
+             True -> Nothing
+             False -> Just pd
+         )
+      PuzzleSelect_HasSolvers -> fmap (fmapMaybe id) . sequence . (Map.map $ \pd -> do
+         vcs <- _puzzleData_currentSolvers pd
+         pure $ case Map.null vcs of
+             True -> Nothing
+             False -> Just pd
+         )
+-}

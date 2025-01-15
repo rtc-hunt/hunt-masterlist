@@ -24,6 +24,14 @@ import Data.Semigroup
 
 import Common.Schema
 
+import Data.IORef
+import Reflex.Query.Class (QueryResult, SelectedCount)
+import System.IO.Unsafe
+import Rhyolite.Api
+-- import Rhyolite.Frontend.App
+import Rhyolite.Vessel.AuthMapV
+
+
 data Msg = Msg
   { _msg_id :: Id Message
   , _msg_timestamp :: UTCTime
@@ -94,3 +102,13 @@ instance FromJSONKey ()
 instance ToJSONKey ()
 
 type PrivateChatV = Vessel V
+
+type MyQueryType = AuthMapV AuthToken PrivateChatV (Const SelectedCount)
+type MyQueryResultType = QueryResult (AuthMapV AuthToken PrivateChatV (Const SelectedCount))
+type MagicQueryHandler m = ((AuthMapV AuthToken PrivateChatV (Const SelectedCount)) -> m (QueryResult (AuthMapV AuthToken PrivateChatV (Const SelectedCount))))
+
+globalMagicQueryHandler :: IORef (Maybe (MagicQueryHandler IO))
+globalMagicQueryHandler = unsafePerformIO $ newIORef Nothing
+
+-- hotQueryHandler :: IORef (Maybe ((AuthMapV AuthToken PrivateChatV (Const SelectedCount)) -> IO (QueryResult (AuthMapV AuthToken PrivateChatV (Const SelectedCount)))))
+-- hotQueryHandler = unsafePerformIO $ newIORef Nothing

@@ -1,8 +1,8 @@
 {
-  "owner": "obsidiansystems",
+  "owner": "jonored",
   "repo": "rhyolite",
-  "branch": "aa/beam-accounts-2",
+  "branch": "hunt-masterlist-server-render",
   "private": false,
-  "rev": "65c8a5b25104bf6a3526420431429ae71365548b",
-  "sha256": "038gpyxf9rpazvi6wcgmkf3xyhxg708c3g6xpxjrb6aabjgbxml0"
+  "rev": "a237a4fbfa2c1b49e78014390072e79040c3b429",
+  "sha256": "18bjirvxkncqm4rwb7vm65c12h6zk3dpaq76r2bq8m81g50wm405"
 }
