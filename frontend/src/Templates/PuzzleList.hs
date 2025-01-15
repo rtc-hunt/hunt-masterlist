@@ -106,7 +106,7 @@ headerDropdownSettings :: Reflex t => DropdownConfig t a
 headerDropdownSettings = def & dropdownConfig_attributes .~ (constDyn $ "class" =: "grow shrink w-4/5 max-w-xs min-w-4")
 
 
-puzzlesTable :: forall t m. (Template t m, MonadHold t m, MonadFix m, MonadIO (Performable m), TriggerEvent t m, PerformEvent t m
+puzzlesTable :: forall js t m. (Template t m, MonadHold t m, MonadFix m, MonadIO (Performable m), TriggerEvent t m, PerformEvent t m, Prerender js t m
      , SetRoute t (R FrontendRoute) m, RouteToUrl (R FrontendRoute) m )
   =>
   PuzzleTableConfig t m -> m ()
@@ -150,10 +150,15 @@ puzzlesTable PuzzleTableConfig { _puzzleTableConfig_query = query, _puzzleTableC
           display $ join $ (sequenceA . fmap _puzzleData_puzzle) <$> puzzleDataDynamic
           display $ join $ (sequenceA . fmap _puzzleData_metas) <$> puzzleDataDynamic
           -- display $ join $ (sequenceA . fmap _puzzleData_solutions) <$> puzzleDataDynamic
-          display $ join $ (sequenceA . fmap _puzzleData_tags) <$> puzzleDataDynamic
-          -}
+          display $ join $ (sequenceA . fmap _puzzleData_tags) <$> puzzleDataDynamic -}
           -- display $ join $ (sequenceA . fmap _puzzleData_notes) <$> puzzleDataDynamic
           -- Reflex.Dom.Core.traceEvent $ "puzzleDataDynamic updated" <$ updated puzzleDataDynamic
+          performEvent_ $ traceM . ("puzzles incremental updated: " <>) . show <$> updatedIncremental puzzles
+          switchSignal <- prerender blank blank
+          performEvent_ $ traceM "switching to live site" <$ updated switchSignal
+          let dumbList :: Dynamic t (Map k v) -> (k -> Dynamic t v -> m a) -> m ()
+              dumbList mapD w = dyn_ $ ffor mapD $ \metMap -> forM_ (Map.toList metMap) $ \(k, v) -> w k (constDyn v)
+          
           (_, _) <- traceShow "Puzzle list started" $ tableDynAttrWithSearch "puzzletable ui celled table"  [
             -- ("Title", \_ _ _ -> puzzleLink (constDyn text "", pure $ (constDyn mempty))
             ("Title", \puzKey puzDat -> puzzleLink (primaryKey . _puzzleData_puzzle <$> puzDat) $ elAttr "div" ("class" =: "" <> "data-tooltip" =: "Open Puzzle") $ dynText $ _puzzle_Title . _puzzleData_puzzle <$> puzDat, return $ (constDyn (mempty :: PuzzleQuery)))
@@ -161,7 +166,8 @@ puzzlesTable PuzzleTableConfig { _puzzleTableConfig_query = query, _puzzleTableC
               , fmap (flip PuzzleQuery PuzzleOrdering_Any) . _dropdown_value <$> dropdown mempty (constDyn (mempty =: " - " <> PuzzleSelect_IsMeta =: "Is Meta" <> (PuzzleSelect_Not PuzzleSelect_IsMeta) =: "Not Meta")) headerDropdownSettings
               )
             , ("Meta", \_ puzDat -> void $
-                listWithKey (_puzzleData_metas <$> puzDat) $ \k dV -> puzzleLink (constDyn k) $ dynText $ dV
+                -- listWithKey (_puzzleData_metas <$> puzDat) $ \k dV -> puzzleLink (constDyn k) $ dynText $ dV
+                dyn_ $ ffor (_puzzleData_metas <$> puzDat) $ \metMap -> forM_ (Map.toList metMap) $ \(metId, met) -> puzzleLink (constDyn metId) $ text met
                 , 
                   elClass "span" "flex flex-row" $ do
                     startValue <- sample $ current $ ((\metas a -> fromMaybe mempty $ matchSubSelect (_puzzleQuery_select a) $ (\case { PuzzleSelect_HasMeta _ -> True; _ -> False }))) <$> knownMetas <*> query
@@ -184,7 +190,7 @@ puzzlesTable PuzzleTableConfig { _puzzleTableConfig_query = query, _puzzleTableC
                    pure dropdownValue
               )
             , ("Status", \_ puzDat -> 
-                void $ listWithKey (Map.filterWithKey (\k _ -> k `elem` statusTags) <$> (_puzzleData_tags <$> puzDat)) $ \k _ -> elAttr "span" ("class" =: "ui label" <> "data-tag" =: k) $ text k
+                void $ dumbList (Map.filterWithKey (\k _ -> k `elem` statusTags) <$> (_puzzleData_tags <$> puzDat)) $ \k _ -> elAttr "span" ("class" =: "ui label" <> "data-tag" =: k) $ text k
             , do
                    startValue <- sample $ current $ ((\a -> fromMaybe mempty $ matchSubSelect a (`elem` ((PuzzleSelect_WithTag <$> ["done", "extraction", "in-progress", "solved", "stalled"]) :: [PuzzleSelect]))) . _puzzleQuery_select) <$> query
                    dropdownValue <- fmap (flip PuzzleQuery PuzzleOrdering_Any) . _dropdown_value <$> dropdown startValue (( (mempty =: " - ") <>) . Map.mapKeys PuzzleSelect_WithTag . Map.fromSet (id) <$> constDyn statusTags) headerDropdownSettings
@@ -192,7 +198,7 @@ puzzlesTable PuzzleTableConfig { _puzzleTableConfig_query = query, _puzzleTableC
                    pure dropdownValue
               )
             , ("Current Solvers", \_ puzDat -> 
-                void $ listWithKey (_puzzleData_currentSolvers <$> puzDat) $ \k u -> el "span" $ dynText u
+                void $ dumbList (_puzzleData_currentSolvers <$> puzDat) $ \k u -> el "span" $ dynText u
               , do
                   startValue <- sample $ current $ ((\a -> fromMaybe mempty $ matchSubSelect a (`elem` ([PuzzleSelect_HasSolvers, PuzzleSelect_Not PuzzleSelect_HasSolvers] :: [PuzzleSelect]))) . _puzzleQuery_select) <$> query
                   dropdownValue <- fmap (flip PuzzleQuery PuzzleOrdering_Any) . _dropdown_value <$> dropdown startValue (constDyn (mempty =: " - " <> PuzzleSelect_HasSolvers =: "Has Current Solvers" <> (PuzzleSelect_Not PuzzleSelect_HasSolvers) =: "No Current Solvers")) headerDropdownSettings
@@ -224,7 +230,7 @@ puzzlesTable PuzzleTableConfig { _puzzleTableConfig_query = query, _puzzleTableC
               ) -}
 -- <<<<<<< HEAD
             , ("Tags", \_ puzDat ->
-                void $ listWithKey (Map.filterWithKey (\k _ -> not $ k `elem` statusTags) <$> (_puzzleData_tags <$> puzDat)) $ \k _ -> elAttr "span" ("class" =: "ui label" <> "data-tag" =: k) $ text k
+                void $ dumbList (Map.filterWithKey (\k _ -> not $ k `elem` statusTags) <$> (_puzzleData_tags <$> puzDat)) $ \k _ -> elAttr "span" ("class" =: "ui label" <> "data-tag" =: k) $ text k
                 -- void $ listWithKey ((\pd -> _puzzleData_tags pd Map.\\ Map.fromList ((\a -> (a, ())) <$> _puzzleData_status pd)) <$> puzDat) $ \k _ -> elAttr "span" ("class" =: "ui label" <> "data-tag" =: k) $ text k
               , do
                   startValue <- sample $ current $ ((\a -> fromMaybe mempty $ matchSubSelect a (\case { PuzzleSelect_WithTag _ -> True; _ -> False })) . _puzzleQuery_select) <$> query
@@ -233,7 +239,7 @@ puzzlesTable PuzzleTableConfig { _puzzleTableConfig_query = query, _puzzleTableC
                   pure dropdownValue
               )
             , ("Notes", \_ puzDat ->
-                void $ listWithKey (_puzzleData_notes <$> puzDat) $ \k dV -> elClass "div" "" $ dynText $ _note_Note <$> dV
+                void $ dumbList (_puzzleData_notes <$> puzDat) $ \k dV -> elClass "div" "" $ dynText $ _note_Note <$> dV
 {- =======
             , ("Tags", \_ puzDat _ ->
               void $ listWithKey (Map.filterWithKey (\k _ -> not $ k `elem` statusTags) <$> (_puzzleData_tags puzDat)) $ \k _ -> elAttr "span" ("class" =: "ui label" <> "data-tag" =: k) $ text k

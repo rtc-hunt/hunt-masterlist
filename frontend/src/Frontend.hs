@@ -294,6 +294,7 @@ runExampleWidget = fmap snd . runObeliskRhyoliteWidget (\a -> do
               getCachedViews >>= \case
                 Just cache -> do
                     let v = (Map.lookup (show avKey) cache)
+                    traceM "Retrieved data from cache"
                     pure (Nothing, fromMaybe mempty v)
                 Nothing -> pure (Nothing, mempty)
           Just handler -> do
