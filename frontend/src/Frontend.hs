@@ -70,8 +70,6 @@ import Debug.Trace hiding (traceEvent)
 import TemplateViewer
 import Templates.Login
 
-authCookieName :: Text
-authCookieName = "auth"
 
 {-j
 frontend :: Frontend (R FrontendRoute)
@@ -99,12 +97,13 @@ frontend = Frontend
       elAttr "link" ("rel" =: "stylesheet" <> "href" =: "https://fonts.googleapis.com/css2?family=Karla:ital,wght@0,200;0,300;0,400;0,500;0,600;0,700;0,800;1,200;1,300;1,400;1,500;1,600;1,700;1,800&display=swap") blank
       elAttr "link" ("rel" =: "stylesheet" <> "href" =: "https://fonts.googleapis.com/icon?family=Material+Icons") blank
       elAttr "meta" ("name"=: "viewport" <> "content" =: "width=device-width, initial-scale=1") blank
-      elAttr "script" ("src" =: "https://apis.google.com/js/platform.js") blank
-      el "script" $ text " \
-          \ var prev=5; \
-          \ function renderButton() {\
-          \   gapi.signin2.render('signin-button', {});\
-          \ }"
+      el "script" $ text "var globalToken; var callback; window.handleGoogleLogin = (e) => { globalToken = e.credential; if( window.callback ){ window.callback(globalToken); } }; window.setCredentialCallback = (cb) => { console.log(\"Calling callback\", cb, globalToken); window.callback = cb; if( globalToken ) { window.callback(globalToken); }; } "
+--j      elAttr "script" ("src" =: "https://apis.google.com/js/platform.js") blank
+--      el "script" $ text " \
+--          \ var prev=5; \
+--          \ function renderButton() {\
+--          \   gapi.signin2.render('signin-button', {});\
+--          \ }"
       blank
   , _frontend_body = runExampleWidget frontendBody
   }
@@ -116,40 +115,53 @@ initGauth
      , PostBuild t m
      , Request m ~ ApiRequest AuthToken PublicRequest PrivateRequest
      , Response m ~ Identity
+     , HasConfigs m
      , HasConfigs (Client m)
+     , TriggerEvent t (Client m)
+     , JS.MonadJSM (Client m)
      , Requester t m)
 --  => m (Dynamic t (Maybe (Text)))
-  => m (Event t AuthToken)
+  => m ()
 initGauth = do
   elClass "div" "w-screen h-screen bg-background flex flex-col overflow-hidden" $ divClass "p-4 mx-auto md:w-sm t_login" $ do
     elClass "h1" "font-karla font-bold text-h1 text-copy mt-12" $ text "Login"
-    elClass "div" "flex flex-col mt-4" $ elAttr "div" ("href" =: "#" <> "id" =: "signinButton") $ text "GOOGLE"
+    elClass "div" "flex flex-col mt-4" $ do
+      client_id <- fromMaybe "" . (>>= A.decodeStrict') <$> getConfig "common/clientGoogleKey"
+      elAttr "script" ("src" =: "https://accounts.google.com/gsi/client" <> "async" =: "") blank
+      el "div" $ do
+        elAttr "div" ("id" =: "g_id_onload" <> "data-auto_prompt" =: "true" <> "data-client_id" =: client_id <> {- "data-ux_mode" =: "redirect" <> -} "data-callback" =: "handleGoogleLogin") $ blank -- text "googly appendage"
+        elAttr "div" ("class" =: "g_id_signin" <> "data-type" =: "standard" <> "data-size" =: "large" <> "data-theme" =: "outline" <> "data-text" =: "sign_in_with") $ blank
+
   updatedUserE <- fmap switchDyn $ prerender (return never) $ do
     allowsForcedDevLogin <- getConfig "common/allows_forced_login"
-    if isJust allowsForcedDevLogin then (return never) else do
-      pb <- getPostBuild
-      (updatedUserE :: Event t (Maybe Text), updatedUserT) <- newTriggerEvent
-      void $ JS.liftJSM $ do
-        updatedUserJS <- JS.toJSVal $ JS.fun $ \ _ _ [ipt] -> JS.eval ("prev.getAuthResponse().id_token"::Text) >>= JS.fromJSVal >>= (liftIO . updatedUserT)
-        JS.setProp "fireSigninEvt" updatedUserJS JS.global
-        JS.eval $ ("fireSigninEvtInner = (e) => { /*console.log(prev != e); */ console.log(e.getAuthResponse().id_token); /* if(prev != e)*/ { prev = e; fireSigninEvt([String(e.getAuthResponse().id_token)]);} }" :: Text)
-      -- let client_id = "570358826294-2ut7bnk6ar7jmqifsef48ljlk0o5m8p4.apps.googleusercontent.com";
-      client_id <- fromMaybe "" . (>>= A.decodeStrict') <$> getConfig "common/clientGoogleKey"
-      performEvent_ $ (void $ JS.liftJSM $ JS.eval ("console.log('"<>client_id<>"'); gapi.load('auth2', () => {auth2 = gapi.auth2.init({client_id: '" <> client_id <> "'}); auth2.attachClickHandler('signinButton', {}, fireSigninEvtInner, console.log); gapi.signin2.render('signinButton', {onsuccess: fireSigninEvtInner}); if(gapi.auth2.getAuthInstance().isSignedIn) { /*fireSigninEvtInner(gapi.auth2.getAuthInstance().currentUser.get());*/ }}); " :: Text)) <$ pb
-      prevState <- hold Nothing $ traceEvent "UpdatedUserE" updatedUserE
-      return $ attachWithMaybe (\a b -> if a/=b then Just b else Nothing) prevState updatedUserE
+    (updatedUserE :: Event t (Maybe Text), updatedUserT) <- newTriggerEvent
+    void $ JS.liftJSM $ do
+        updatedUserJS <- JS.toJSVal $ JS.fun $ \ _ _ [ipt] -> JS.fromJSVal ipt >>= (liftIO . updatedUserT)
+        JS.jsg1 ("setCredentialCallback" :: Text) updatedUserJS
+    prevState <- hold Nothing $ traceEvent "UpdatedUserE" updatedUserE
+    -- if isJust allowsForcedDevLogin then (return never) else do
+    return $ attachWithMaybe (\a b -> if a/=b then Just b else Nothing) prevState updatedUserE
 
 -- This is for debugging, because it's inconvenient to use google auth locally.
   forceLoginEvent :: Event t () <- switchDyn <$> (prerender (pure never) (do
     allowsForcedDevLogin <- getConfig "common/allows_forced_login"
-    if isJust allowsForcedDevLogin then text "Yep" >> buttonClass "nope" "Force Login" else pure never
+    if isJust allowsForcedDevLogin then buttonClass "nope" "Force Login" else pure never
     ))
   let forcedLoginRequest = (ApiRequest_Public PublicRequest_ForceLogin) <$ forceLoginEvent
 
   let loginRequest = (ApiRequest_Public . PublicRequest_GoogleLogin) <$> fmapMaybe id updatedUserE
   loginResponse <- requestingIdentity $ leftmost [ loginRequest, forcedLoginRequest ]
   let loginSuccess = fmapMaybe (^? _Right) $ traceEvent "Login Response" $ loginResponse
-  return $ traceEvent "Updated Login" loginSuccess
+  prerender blank $
+    performEvent_ $ ffor loginSuccess $ \token -> do
+      doc <- currentDocumentUnchecked
+      cookie <- defaultCookieJson authCookieName (Just token)
+      setPermanentCookie doc (cookie { setCookiePath = Just "/" })
+      JS.liftJSM $ do 
+         JS.eval ( "console.log(\"Reloading due to login\"); location.reload();" :: Text )
+         pure ()
+  pure ()
+  -- return $ traceEvent "Updated Login" loginSuccess
   -- tellEvent $ First <$> loginSuccess
   
   --holdDyn Nothing $ updatedUserE
@@ -198,23 +210,42 @@ frontendBody
 frontendBody = do
   cookies <- askCookies
   -- display $ constDyn cookies
+  subRoute_ $ \case
+    FrontendRoute_Main -> void $ prerender blank $ do
+      JS.liftJSM $ do 
+         JS.eval ( "location.assign(\"/hunt/3/\");" :: Text )
+         pure ()
+    _ -> blank
+
   let mAuthCookie0 = A.decodeStrict . (\t -> if BS.head t == 34 then t else (34 `cons` t) `snoc` 34) =<< L.lookup (T.encodeUtf8 authCookieName) cookies
+  case mAuthCookie0 of
+    Nothing -> subRoute_ $ \case
+        FrontendRoute_Main -> blank
+        _ -> void $ initGauth
+    Just token -> void $ mapRoutedT (authenticatedWidget token) $ handleAuthFailure (void renderInvalid) $ subRoute_ $ \case
+        FrontendRoute_Templates -> void $ templateViewer
+        FrontendRoute_Channel -> void $ channel
+        FrontendRoute_Puzzle -> void $ puzzles
+        FrontendRoute_HuntSelection -> void $ huntselect
+        FrontendRoute_Main -> blank
+ {-
+-- do
   -- display $ constDyn mAuthCookie0
   -- text $ Data.Text.pack $ show mAuthCookie0
   -- sample (current mAuthCookie0) >>= text
-  rec mAuthCookie <- holdDyn mAuthCookie0 authChange
+  -- rec mAuthCookie <- holdDyn mAuthCookie0 authChange
   -- We have to give a type signature to the argument of subRoute because
   -- (at least on GHC 8.6.5) the compiler cannot properly infer that
   -- this function has the proper higher rank type.
-      authChange <- fmap switchDyn $ subRoute $ ((\case
+      subRoute $ ((\case
         FrontendRoute_Templates -> templateViewer >> return never
-        FrontendRoute_Channel -> authenticateWithToken mAuthCookie $ do
+        FrontendRoute_Channel -> do
           logout <- channel
           pure $ Nothing <$ logout
-        FrontendRoute_Puzzle ->  authenticateWithToken mAuthCookie $ do
+        FrontendRoute_Puzzle ->  do
           logout <- puzzles
           pure $ Nothing <$ logout
-        FrontendRoute_HuntSelection -> authenticateWithToken mAuthCookie $ do
+        FrontendRoute_HuntSelection -> do
           logout <- huntselect
           pure $ Nothing <$ logout
         FrontendRoute_Auth -> do
@@ -223,7 +254,7 @@ frontendBody = do
                 AuthRoute_Signup :/ () -> LoginMode_Signup
                 AuthRoute_Login :/ () -> LoginMode_Login-}
           -- rec credentials <- do
-          token <- initGauth
+          -- token <- initGauth
               
               {-   auth mode $ fmap Just errors
               x :: Dynamic t (Event t (Either Text AuthToken)) <- subRoute $ \case
@@ -234,17 +265,20 @@ frontendBody = do
                   requestingIdentity . ffor credentials $ \(user, pw) ->
                     ApiRequest_Public $ PublicRequest_Signup user pw
               let (errors, token)  = fanEither $ switch $ current x -}
-          authenticateWithToken mAuthCookie $ do
-            redirectIfAuthenticated mAuthCookie
-            pure $ never
-          pure $ Just <$> token
+          -- authenticateWithToken mAuthCookie $ do
+          --   redirectIfAuthenticated mAuthCookie
+          --  pure $ never
+          -- pure $ Just <$> token
+          pure never
         FrontendRoute_Main -> do
           pb <- getPostBuild
           setRoute $ FrontendRoute_Auth :/ AuthRoute_Login :/ () <$ pb
           pure never
-        ) :: forall a. FrontendRoute a -> RoutedT t a (ExampleWidget t m) (Event t (Maybe AuthToken)))
-  manageAuthCookie authChange
+        )) -- :: forall a. FrontendRoute a -> RoutedT t a (ExampleWidget t m) (Event t (Maybe AuthToken)))
+      pure never
+  -- manageAuthCookie authChange
   pure ()
+  -}
 
 redirectIfAuthenticated
   :: ( PostBuild t m

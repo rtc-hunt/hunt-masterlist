@@ -15,6 +15,7 @@ import Data.Time.Clock
 import Data.Maybe (fromMaybe)
 import Data.Text.Encoding
 import Data.Pool
+import Data.Signed (Signed)
 import Data.Signed.ClientSession
 import Data.Text (Text)
 import Database.Beam
@@ -52,6 +53,8 @@ createSheet name = handle failedCreateSheet $ do
       Google.send $ filesCreate $ file & (fMimeType ?~ "application/vnd.google-apps.spreadsheet") . (fName ?~ name) . (fParents .~ ["1F40xJAGFXFE8Z64xw_gxSR_P8TBYrwsi"])
     return $ qqq ^. fId
   where failedCreateSheet (e :: SomeException) = putStrLn "Failed to create google sheet, please check configuration." >> pure Nothing
+
+type RequestHandlerType = RequestHandler (ApiRequest AuthToken PublicRequest PrivateRequest) IO
 
 requestHandler
   :: Pool Connection
@@ -201,7 +204,7 @@ requestHandler pool csk authAudience allowForcedLogins = RequestHandler $ \case
       Right aid -> do
         x <- signWithKey csk aid
         pure (Right x) -}
-  ApiRequest_Public (PublicRequest_GoogleLogin token) -> do
+  ApiRequest_Public (PublicRequest_GoogleLogin token) -> checkGoogleAuthToken pool authAudience csk token {-do
       let googuri = https "www.googleapis.com" /: "oauth2" /: "v3" /: "certs"
       lastGSK <- runDb pool $ runSelectReturningOne $ select $ limit_ 1 $ do
           k <- all_ (_db_googleKeys db)
@@ -251,6 +254,7 @@ requestHandler pool csk authAudience allowForcedLogins = RequestHandler $ \case
         Left _ -> do
           return $ Left "Bad token"
         Right claims -> handleValidClaims claims
+      -}
   ApiRequest_Public (PublicRequest_ForceLogin) -> do
       if not allowForcedLogins then return $ Left "Not allowed" else do
         existingUser <- runDb pool $ runSelectReturningOne $ select $ do
@@ -268,3 +272,56 @@ requestHandler pool csk authAudience allowForcedLogins = RequestHandler $ \case
                   case muid of
                     Nothing -> return $ Left "Couldn't create user"
                     Just uid -> Right <$> signWithKey csk (uid)
+
+
+checkGoogleAuthToken :: (Pool Connection) -> Text -> Key -> Text -> IO (Either Text (Data.Signed.Signed (PrimaryKey Account Identity)))
+checkGoogleAuthToken pool authAudience csk token = do
+      let googuri = https "www.googleapis.com" /: "oauth2" /: "v3" /: "certs"
+      lastGSK <- runDb pool $ runSelectReturningOne $ select $ limit_ 1 $ do
+          k <- all_ (_db_googleKeys db)
+          guard_ $ _googleKey_expires k Database.Beam.>. current_timestamp_
+          pure $ _googleKey_keyset k
+      gsk :: JWKSet <- case lastGSK of
+           Just (PgJSON a) -> do
+                return a
+           Nothing -> do
+                current <- getCurrentTime
+                new <- runReq defaultHttpConfig $ Req.req GET googuri NoReqBody jsonResponse mempty
+                let maxAge = fromMaybe 0 $ getFirst $ ((mconcat $ (First . (fmap (fromRational @NominalDiffTime ) .  readMaybe . C8.unpack <=< C8.stripSuffix "," <=< C8.stripPrefix "max-age=")) <$> (C8.words $ fromMaybe "" (responseHeader new "Cache-Control"))))
+                    expires = addUTCTime maxAge current
+                runDb pool $ runInsert $ insert (_db_googleKeys db) $ insertValues [GoogleKey
+                  { _googleKey_fetchedAt = current
+                  , _googleKey_expires = expires
+                  , _googleKey_keyset = PgJSON $ responseBody new
+                  }]
+                return $ responseBody new
+      (parsedToken :: Either JWT.JWTError JWT.ClaimsSet) <- runExceptT $ do
+         let config = JWT.defaultJWTValidationSettings (const True . (== authAudience) . (^. JWT.string)) -- "570358826294-2ut7bnk6ar7jmqifsef48ljlk0o5m8p4.apps.googleusercontent.com"
+         decoded <- JWT.decodeCompact $ fromStrict $ encodeUtf8 token
+         JWT.verifyClaims config gsk decoded
+      let handleValidClaims claims = do
+          if not $ (claims ^. JWT.claimIss) `elem` [Just "https://accounts.google.com", Just "accounts.google.com"] 
+            then return $ Left "Invalid claims"
+            else do
+              let subject = claims ^. JWT.claimSub . _Just . JWT.string
+              let name = claims ^? JWT.unregisteredClaims . at "name" . _Just . _String
+              -- let Just (Aeson.String email) = claims ^. JWT.unregisteredClaims . at "email"
+              existingUser <- runDb pool $ runSelectReturningOne $ select $ do
+                user <- all_ (_db_account db)
+                guard_ $ _account_guid user ==. val_ subject
+                return user
+              case existingUser of
+                Just someUser -> Right <$> signWithKey csk (AccountId $ _account_id someUser)
+                Nothing -> do
+                  muid <- runDb pool $ insertAndNotify (_db_account db) $ Account
+                    { _account_id = default_
+                    , _account_name = val_ $ fromMaybe "Unnamed" name
+                    , _account_guid = val_ $ subject
+                    }
+                  case muid of
+                    Nothing -> return $ Left "Couldn't create user"
+                    Just uid -> Right <$> signWithKey csk (uid)
+      case parsedToken of
+        Left _ -> do
+          return $ Left "Bad token"
+        Right claims -> handleValidClaims claims

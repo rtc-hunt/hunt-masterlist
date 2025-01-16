@@ -16,6 +16,9 @@ import Database.Beam.Schema
 import GHC.Generics
 -- import Rhyolite.Account
 
+authCookieName :: Text
+authCookieName = "auth"
+
 type Id a = PrimaryKey a Identity
 
 type AuthToken = Signed (PrimaryKey Account Identity)

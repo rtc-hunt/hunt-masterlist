@@ -12,6 +12,8 @@ library
                , lens-aeson
                , lens
                , directory
+               , snap
+               , either
                , mtl
                , aeson-gadt-th
                , bytestring

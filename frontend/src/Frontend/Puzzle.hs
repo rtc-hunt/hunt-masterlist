@@ -180,7 +180,7 @@ masterlist huntId queryD = do
                       FrontendRoute_Puzzle :/ (hunt, currentQuery) -> FrontendRoute_Puzzle :/ (hunt, over _Left mod $ currentQuery)
                       a -> a) <$> e
               , _puzzleTableConfig_results = puzzleListI
-              , _puzzleTableConfig_puzzleLink = \id -> dynRouteLink $ (\i -> FrontendRoute_Puzzle :/ (huntId, Right i)) <$> id
+              , _puzzleTableConfig_puzzleLink = \id -> reloadingRouteLink $ (\i -> FrontendRoute_Puzzle :/ (huntId, Right i)) <$> id
               , _puzzleTableConfig_metas = knownMetas
               , _puzzleTableConfig_tags = knownTags
               }
@@ -252,7 +252,8 @@ huntselect = do
   divClass "appMain" $ el "div" $ el "div" $ elClass "ul" "grid h-screen place-items-center" $ el "div" $ do
     elClass "div" "huntlist-title" $ text "Select a hunt"
     list hunts $ \dHunt ->
-      el "li" $ dynRouteLink ((\a -> FrontendRoute_Puzzle :/ (HuntId $ _hunt_id a, Left mempty)) <$> dHunt) $ elClass "div" "text-lg huntlist-button" $ dynText $ _hunt_title <$> dHunt
+      -- el "li" $ dynRouteLink ((\a -> FrontendRoute_Puzzle :/ (HuntId $ _hunt_id a, Left mempty)) <$> dHunt) $ elClass "div" "text-lg huntlist-button" $ dynText $ _hunt_title <$> dHunt
+      el "li" $ reloadingRouteLink ((\a -> FrontendRoute_Puzzle :/ (HuntId $ _hunt_id a, Left mempty)) <$> dHunt) $ elClass "div" "text-lg huntlist-button" $ dynText $ _hunt_title <$> dHunt
   pure never
 
 

@@ -27,6 +27,11 @@ data Framed m t a = Framed
   , _framed_hunt :: Dynamic t (Id Hunt)
   }
 
+reloadingRouteLink :: (Monad m, DomBuilder t m, MonadFix m, SetRoute t (R FrontendRoute) m, RouteToUrl (R FrontendRoute) m, PostBuild t m, MonadHold t m, Prerender js t m) => Dynamic t (R FrontendRoute) -> m () -> m ()
+reloadingRouteLink routeD a = do
+    toUrl <- askRouteToUrl
+    elDynAttr "a" ((\route -> "href" =: (toUrl $ route)) <$> routeD) $ a
+
 framed :: (Monad m, DomBuilder t m, MonadFix m, SetRoute t (R FrontendRoute) m, RouteToUrl (R FrontendRoute) m, PostBuild t m, MonadHold t m, Prerender js t m) => Framed m t a -> m ()
 framed Framed
   { _framed_headerItems = header
@@ -36,7 +41,11 @@ framed Framed
   }
   = mdo
     (menuStuff, a) <- elClass "nav" "app ui fixed inverted menu" $ mdo
-      dynRouteLink ((\hid -> FrontendRoute_Puzzle :/ (hid, Left mempty)) <$> huntId) $ divClass "logo header item whitespace-nowrap" $ text "Hunt Master List"
+      -- toUrl <- askRouteToUrl
+      -- dynRouteLink ((\hid -> FrontendRoute_Puzzle :/ (hid, Left mempty)) <$> huntId) $ divClass "logo header item whitespace-nowrap" $ text "Hunt Master List"
+      -- elDynAttr "a" ((\hid -> "href" =: (toUrl $ FrontendRoute_Puzzle :/ (hid, Left mempty))) <$> huntId) $ divClass "logo header item whitespace-nowrap" $ text "Hunt Master List"
+      reloadingRouteLink ((\hid -> FrontendRoute_Puzzle :/ (hid, Left mempty)) <$> huntId) $ divClass "logo header item whitespace-nowrap" $ text "Hunt Master List"
+
 
       rv <- header
       (menuElem, (layoutD, menuOpenD)) <- elClass "div" "right menu" $ elDynAttr' "div" (ffor menuOpenD $ \c -> "class" =: ("ui icon top right dropdown button item " <> c)) $ do
