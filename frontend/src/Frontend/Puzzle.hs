@@ -148,7 +148,14 @@ masterlist huntId queryD = do
              sequence $ ffor tabs $ \tab ->
               let itemClass = ffor activeTab $ \aTab ->
                      "class" =: if aTab == tab then "item active" else "item"
-              in fmap (domEvent Click . fst) $ elDynAttr' "div" itemClass $ text $ masterlistPageToText tab
+              in fmap (domEvent Click . fst) $ elDynAttr' "div" itemClass $ do
+                       text $ masterlistPageToText tab
+                       case tab of
+                         MasterlistPage_HuntPage -> do
+                            let lnk = _hunt_rootpage <$> hunt
+                                lattr = ((\l -> ("target":: Text) =: "_blank" <> "href" =: l) <$> lnk)
+                            elDynAttr "a" lattr $ elClass "i" "external alternate icon px-4" $ blank
+                         _ -> blank
             activeTab :: Dynamic t MasterlistPage <- holdDyn MasterlistPage_List $ leftmost $ zipWith (<$) [MasterlistPage_List, MasterlistPage_HuntPage, MasterlistPage_Chat] evts
             -- activeSolverList puzId puzzlesData
             return $ activeTab
