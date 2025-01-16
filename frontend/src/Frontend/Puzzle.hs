@@ -173,7 +173,7 @@ masterlist huntId queryD = do
             mkMsgReq c m = case c of
                         Nothing -> Nothing
                         Just c' -> Just $ ApiRequest_Private () $ PrivateRequest_SendMessage c' m
-        chatOverlay $ mcid
+        chatOverlay False mcid
         _ <- requestingIdentity $ attachWithMaybe (\c m -> mkMsgReq c m) (current mcid) msgString
         
         myTabDisplay "ui top attached tabular menu" "activeTab" activeTab $
@@ -397,7 +397,7 @@ puzzle puz = do
              in elDynAttr "a" (fromMaybe mempty . fmap ((<> ("class" =: "item" <> "target" =: "_blank")) . ("href" =:)) <$> lnkD) $ (dynText $ fromMaybe "" . (fmap (const "Voice Chat")) <$> lnkD)
             return $ activeTab
         , _framed_body = \ activeTab newMsg cmd _ -> do -- divClass "" $ do
-            chatOverlay $ fmap ChatroomId . unChatroomId . _puzzle_Channel <$> (puzzleData >>= _puzzleData_puzzle) -- divClass "chat-overlay scrollable" $ text "Chat Messagez"
+            chatOverlay True $ fmap ChatroomId . unChatroomId . _puzzle_Channel <$> (puzzleData >>= _puzzleData_puzzle) -- divClass "chat-overlay scrollable" $ text "Chat Messagez"
             let mcid = (fmap ChatroomId . unChatroomId . _puzzle_Channel) <$> (puzzleData >>= _puzzleData_puzzle)
                 chatWidget cls = do
                        channelView <- channelBuilder mcid

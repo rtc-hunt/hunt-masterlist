@@ -18,6 +18,7 @@ import Common.Schema
 import Common.Request
 import Common.Route
 import Frontend.Channel
+import Frontend.Utils
 import qualified Templates.Partials.Message as Templates
 
 chatOverlay :: (Monad m, MonadFix m, Reflex t, Adjustable t m, NotReady t m, PostBuild t m, DomBuilder t m, MonadHold t m
@@ -33,13 +34,13 @@ chatOverlay :: (Monad m, MonadFix m, Reflex t, Adjustable t m, NotReady t m, Pos
      , MonadIO (Performable m)
      , Response (Client m) ~ Identity
      , Request (Client m) ~ ApiRequest () PublicRequest PrivateRequest
-  ) => Dynamic t (Maybe (Id Chatroom)) -> m ()
-chatOverlay channelId = do
+  ) => Bool -> Dynamic t (Maybe (Id Chatroom)) -> m ()
+chatOverlay enableHotPopup channelId = do
     cv <- channelBuilder channelId
     let messages = join $ fromMaybe mempty <$> _channelView_messages cv
-    let newMessagesE = ffilter (not . Map.null) $ attachWith (flip Map.difference) (current messages) (updated messages)
+    popupsB <- onRender >>= delay 5 >>= hold enableHotPopup . (True <$)
+    let newMessagesE = gate popupsB $ ffilter (not . Map.null) $ attachWith (flip Map.difference) (current messages) (updated messages)
     let recentMessages = (\m -> Map.drop (Map.size m - 2) m) <$> messages
-
     hideMessages <- fmap switchDyn $ prerender (pure never) $ debounce 3 newMessagesE
     finishHideMessages <- fmap switchDyn $ prerender (pure never) $ debounce 4 newMessagesE
     showMessagesD <- holdDyn 0 $ leftmost [ 2 <$ newMessagesE, 1 <$ hideMessages, 0 <$ finishHideMessages ]
