@@ -11,6 +11,7 @@ import Data.Vessel
 import Control.Monad.IO.Class
 import Control.Monad
 import Data.Maybe
+import qualified Data.Foldable as F
 import qualified Data.Map as Map
 import qualified Data.Text as T
 
@@ -19,7 +20,9 @@ import Common.Request
 import Common.Route
 import Frontend.Channel
 import Frontend.Utils
+import qualified Language.Javascript.JSaddle as JS
 import qualified Templates.Partials.Message as Templates
+import Debug.Trace
 
 chatOverlay :: (Monad m, MonadFix m, Reflex t, Adjustable t m, NotReady t m, PostBuild t m, DomBuilder t m, MonadHold t m
      , Requester t m, Response m ~ Identity, Request m ~ ApiRequest () PublicRequest PrivateRequest
@@ -47,4 +50,6 @@ chatOverlay enableHotPopup channelId = do
     let chatOverlayClass = ffor showMessagesD $ \i -> "class" =: ("chat-overlay scrollable flex flex-col hide-state-" <> (T.pack $ show i)) 
     elDynAttr "div" chatOverlayClass $ do
       void $ listWithKey (recentMessages) $ \_ -> Templates.message
+    prerender_ blank $ performEvent_ $ ffor (attachPromptlyDyn (_channelView_name cv) (coincidence $ updated recentMessages <$ newMessagesE)) $ \(title, messages) -> void $ JS.liftJSM $ do
+            JS.jsg2 ("flingMessages" :: T.Text) (JS.toJSVal $ fromMaybe "NOTITLE" title) $ JS.toJSVal $ F.fold $ (\a -> _msg_handle a <> ": " <> _msg_text a <> "\n") <$> messages
 

@@ -97,7 +97,10 @@ frontend = Frontend
       elAttr "link" ("rel" =: "stylesheet" <> "href" =: "https://fonts.googleapis.com/css2?family=Karla:ital,wght@0,200;0,300;0,400;0,500;0,600;0,700;0,800;1,200;1,300;1,400;1,500;1,600;1,700;1,800&display=swap") blank
       elAttr "link" ("rel" =: "stylesheet" <> "href" =: "https://fonts.googleapis.com/icon?family=Material+Icons") blank
       elAttr "meta" ("name"=: "viewport" <> "content" =: "width=device-width, initial-scale=1") blank
-      el "script" $ text "var globalToken; var callback; window.handleGoogleLogin = (e) => { globalToken = e.credential; if( window.callback ){ window.callback(globalToken); } }; window.setCredentialCallback = (cb) => { console.log(\"Calling callback\", cb, globalToken); window.callback = cb; if( globalToken ) { window.callback(globalToken); }; } "
+      --elAttr "script" ("src" =: $(static "jslib.js")) blank
+      el "script" $ do
+          text "var globalToken; var callback; window.handleGoogleLogin = (e) => { globalToken = e.credential; if( window.callback ){ window.callback(globalToken); } }; window.setCredentialCallback = (cb) => { console.log(\"Calling callback\", cb, globalToken); window.callback = cb; if( globalToken ) { window.callback(globalToken); }; }; "
+          text "window.flingMessages = (title, body) => { if( Notification.permission == \"granted\" && window.enableNotifications && document.visibilityState == \"hidden\" ) { new Notification(title, {body, tag: \"HML Chat\"}) } }; "
 --j      elAttr "script" ("src" =: "https://apis.google.com/js/platform.js") blank
 --      el "script" $ text " \
 --          \ var prev=5; \
