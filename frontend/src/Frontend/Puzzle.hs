@@ -67,6 +67,7 @@ import Frontend.Cli
 import Frontend.Types
 import Frontend.Utils
 import Frontend.Patch
+import Frontend.SortSelect
 
 import Control.Monad.Fix
 
@@ -547,7 +548,7 @@ puzzleListBuilder
      , Requester t m, Response m ~ Identity, Request m ~ ApiRequest () PublicRequest PrivateRequest
      )
   -- => Id Hunt -> m (Incremental t (PatchMapWithPatchingMove (Id Puzzle) PuzzleDataPatch)) -- (Dynamic t (StrictMap.Map (Id Puzzle) (PuzzleDataT Identity)))
-  => Id Hunt -> m (Incremental t (PatchMapWithMove (Id Puzzle) (PuzzleDataT Identity)))-- m (Dynamic t (StrictMap.Map (Id Puzzle) (PuzzleData t)))
+  => Id Hunt -> m (Incremental t (PatchMapWithMove PuzzleSortKey (PuzzleDataT Identity)))-- m (Dynamic t (StrictMap.Map (Id Puzzle) (PuzzleData t)))
 puzzleListBuilder hunt = do
   puzzleIds <- watch $ pure $ key V_HuntPuzzles ~> key hunt ~> postMap (traverse (fmap getMonoidalMap . getComplete))
 
@@ -582,7 +583,7 @@ puzzleListBuilder hunt = do
   puzDataD <- watch $ queryD
 
   let 
-   puzzlesD = ffor puzDataD $ \puzzles -> (flip Map.mapWithKey) (fromMaybe mempty puzzles) $ \puzId (puz, metas, tags, solutions, notes, currentSolvers) ->
+   puzzlesDUnsorted = ffor puzDataD $ \puzzles -> (flip Map.mapWithKey) (fromMaybe mempty puzzles) $ \puzId (puz, metas, tags, solutions, notes, currentSolvers) ->
     PuzzleData
       -- { _puzzleData_id = puzId
       { _puzzleData_puzzle = getFirst puz
@@ -592,6 +593,8 @@ puzzleListBuilder hunt = do
       , _puzzleData_notes = fromMaybe mempty $ fmap getMonoidalMap $ getComplete $ notes
       , _puzzleData_currentSolvers = fromMaybe mempty $ fmap getMonoidalMap $ getComplete $ currentSolvers
       }
+
+  let puzzlesD = toSortKeys (constDyn PuzzleOrdering_ByMeta) puzzlesDUnsorted
 
   initialPuzzles <- sample $ current puzzlesD
   traceM "Building puzzle list"

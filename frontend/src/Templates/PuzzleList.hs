@@ -39,7 +39,7 @@ data PuzzleTableConfig t m = PuzzleTableConfig
   { _puzzleTableConfig_query :: Dynamic t PuzzleQuery
   , _puzzleTableConfig_modifyQuery :: Event t (Endo PuzzleQuery) -> m ()
   --, _puzzleTableConfig_results :: Incremental t (PatchMapWithPatchingMove (Id Puzzle) PuzzleDataPatch)-- Dynamic t (Map (PrimaryKey Puzzle Identity) (PuzzleDataT Identity))
-  , _puzzleTableConfig_results :: Incremental t (PatchMapWithMove (Id Puzzle) (PuzzleDataT Identity))-- Dynamic t (Map (PrimaryKey Puzzle Identity) (PuzzleDataT Identity))
+  , _puzzleTableConfig_results :: Incremental t (PatchMapWithMove (PuzzleSortKey) (PuzzleDataT Identity))-- Dynamic t (Map (PrimaryKey Puzzle Identity) (PuzzleDataT Identity))
   , _puzzleTableConfig_puzzleLink :: Dynamic t (PrimaryKey Puzzle Identity) -> m () -> m ()
   , _puzzleTableConfig_metas :: Dynamic t (Map (Id Puzzle) Text)
   , _puzzleTableConfig_tags :: Dynamic t (Set Text)
@@ -161,7 +161,7 @@ puzzlesTable PuzzleTableConfig { _puzzleTableConfig_query = query, _puzzleTableC
           
           (_, _) <- traceShow "Puzzle list started" $ tableDynAttrWithSearch "puzzletable ui celled table"  [
             -- ("Title", \_ _ _ -> puzzleLink (constDyn text "", pure $ (constDyn mempty))
-            ("Title", \puzKey puzDat -> puzzleLink (primaryKey . _puzzleData_puzzle <$> puzDat) $ elAttr "div" ("class" =: "" <> "data-tooltip" =: "Open Puzzle") $ dynText $ _puzzle_Title . _puzzleData_puzzle <$> puzDat, return $ (constDyn (mempty :: PuzzleQuery)))
+            ("Title", \_ puzDat -> puzzleLink (primaryKey . _puzzleData_puzzle <$> puzDat) $ elAttr "div" ("class" =: "" <> "data-tooltip" =: "Open Puzzle") $ dynText $ _puzzle_Title . _puzzleData_puzzle <$> puzDat, return $ (constDyn (mempty :: PuzzleQuery)))
             , ("Is meta?", \_ puzDat -> dynText $ (\p -> if p then "META" else "") . _puzzle_IsMeta . _puzzleData_puzzle <$> puzDat
               , fmap (flip PuzzleQuery PuzzleOrdering_Any) . _dropdown_value <$> dropdown mempty (constDyn (mempty =: " - " <> PuzzleSelect_IsMeta =: "Is Meta" <> (PuzzleSelect_Not PuzzleSelect_IsMeta) =: "Not Meta")) headerDropdownSettings
               )
