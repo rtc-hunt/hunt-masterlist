@@ -219,6 +219,9 @@ masterlist huntId queryD = do
                 
                 pzl <- buttonOneshotClass "ui button" "Add Puzzle" $ () <$ reqDone
                 reqDone <- requestingIdentity $ ApiRequest_Private () <$> curNewPuzzle <@ pzl
+                setRoute $ flip fmapMaybe reqDone $ \case
+                  Left err -> Nothing
+                  Right newPuzzle -> Just ( FrontendRoute_Puzzle :/ ( huntId, Right newPuzzle) )
                 blank
         divClass "chat-sidebar" $ chatWidget "flex flex-col flex-grow p-4 overflow-y-scroll"
         let (cliErrors, cmdSel) = parseCli Nothing cmdString
