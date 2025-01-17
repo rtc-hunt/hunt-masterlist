@@ -107,6 +107,10 @@ frontend = Frontend
 --          \ function renderButton() {\
 --          \   gapi.signin2.render('signin-button', {});\
 --          \ }"
+      subRoute_ $ \case
+        FrontendRoute_Main -> 
+          elAttr "meta" ("http-equiv" =: "refresh" <> "content" =: ("0; url=" <> "https://hunt-masterlist.tcita.com/hunt/4/" )) blank
+        _ -> blank
       blank
   , _frontend_body = runExampleWidget frontendBody
   }
