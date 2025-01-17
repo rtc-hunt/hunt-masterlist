@@ -162,7 +162,7 @@ puzzlesTable PuzzleTableConfig { _puzzleTableConfig_query = query, _puzzleTableC
           (_, _) <- traceShow "Puzzle list started" $ tableDynAttrWithSearch "puzzletable ui celled table"  [
             -- ("Title", \_ _ _ -> puzzleLink (constDyn text "", pure $ (constDyn mempty))
             ("Title", \puzKey puzDat -> puzzleLink (primaryKey . _puzzleData_puzzle <$> puzDat) $ elAttr "div" ("class" =: "" <> "data-tooltip" =: "Open Puzzle") $ dynText $ _puzzle_Title . _puzzleData_puzzle <$> puzDat, return $ (constDyn (mempty :: PuzzleQuery)))
-            , ("Is meta?", \_ puzDat -> blank -- dynText $ (\p -> if p then "META" else "") . _puzzle_IsMeta <$> (puzDat >>= _puzzleData_puzzle)
+            , ("Is meta?", \_ puzDat -> dynText $ (\p -> if p then "META" else "") . _puzzle_IsMeta . _puzzleData_puzzle <$> puzDat
               , fmap (flip PuzzleQuery PuzzleOrdering_Any) . _dropdown_value <$> dropdown mempty (constDyn (mempty =: " - " <> PuzzleSelect_IsMeta =: "Is Meta" <> (PuzzleSelect_Not PuzzleSelect_IsMeta) =: "Not Meta")) headerDropdownSettings
               )
             , ("Meta", \_ puzDat -> void $
@@ -207,7 +207,6 @@ puzzlesTable PuzzleTableConfig { _puzzleTableConfig_query = query, _puzzleTableC
               )
             {- , ("Voice Chat", \_ puzDat _ -> 
                 let lnkD = _puzzle_voicelink $ (_puzzleData_puzzle $ puzDat)
-{-
 =======
             , ("Status", \_ puzDat _ -> 
                 void $ listWithKey (Map.filterWithKey (\k _ -> k `elem` statusTags) <$> (_puzzleData_tags puzDat)) $ \k _ -> elAttr "span" ("class" =: "ui label" <> "data-tag" =: k) $ text k
@@ -217,17 +216,16 @@ puzzlesTable PuzzleTableConfig { _puzzleTableConfig_query = query, _puzzleTableC
             , ("Current Solvers", \_ puzDat _ -> 
                 void $ listWithKey (_puzzleData_currentSolvers puzDat) $ \k u -> el "span" $ dynText u
               , fmap (flip PuzzleQuery PuzzleOrdering_Any) . _dropdown_value <$> dropdown mempty (constDyn (mempty =: " - " <> PuzzleSelect_HasSolvers =: "Has Current Solvers" <> (PuzzleSelect_Not PuzzleSelect_HasSolvers) =: "No Current Solvers")) headerDropdownSettings
-              )
-            , ("Voice Chat", \_ puzDat _ -> 
-                let lnkD = _puzzle_voicelink <$> (_puzzleData_puzzle puzDat)
->>>>>>> batched-query-static-render -} 
+              ) -}
+            , ("Voice Chat", \_ puzDat -> 
+                let lnkD = _puzzle_voicelink . _puzzleData_puzzle <$> puzDat
                 in elDynAttr "a" (fromMaybe mempty . fmap ((<> ("class" =: "text-xs voicelink" <> "target" =: "_blank")) . ("href" =:)) <$> lnkD) $ dynText $ fromMaybe "" . ("Voice Chat" <$) <$> lnkD
               , do
                   startValue <- sample $ current $ ((\a -> fromMaybe mempty $ matchSubSelect a (`elem` ([PuzzleSelect_HasVoice, PuzzleSelect_Not PuzzleSelect_HasVoice] :: [PuzzleSelect]))) . _puzzleQuery_select) <$> query
                   dropdownValue <- fmap (flip PuzzleQuery PuzzleOrdering_Any) . _dropdown_value <$> dropdown startValue (constDyn (mempty =: " - " <> PuzzleSelect_HasVoice =: "Has Voice Chat" <> (PuzzleSelect_Not PuzzleSelect_HasVoice) =: "No Voice Chat")) headerDropdownSettings
                   modifyQuery $ (\(PuzzleQuery old _) (PuzzleQuery new _) -> Endo $ \(PuzzleQuery all ord) -> PuzzleQuery (new <> subPuzzleSelect all old) ord) <$> current dropdownValue <@> updated dropdownValue
                   pure dropdownValue
-              ) -}
+              )
 -- <<<<<<< HEAD
             , ("Tags", \_ puzDat ->
                 void $ dumbList (Map.filterWithKey (\k _ -> not $ k `elem` statusTags) <$> (_puzzleData_tags <$> puzDat)) $ \k _ -> elAttr "span" ("class" =: "ui label" <> "data-tag" =: k) $ text k
