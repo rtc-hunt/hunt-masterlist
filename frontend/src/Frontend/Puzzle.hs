@@ -94,6 +94,7 @@ puzzles :: (Monad m, MonadFix m, Reflex t, Routed t (Id Hunt, Either PuzzleQuery
      , MonadIO (Performable m)
      , MonadJSM (Performable (Client m))
      , Response (Client m) ~ Identity
+     , RouteToUrl (R FrontendRoute) (Client m)
      , Request (Client m) ~ ApiRequest () PublicRequest PrivateRequest
   ) => m (Event t ())
 puzzles = do
@@ -117,7 +118,7 @@ masterlistPageToText = \case
   MasterlistPage_Chat -> "Chat"
 
 masterlist :: (Monad m, MonadHold t m, PostBuild t m, Reflex t, DomBuilder t m, MonadFix m
-     , SetRoute t (R FrontendRoute) m, RouteToUrl (R FrontendRoute) m, Prerender js t m
+     , SetRoute t (R FrontendRoute) m, RouteToUrl (R FrontendRoute) m, Prerender js t m, RouteToUrl (R FrontendRoute) (Client m)
      , MonadQuery t (Vessel V (Const SelectedCount)) m
      , Requester t m, Response m ~ Identity, Request m ~ ApiRequest () PublicRequest PrivateRequest
      , PerformEvent t m
@@ -180,7 +181,20 @@ masterlist huntId queryD = do
           MasterlistPage_List =: ("List", do
             puzzleListI <- puzzleListBuilder huntId
             performEvent_ $ (liftIO (Data.Time.Clock.getCurrentTime >>= (print . ((,) "puzzleListD updated: ")))) <$ updatedIncremental puzzleListI
-            puzzlesTable PuzzleTableConfig
+            prerender_ (
+             puzzlesTable PuzzleTableConfig
+              { _puzzleTableConfig_query = queryD
+              , _puzzleTableConfig_modifyQuery = \e -> do
+                   modifyRoute $ (\(Endo mod) -> \case
+                      FrontendRoute_Puzzle :/ (hunt, currentQuery) -> FrontendRoute_Puzzle :/ (hunt, over _Left mod $ currentQuery)
+                      a -> a) <$> e
+              , _puzzleTableConfig_results = puzzleListI
+              , _puzzleTableConfig_puzzleLink = \id -> reloadingRouteLink $ (\i -> FrontendRoute_Puzzle :/ (huntId, Right i)) <$> id
+              , _puzzleTableConfig_metas = knownMetas
+              , _puzzleTableConfig_tags = knownTags
+              }
+              ) (
+             puzzlesTable PuzzleTableConfig
               { _puzzleTableConfig_query = queryD
               , _puzzleTableConfig_modifyQuery = \e -> do
                    modifyRoute $ (\(Endo mod) -> \case
@@ -192,6 +206,7 @@ masterlist huntId queryD = do
               , _puzzleTableConfig_tags = knownTags
               }
               )
+	    )
            <> MasterlistPage_HuntPage =: ("frontpage", do
                frameURI $ _hunt_rootpage <$> hunt
               )
