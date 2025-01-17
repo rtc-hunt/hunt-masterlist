@@ -216,7 +216,7 @@ frontendBody = do
   subRoute_ $ \case
     FrontendRoute_Main -> void $ prerender blank $ do
       JS.liftJSM $ do 
-         JS.eval ( "location.assign(\"/hunt/3/\");" :: Text )
+         JS.eval ( "location.assign(\"/hunt/4/\");" :: Text )
          pure ()
     _ -> blank
 
@@ -300,7 +300,7 @@ redirectIfAuthenticated mAuthCookie = do
         , updated mAuthCookie
         ]
   liveHunts <- fmap (fmap (fromMaybe mempty)) $ watch $ constDyn $ key V_LiveHunts ~> key () ~> postMap (traverse (fmap (Map.keysSet . getMonoidalMap) . getComplete))
-  setRoute $ fmap (\hunt -> FrontendRoute_Puzzle :/ (hunt, Left mempty)) $ (fromMaybe (HuntId 3) <$> current (Set.lookupMax <$> liveHunts) <@ hasAuth)
+  setRoute $ fmap (\hunt -> FrontendRoute_Puzzle :/ (hunt, Left mempty)) $ (fromMaybe (HuntId 4) <$> current (Set.lookupMax <$> liveHunts) <@ hasAuth)
 
 runExampleWidget
   :: ( DomBuilder t m
