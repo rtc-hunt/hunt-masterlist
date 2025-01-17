@@ -597,7 +597,7 @@ puzzleListBuilder hunt = do
   traceM "Building puzzle list"
   rec
     --puzzleIncremental <- holdIncremental initialPuzzles $ patchThatChangesMapWith PuzzleOrd diffPuzzleData <$> currentIncremental puzzleIncremental <@> updated puzzlesD
-    puzzleIncremental <- holdIncremental initialPuzzles $ patchThatChangesMap <$> current puzzlesD <@> updated puzzlesD
+    puzzleIncremental <- holdIncremental initialPuzzles $ patchThatChangesMap <$> currentIncremental puzzleIncremental <@> updated puzzlesD
 
   return puzzleIncremental 
   --return puzzlesD
