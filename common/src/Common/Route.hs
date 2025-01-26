@@ -1,6 +1,7 @@
 {-# Language ScopedTypeVariables #-}
 {-# Language DeriveAnyClass #-}
 {-# Language OverloadedStrings #-}
+{-# Language ConstraintKinds #-}
 module Common.Route where
 
 import Control.Category

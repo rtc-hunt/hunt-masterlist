@@ -22,21 +22,18 @@ import Frontend.Channel
 import Frontend.Utils
 import qualified Language.Javascript.JSaddle as JS
 import qualified Templates.Partials.Message as Templates
+import Frontend.Types
 import Debug.Trace
 
 chatOverlay :: (Monad m, MonadFix m, Reflex t, Adjustable t m, NotReady t m, PostBuild t m, DomBuilder t m, MonadHold t m
-     , Requester t m, Response m ~ Identity, Request m ~ ApiRequest () PublicRequest PrivateRequest
      , SetRoute t (R FrontendRoute) m, RouteToUrl (R FrontendRoute) m
      , PerformEvent t m
      , TriggerEvent t m
-     , MonadQuery t (Vessel V (Const SelectedCount)) m
-     , MonadQuery t (Vessel V (Const SelectedCount)) (Client m)
-     , Prerender js t m
-     , Requester t (Client m)
+     , Prerender t m
      , SetRoute t (R FrontendRoute) (Client m)
+     , AuthReq t m
+     , AuthenticatedMonadQuery t m
      , MonadIO (Performable m)
-     , Response (Client m) ~ Identity
-     , Request (Client m) ~ ApiRequest () PublicRequest PrivateRequest
   ) => Bool -> Dynamic t (Maybe (Id Chatroom)) -> m ()
 chatOverlay enableHotPopup channelId = do
     cv <- channelBuilder channelId

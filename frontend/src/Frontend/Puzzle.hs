@@ -41,6 +41,9 @@ import Data.Map.Monoidal as MMap hiding (keys)
 import Data.Functor.Misc (Const2(..))
 import Rhyolite.SemiMap
 
+import Frontend.Types
+import Rhyolite.Frontend.Auth.App
+
 import Data.Patch.MapWithMove
 
 import Control.Monad.Zip
@@ -50,6 +53,7 @@ import qualified Templates as Templates
 import Templates.Partials.ChannelList
 import Templates.Partials.Message as Templates
 import Templates.Types
+import Rhyolite.Vessel.AuthenticatedV
 
 import Common.Request
 import Common.Route
@@ -80,6 +84,8 @@ import Templates.Puzzle as Template
 import Templates.PuzzleList as Template
 import Common.Schema
 import Debug.Trace
+import Frontend.Authentication
+import Rhyolite.Frontend.Auth.App
 
 puzzles :: (Monad m, MonadFix m, Reflex t, Routed t (Id Hunt, Either PuzzleQuery (Id Puzzle)) m, Adjustable t m, NotReady t m, PostBuild t m, DomBuilder t m, MonadHold t m
      , Routed t ((Id Hunt, Either PuzzleQuery (Id Puzzle))) (Client m)
@@ -87,16 +93,14 @@ puzzles :: (Monad m, MonadFix m, Reflex t, Routed t (Id Hunt, Either PuzzleQuery
      , SetRoute t (R FrontendRoute) m, RouteToUrl (R FrontendRoute) m
      , PerformEvent t m
      , TriggerEvent t m
-     , MonadQuery t (Vessel V (Const SelectedCount)) m
-     , MonadQuery t (Vessel V (Const SelectedCount)) (Client m)
-     , Prerender js t m
+     , Prerender t m
      , Requester t (Client m)
      , SetRoute t (R FrontendRoute) (Client m)
      , MonadIO (Performable m)
      , MonadJSM (Performable (Client m))
-     , Response (Client m) ~ Identity
      , RouteToUrl (R FrontendRoute) (Client m)
-     , Request (Client m) ~ ApiRequest () PublicRequest PrivateRequest
+     , AuthenticatedMonadQuery t m
+     , AuthReq t m
   ) => m (Event t ())
 puzzles = do
   routeD <- askRoute
@@ -119,27 +123,22 @@ masterlistPageToText = \case
   MasterlistPage_Chat -> "Chat"
 
 masterlist :: (Monad m, MonadHold t m, PostBuild t m, Reflex t, DomBuilder t m, MonadFix m
-     , SetRoute t (R FrontendRoute) m, RouteToUrl (R FrontendRoute) m, Prerender js t m, RouteToUrl (R FrontendRoute) (Client m)
-     , MonadQuery t (Vessel V (Const SelectedCount)) m
-     , Requester t m, Response m ~ Identity, Request m ~ ApiRequest () PublicRequest PrivateRequest
+     , SetRoute t (R FrontendRoute) m, RouteToUrl (R FrontendRoute) m, Prerender t m, RouteToUrl (R FrontendRoute) (Client m)
      , PerformEvent t m
      , TriggerEvent t m
      , MonadHold t m
      , PostBuild t m
      , MonadFix m
      , SetRoute t (R FrontendRoute) (Client m)
-     , MonadQuery t (Vessel V (Const SelectedCount)) m
-     , MonadQuery t (Vessel V (Const SelectedCount)) (Client m)
-     , Response (Client m) ~ Identity
-     , Request (Client m) ~ ApiRequest () PublicRequest PrivateRequest
-     , Requester t (Client m)
-     , Prerender js t m
+     , Prerender t m
      , MonadIO (Performable m)
+     , AuthReq t m
+     , AuthenticatedMonadQuery t m
   )
   => Id Hunt -> Dynamic t PuzzleQuery -> m ()
 masterlist huntId queryD = do
   hunt <- buildHunt huntId
-  knownMetas <- fmap (fmap (fromMaybe mempty)) $ watch $ constDyn $ key V_HuntMetas ~> key huntId ~> postMap (traverse (fmap getMonoidalMap . getComplete))
+  knownMetas <- fmap (fmap (fromMaybe mempty)) $ watch $ constDyn $ privateP ~> key V_HuntMetas ~> key huntId ~> postMap (traverse (fmap getMonoidalMap . getComplete))
   knownTags <- getKnownTags
   manageDocumentTitle $ ("Hunt Master List " <>) . review puzzleQueryStringOrPuzzle_prism . Left <$> queryD
   framed $ Framed
@@ -252,22 +251,16 @@ masterlist huntId queryD = do
     }
 
 huntselect :: (Monad m, MonadHold t m, PostBuild t m, Reflex t, DomBuilder t m, MonadFix m
-     , SetRoute t (R FrontendRoute) m, RouteToUrl (R FrontendRoute) m, Prerender js t m
-     , MonadQuery t (Vessel V (Const SelectedCount)) m
-     , Requester t m, Response m ~ Identity, Request m ~ ApiRequest () PublicRequest PrivateRequest
+     , SetRoute t (R FrontendRoute) m, RouteToUrl (R FrontendRoute) m, Prerender t m
      , PerformEvent t m
      , TriggerEvent t m
      , MonadHold t m
      , PostBuild t m
      , MonadFix m
      , SetRoute t (R FrontendRoute) (Client m)
-     , MonadQuery t (Vessel V (Const SelectedCount)) m
-     , MonadQuery t (Vessel V (Const SelectedCount)) (Client m)
-     , Response (Client m) ~ Identity
-     , Request (Client m) ~ ApiRequest () PublicRequest PrivateRequest
-     , Requester t (Client m)
-     , Prerender js t m
+     , Prerender t m
      , MonadIO (Performable m)
+     , AuthenticatedMonadQuery t m
   )
   => m (Event t ())
 huntselect = do
@@ -290,12 +283,11 @@ buildHunts
      , DomBuilder t m
      , MonadHold t m
      , MonadFix m
-     , Prerender js t m
-     , MonadQuery t (Vessel V (Const SelectedCount)) m
+     , Prerender t m
      , PerformEvent t m
      , TriggerEvent t m
      , MonadIO (Performable m)
-     , Requester t m, Response m ~ Identity, Request m ~ ApiRequest () PublicRequest PrivateRequest
+     , AuthenticatedMonadQuery t m
      )
 --  :: ( Reflex t
 --     , Monad m
@@ -303,7 +295,7 @@ buildHunts
   =>
   m (Dynamic t (Map (Id Hunt) (Hunt Identity)))
 buildHunts = do
-  dynHuntMaybe <- watch $ constDyn $ key V_Hunts ~> key () ~> postMap (traverse (fmap getMonoidalMap . getComplete))
+  dynHuntMaybe <- watch $ constDyn $ privateP ~> key V_Hunts ~> key () ~> postMap (traverse (fmap getMonoidalMap . getComplete))
   pure $ fromMaybe mempty <$> dynHuntMaybe
 
 buildHunt
@@ -312,12 +304,12 @@ buildHunt
      , DomBuilder t m
      , MonadHold t m
      , MonadFix m
-     , Prerender js t m
-     , MonadQuery t (Vessel V (Const SelectedCount)) m
+     , Prerender t m
      , PerformEvent t m
      , TriggerEvent t m
      , MonadIO (Performable m)
-     , Requester t m, Response m ~ Identity, Request m ~ ApiRequest () PublicRequest PrivateRequest
+     , AuthenticatedMonadQuery t m
+     , AuthReq t m
      )
 --  :: ( Reflex t
 --     , Monad m
@@ -325,7 +317,7 @@ buildHunt
   =>
   Id Hunt -> m (Dynamic t (Hunt Identity))
 buildHunt huntId = do 
-  dynHuntMaybe <- watch $ constDyn $ key V_Hunts ~> key () ~> postMap (traverse (fmap getMonoidalMap . getComplete))
+  dynHuntMaybe <- watch $ constDyn $ privateP ~> key V_Hunts ~> key () ~> postMap (traverse (fmap getMonoidalMap . getComplete))
   let terriblePlaceholderHunt = Hunt { _hunt_id = 1, _hunt_title = "Test Hunt", _hunt_rootpage = "https://www.starrats.org/", _hunt_channel = ChatroomId 1 }
   return $ fromMaybe terriblePlaceholderHunt . ((Map.!? huntId) =<<) <$> dynHuntMaybe
   -- return $ (<> statusTags) . fromMaybe mempty <$> tags
@@ -346,7 +338,7 @@ tabToText = \case
 
 manageDocumentTitle
    :: ( MonadJSM (Performable (Client m))
-      , Prerender js t m
+      , Prerender t m
       , PerformEvent t m
       , Reflex t
       , PostBuild t m
@@ -360,23 +352,18 @@ manageDocumentTitle titleD = do
         setTitle doc title
 
 puzzle :: (Monad m, Reflex t, DomBuilder t m
-     , MonadQuery t (Vessel V (Const SelectedCount)) m
-     , Requester t m, Response m ~ Identity, Request m ~ ApiRequest () PublicRequest PrivateRequest
-     , SetRoute t (R FrontendRoute) m, RouteToUrl (R FrontendRoute) m, Prerender js t m
+     , SetRoute t (R FrontendRoute) m, RouteToUrl (R FrontendRoute) m, Prerender t m
      , PerformEvent t m
      , TriggerEvent t m
      , MonadHold t m
      , PostBuild t m
      , MonadFix m
      , SetRoute t (R FrontendRoute) (Client m)
-     , MonadQuery t (Vessel V (Const SelectedCount)) m
-     , MonadQuery t (Vessel V (Const SelectedCount)) (Client m)
-     , Response (Client m) ~ Identity
-     , Request (Client m) ~ ApiRequest () PublicRequest PrivateRequest
-     , Requester t (Client m)
      , MonadJSM (Performable (Client m))
-     , Prerender js t m
+     , Prerender t m
      , MonadIO (Performable m)
+     , AuthenticatedMonadQuery t m
+     , AuthReq t m
   ) => Id Puzzle -> m ()
 puzzle puz = do
   puzzleDataDM <- (puzzleBuilder $ constDyn puz) >>= maybeDyn
@@ -386,7 +373,7 @@ puzzle puz = do
     Nothing -> blank
     Just puzzleData -> do
       let huntId = _puzzle_Hunt <$> (puzzleData >>= _puzzleData_puzzle)
-      knownMetas <- fmap (fmap (fromMaybe mempty)) $ watch $ (\hunt -> key V_HuntMetas ~> key hunt ~> postMap (traverse (fmap getMonoidalMap . getComplete))) <$> huntId
+      knownMetas <- fmap (fmap (fromMaybe mempty)) $ watch $ (\hunt -> privateP ~> key V_HuntMetas ~> key hunt ~> postMap (traverse (fmap getMonoidalMap . getComplete))) <$> huntId
       manageDocumentTitle $ ("H.M.L.: " <>) . _puzzle_Title <$> (puzzleData >>= _puzzleData_puzzle)
       framed $ Framed
         { _framed_hunt = huntId
@@ -478,16 +465,15 @@ getKnownTags
      , DomBuilder t m
      , MonadHold t m
      , MonadFix m
-     , Prerender js t m
-     , MonadQuery t (Vessel V (Const SelectedCount)) m
+     , Prerender t m
      , PerformEvent t m
      , TriggerEvent t m
      , MonadIO (Performable m)
-     , Requester t m, Response m ~ Identity, Request m ~ ApiRequest () PublicRequest PrivateRequest
+     , AuthenticatedMonadQuery t m
      )
   => m (Dynamic t (Set Text))
 getKnownTags = do
-  tags <- watch $ constDyn $ key V_UniqueTags ~> key () ~> postMap (traverse (fmap (Map.keysSet . getMonoidalMap) . getComplete))
+  tags <- watch $ constDyn $ privateP ~> key V_UniqueTags ~> key () ~> postMap (traverse (fmap (Map.keysSet . getMonoidalMap) . getComplete))
   return $ (<> statusTags) . fromMaybe mempty <$> tags
   
 
@@ -497,27 +483,26 @@ puzzleBuilder
      , DomBuilder t m
      , MonadHold t m
      , MonadFix m
-     , Prerender js t m
-     , MonadQuery t (Vessel V (Const SelectedCount)) m
+     , Prerender t m
      , PerformEvent t m
      , TriggerEvent t m
      , MonadIO (Performable m)
-     , Requester t m, Response m ~ Identity, Request m ~ ApiRequest () PublicRequest PrivateRequest
+     , AuthenticatedMonadQuery t m
      )
   => Dynamic t (Id Puzzle)
   -> m (Dynamic t (Maybe (PuzzleData t)))
 puzzleBuilder puzIdD = do
-  puzzle <- traceShow "Entered puzzleBuilder" $ fmap (fmap (fmap getFirst)) $ watch $ (\puz -> key V_Puzzle ~> key puz) <$> puzIdD
-  metas <- watch $ (\puzId -> key V_Metas ~> key puzId ~> postMap (traverse (fmap getMonoidalMap . getComplete))) <$> puzIdD
+  puzzle <- traceShow "Entered puzzleBuilder" $ fmap (fmap (fmap getFirst)) $ watch $ (\puz -> privateP ~> key V_Puzzle ~> key puz) <$> puzIdD
+  metas <- watch $ (\puzId -> privateP ~> key V_Metas ~> key puzId ~> postMap (traverse (fmap getMonoidalMap . getComplete))) <$> puzIdD
 
-  metas_puzzles <- fmap (fmap (fmap (fmap getFirst))) $ watch $ (\puz -> key V_Puzzle ~> keys (Map.keysSet puz)) . Map.mapKeys _meta_Metapuzzle . fromMaybe mempty <$> metas
+  metas_puzzles <- fmap (fmap (fmap (fmap getFirst))) $ watch $ (\puz -> privateP ~> key V_Puzzle ~> keys (Map.keysSet puz)) . Map.mapKeys _meta_Metapuzzle . fromMaybe mempty <$> metas
   let metaIdTitle = fmap (fmap _puzzle_Title) $ fromMaybe mempty <$> metas_puzzles
-  tags <- watch $ (\puzId -> key V_Tags ~> key puzId ~> postMap (traverse (fmap getMonoidalMap . getComplete))) <$> puzIdD
-  solutions <- watch $ (\puzId -> key V_Solutions ~> key puzId ~> postMap (traverse (fmap getMonoidalMap . getComplete))) <$> puzIdD
-  notes <- watch $ (\puzId -> key V_Notes ~> key puzId ~> postMap (traverse (fmap getMonoidalMap . getComplete))) <$> puzIdD
+  tags <- watch $ (\puzId -> privateP ~> key V_Tags ~> key puzId ~> postMap (traverse (fmap getMonoidalMap . getComplete))) <$> puzIdD
+  solutions <- watch $ (\puzId -> privateP ~> key V_Solutions ~> key puzId ~> postMap (traverse (fmap getMonoidalMap . getComplete))) <$> puzIdD
+  notes <- watch $ (\puzId -> privateP ~> key V_Notes ~> key puzId ~> postMap (traverse (fmap getMonoidalMap . getComplete))) <$> puzIdD
   let puzChan = (>>= fmap (ChatroomId @Identity) . unChatroomId . _puzzle_Channel) <$> puzzle
   dynCurrentDyn <- maybeDyn puzChan
-  let currentSolverQuery = fmap (fmap ((\chanId -> key V_ActiveUsers ~> key chanId ~> postMap (traverse (fmap getMonoidalMap . getComplete))))) <$> dynCurrentDyn
+  let currentSolverQuery = fmap (fmap ((\chanId -> privateP ~> key V_ActiveUsers ~> key chanId ~> postMap (traverse (fmap getMonoidalMap . getComplete))))) <$> dynCurrentDyn
   let watcher = fmap watch <$> currentSolverQuery
   dynRes <- dyn $ fromMaybe (return $ constDyn mempty) <$> watcher
   currentSolvers <- join <$> holdDyn (constDyn mempty) dynRes
@@ -540,20 +525,19 @@ puzzleListBuilder
      , DomBuilder t m
      , MonadHold t m
      , MonadFix m
-     , Prerender js t m
-     , MonadQuery t (Vessel V (Const SelectedCount)) m
+     , Prerender t m
      , PerformEvent t m
      , TriggerEvent t m
      , MonadIO (Performable m)
-     , Requester t m, Response m ~ Identity, Request m ~ ApiRequest () PublicRequest PrivateRequest
+     , AuthenticatedMonadQuery t m
      )
   -- => Id Hunt -> m (Incremental t (PatchMapWithPatchingMove (Id Puzzle) PuzzleDataPatch)) -- (Dynamic t (StrictMap.Map (Id Puzzle) (PuzzleDataT Identity)))
   => Id Hunt -> m (Incremental t (PatchMapWithMove PuzzleSortKey (PuzzleDataT Identity)))-- m (Dynamic t (StrictMap.Map (Id Puzzle) (PuzzleData t)))
 puzzleListBuilder hunt = do
-  puzzleIds <- watch $ pure $ key V_HuntPuzzles ~> key hunt ~> postMap (traverse (fmap getMonoidalMap . getComplete))
+  puzzleIds <- watch $ pure $ privateP ~> key V_HuntPuzzles ~> key hunt ~> postMap (traverse (fmap getMonoidalMap . getComplete))
 
-  puzzleIds2 <- fmap (fmap (Map.keysSet . fromMaybe mempty)) $ watch $ pure $ key V_HuntPuzzles ~> key hunt ~> postMap (traverse (fmap getMonoidalMap . getComplete))
-  channels <- fmap (fmap $ fromMaybe mempty) $ watch $ ffor puzzleIds2 $ \puzs -> key V_Puzzle ~> keys puzs ~> postMap (Just . fmap (Set.fromList . fmapMaybe (\case { ChatroomId Nothing -> Nothing; ChatroomId (Just k) -> Just $ (ChatroomId k :: Id Chatroom) }) . Map.elems . fmap (_puzzle_Channel . getFirst))) -- (Map.keysSet (fromMaybe mempty puzs))
+  puzzleIds2 <- fmap (fmap (Map.keysSet . fromMaybe mempty)) $ watch $ pure $ privateP ~> key V_HuntPuzzles ~> key hunt ~> postMap (traverse (fmap getMonoidalMap . getComplete))
+  channels <- fmap (fmap $ fromMaybe mempty) $ watch $ ffor puzzleIds2 $ \puzs -> privateP ~> key V_Puzzle ~> keys puzs ~> postMap (Just . fmap (Set.fromList . fmapMaybe (\case { ChatroomId Nothing -> Nothing; ChatroomId (Just k) -> Just $ (ChatroomId k :: Id Chatroom) }) . Map.elems . fmap (_puzzle_Channel . getFirst))) -- (Map.keysSet (fromMaybe mempty puzs))
 
   let bzip :: (Coercible a a', Semigroup c) => Path a c c' d -> Path a' c c' d' -> Path a c c' (d, d')
       bzip (Path to from) (Path to' from') = Path (\x -> to x <> to' (coerce x)) (\c -> liftA2 (,) (from c) (from' c))
@@ -565,7 +549,7 @@ puzzleListBuilder hunt = do
       a `zz2` b = bzip a b ~> postMap (Just . fmap (uncurry (Map.intersectionWith (,))) . uncurry mzip)
       -- allTheThingsQuery :: Dynamic t (Set (Id Puzzle)) -> Dynamic t (Set (Id Chatroom)) -> Path (Const SelectedCount _) _ _ _
       allTheThingsQuery puzs chans = 
-       (
+       privateP ~> (
         ((key V_Puzzle ~> keys puzs)
         `zz2` (key V_Metas ~> keys puzs)
         `zz2` (key V_Tags ~> keys puzs)

@@ -32,6 +32,7 @@ import Backend.Schema
 import Backend.View.Chatroom (searchForChatroom)
 import Common.Schema
 import Common.View
+import Rhyolite.Vessel.App
 
 data Notify a where
   Notify_Account :: Notify (Id Account)
@@ -82,10 +83,18 @@ getChatroom = runSelectReturningOne . lookup_ (_db_chatroom db)
 
 notifyHandler
   :: Pool Connection
+  -> (token -> (Maybe (Id Account)))
+  -> DbNotification Notify
+  -> FullAppV MasterlistApp Proxy
+  -> m (FullAppV MasterlistApp Identity)
+notifyHandler = undefined
+
+privateNotifyHandler
+  :: Pool Connection
   -> DbNotification Notify
   -> PrivateChatV Proxy
   -> IO (PrivateChatV Identity)
-notifyHandler pool nm v = case _dbNotification_message nm of
+privateNotifyHandler pool nm v = case _dbNotification_message nm of
   Notify_Account :/ _ -> pure emptyV
   Notify_Hunt :/ huntId -> buildV v $ \case
     V_Chatrooms -> const $ pure emptyV

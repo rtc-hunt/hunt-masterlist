@@ -27,12 +27,12 @@ data Framed m t a = Framed
   , _framed_hunt :: Dynamic t (Id Hunt)
   }
 
-reloadingRouteLink :: (Monad m, DomBuilder t m, MonadFix m, SetRoute t (R FrontendRoute) m, RouteToUrl (R FrontendRoute) m, PostBuild t m, MonadHold t m, Prerender js t m) => Dynamic t (R FrontendRoute) -> m () -> m ()
+reloadingRouteLink :: (Monad m, DomBuilder t m, MonadFix m, SetRoute t (R FrontendRoute) m, RouteToUrl (R FrontendRoute) m, PostBuild t m, MonadHold t m, Prerender t m) => Dynamic t (R FrontendRoute) -> m () -> m ()
 reloadingRouteLink routeD a = do
     toUrl <- askRouteToUrl
     elDynAttr "a" ((\route -> "href" =: (toUrl $ route)) <$> routeD) $ a
 
-framed :: (Monad m, DomBuilder t m, MonadFix m, SetRoute t (R FrontendRoute) m, RouteToUrl (R FrontendRoute) m, PostBuild t m, MonadHold t m, Prerender js t m) => Framed m t a -> m ()
+framed :: (Monad m, DomBuilder t m, MonadFix m, SetRoute t (R FrontendRoute) m, RouteToUrl (R FrontendRoute) m, PostBuild t m, MonadHold t m, Prerender t m) => Framed m t a -> m ()
 framed Framed
   { _framed_headerItems = header
   , _framed_body = body

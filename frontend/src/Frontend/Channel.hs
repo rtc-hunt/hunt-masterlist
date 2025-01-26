@@ -21,6 +21,7 @@ import Obelisk.Route.Frontend
 import Reflex.Dom.Core hiding (El)
 import Rhyolite.Api (ApiRequest(..))
 import Rhyolite.Frontend.App
+import Rhyolite.Vessel.AuthenticatedV
 import Rhyolite.Vessel.Path
 
 import Templates (ChannelConfig(..), ChannelOut(..), MessagesConfig(..))
@@ -33,8 +34,10 @@ import Common.Request
 import Common.Route
 import Common.Schema
 import Common.View
+import Rhyolite.Frontend.Auth.App
 
 import Frontend.ChannelList
+
 import Frontend.Types
 import Frontend.Utils
 
@@ -44,22 +47,17 @@ channel ::
   , MonadFix m
   , MonadHold t m
   , PostBuild t m
-  , PerformEvent t m
-  , TriggerEvent t m
-  , DomBuilder t m
-  , Prerender js t m
-  , MonadQuery t (Vessel V (Const SelectedCount)) m
-  , MonadQuery t (Vessel V (Const SelectedCount)) (Client m)
-  , SetRoute t (R FrontendRoute) (Client m)
+  , AuthReq t m
+  , AuthReq t (Client m)
   , Routed t (Maybe (Id Chatroom)) m
-  , Requester t m
-  , Requester t (Client m)
-  , Response m ~ Identity
-  , Response (Client m) ~ Identity
-  , Request m ~ ApiRequest () PublicRequest PrivateRequest
-  , Request (Client m) ~ ApiRequest () PublicRequest PrivateRequest
+  , DomBuilder t m
+  , Prerender t m
+  , SetRoute t (R FrontendRoute) (Client m)
+  , AuthenticatedMonadQuery t m
+  , TriggerEvent t m
+  , PerformEvent t m
   )
-  => m (Event t Logout)
+  => m (Event t Logout) -- AuthAppWidget MasterlistApp t m (Event t Logout)
 channel = do
   mcid <- askRoute
   channelView <- channelBuilder mcid
@@ -101,16 +99,13 @@ embeddableChannel ::
   , PerformEvent t m
   , TriggerEvent t m
   , DomBuilder t m
-  , Prerender js t m
-  , MonadQuery t (Vessel V (Const SelectedCount)) m
-  , MonadQuery t (Vessel V (Const SelectedCount)) (Client m)
+  , Prerender t m
   , SetRoute t (R FrontendRoute) (Client m)
-  , Requester t m
-  , Requester t (Client m)
-  , Response m ~ Identity
-  , Response (Client m) ~ Identity
-  , Request m ~ ApiRequest () PublicRequest PrivateRequest
-  , Request (Client m) ~ ApiRequest () PublicRequest PrivateRequest
+  , AuthenticatedMonadQuery t m
+  , AuthReq t m
+  , AuthReq t (Client m)
+  , TriggerEvent t m
+  , PerformEvent t m
   )
   => Dynamic t (Maybe (Id Chatroom))-> m ()
 embeddableChannel mcid = mdo      
@@ -156,15 +151,15 @@ channelBuilder
      , DomBuilder t m
      , MonadHold t m
      , MonadFix m
-     , Prerender js t m
-     , MonadQuery t (Vessel V (Const SelectedCount)) m
-     , PerformEvent t m
-     , TriggerEvent t m
+     , Prerender t m
+     , AuthenticatedMonadQuery t m
+     , AuthReq t m
      , MonadIO (Performable m)
-     , Requester t m, Response m ~ Identity, Request m ~ ApiRequest () PublicRequest PrivateRequest
+     , TriggerEvent t m
+     , PerformEvent t m
      )
   => Dynamic t (Maybe (Id Chatroom))
-  -> m (ChannelView t)
+  -> m (ChannelView t) -- AuthAppWidget MasterlistApp t m (ChannelView t)
 channelBuilder cid = do
   pb <- onRender
   let cidE = fmapMaybe id $ leftmost
@@ -174,7 +169,7 @@ channelBuilder cid = do
   (_errors, channelInfo) <- fmap fanEither $ requestingIdentity $ ffor cidE $ \c ->
     ApiRequest_Private () $ PrivateRequest_LatestMessage c
   (name, msgs) <- fmap splitDynPure $ widgetHold (pure mempty) $ ffor channelInfo $ \(c, n) -> do
-    name <- watch $ pure $ key V_Chatroom ~> key c ~> firstP
+    name <- watch $ pure $ privateP ~> key V_Chatroom ~> key c ~> firstP
     rec let requestCount = 100
             nearToEnd :: Int -> Int -> Bool
             nearToEnd lastMessage maxAllowed = lastMessage + 20 >= maxAllowed
@@ -190,7 +185,7 @@ channelBuilder cid = do
         intervals <- foldDyn ($) interval0 loadBottom
         mMessagesE <- fmapMaybe ((\case (_ :> x) -> Just x; _ -> Nothing) . Seq.viewr) <$> batchOccurrences 1 (updated mMessages')
         mMessages' :: Dynamic t (Maybe (Map RequestInterval (Map Int Msg))) <- watch . ffor intervals $ \ris ->
-          key V_Messages ~> key c ~> keys ris ~> semiMapsP
+          privateP ~> key V_Messages ~> key c ~> keys ris ~> semiMapsP
     channelMessages <- maybeDyn $ fmap (fmap Map.unions) mMessages'
     pure (name, channelMessages)
   pure $ ChannelView

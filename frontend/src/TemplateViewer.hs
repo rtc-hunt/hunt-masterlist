@@ -27,7 +27,7 @@ templateViewer ::
   , MonadHold t m
   , RouteToUrl (R FrontendRoute) m
   , SetRoute t (R FrontendRoute) m
-  , Prerender js t m
+  , Prerender t m
   , MonadIO (Performable m)
   , TriggerEvent t m
   , PerformEvent t m
@@ -87,7 +87,7 @@ puzzleTemplateViewer
   ( Template t m, MonadHold t m, MonadFix m
   , RouteToUrl (R FrontendRoute) m
   , SetRoute t (R FrontendRoute) m
-  , Prerender js t m
+  , Prerender t m
   , MonadHold t m
   , MonadIO (Performable m)
   )
@@ -118,7 +118,7 @@ puzzleTemplateViewer = do
     Template t m, MonadHold t m, MonadFix m
   , RouteToUrl (R FrontendRoute) m
   , SetRoute t (R FrontendRoute) m
-  , Prerender js t m
+  , Prerender t m
   , MonadIO (Performable m)
   , TriggerEvent t m
   , PerformEvent t m

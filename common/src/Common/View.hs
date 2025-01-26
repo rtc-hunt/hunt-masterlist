@@ -28,7 +28,11 @@ import Data.IORef
 import Reflex.Query.Class (QueryResult, SelectedCount)
 import System.IO.Unsafe
 import Rhyolite.Api
--- import Rhyolite.Frontend.App
+import Rhyolite.Frontend.App
+import Common.Request
+import Data.Vessel.Void
+import Rhyolite.Vessel.App
+import Rhyolite.Vessel.AuthenticatedV
 import Rhyolite.Vessel.AuthMapV
 
 
@@ -103,12 +107,27 @@ instance ToJSONKey ()
 
 type PrivateChatV = Vessel V
 
-type MyQueryType = AuthMapV AuthToken PrivateChatV (Const SelectedCount)
-type MyQueryResultType = QueryResult (AuthMapV AuthToken PrivateChatV (Const SelectedCount))
-type MagicQueryHandler m = ((AuthMapV AuthToken PrivateChatV (Const SelectedCount)) -> m (QueryResult (AuthMapV AuthToken PrivateChatV (Const SelectedCount))))
+type MyQueryType = AuthenticatedV VoidV (AuthMapV AuthToken PrivateChatV) VoidV (Const SelectedCount)
+type MyQueryResultType = QueryResult MyQueryType -- AuthenticatedV VoidV (AuthMapV AuthToken PrivateChatV) VoidV (Const SelectedCount)
+-- type MyQueryResultType = QueryResult (AuthMapV AuthToken PrivateChatV (Const SelectedCount))
+-- type MagicQueryHandler m = ((AuthMapV AuthToken PrivateChatV (Const SelectedCount)) -> m (QueryResult (AuthMapV AuthToken PrivateChatV (Const SelectedCount))))
 
-globalMagicQueryHandler :: IORef (Maybe (MagicQueryHandler IO))
+-- globalMagicQueryHandler :: IORef (Maybe (MagicQueryHandler IO))
+-- globalMagicQueryHandler = unsafePerformIO $ newIORef Nothing
+
+globalMagicQueryHandler :: IORef (Maybe ())
 globalMagicQueryHandler = unsafePerformIO $ newIORef Nothing
 
 -- hotQueryHandler :: IORef (Maybe ((AuthMapV AuthToken PrivateChatV (Const SelectedCount)) -> IO (QueryResult (AuthMapV AuthToken PrivateChatV (Const SelectedCount)))))
 -- hotQueryHandler = unsafePerformIO $ newIORef Nothing
+
+data MasterlistApp
+
+instance RhyoliteAuthApp MasterlistApp where
+  type AuthCredential MasterlistApp = AuthToken
+  type PublicApi MasterlistApp = PublicRequest
+  type PrivateApi MasterlistApp = PrivateRequest
+  type PrivateV MasterlistApp = PrivateChatV
+  type PersonalV MasterlistApp = VoidV
+  type PublicV MasterlistApp = VoidV
+

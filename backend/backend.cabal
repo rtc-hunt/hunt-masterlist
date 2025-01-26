@@ -27,6 +27,7 @@ library
                , obelisk-route
                , gogol
                , gogol-drive
+               , gogol-sheets
                , semimap
                , signed-data-clientsession
                , text
@@ -52,7 +53,7 @@ library
                , beam-postgres
                , beam-automigrate
                , psql-simple-beam
-               , websockets
+               -- , websockets
                , rhyolite-frontend
                , reflex
   exposed-modules:
@@ -64,9 +65,10 @@ library
     Backend.View.Messages
     Backend.Schema
     Backend.View
-    Backend.Loadtest
+    -- Backend.Loadtest
   ghc-options: -Wall -Wredundant-constraints -Wincomplete-uni-patterns -Wincomplete-record-updates -O -fno-show-valid-hole-fits
   default-extensions:
+    ConstraintKinds
     FlexibleContexts
     FlexibleInstances
     GADTs

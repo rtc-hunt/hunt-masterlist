@@ -13,24 +13,27 @@ import Rhyolite.Vessel.Path
 import Common.Request
 import Common.Route
 import Common.View
+import Rhyolite.Frontend.Auth.App
 import Templates.Partials.ChannelList
+import Control.Monad.Ref
+import Frontend.Types
+import Rhyolite.Vessel.AuthenticatedV
 
 channelSearchResults
   :: ( MonadFix m
      , MonadHold t m
-     , MonadQuery t (Vessel V (Const SelectedCount)) m
+     , AuthenticatedMonadQuery t m
+     , AuthReq t m
+     , AuthReq t (Client m)
      , DomBuilder t m
-     , SetRoute t (R FrontendRoute) m
      , PostBuild t m
-     , Requester t m
-     , Response m ~ Identity
-     , Request m ~ ApiRequest () publicRequest PrivateRequest
+     , SetRoute t (R FrontendRoute) m
      )
   => ChannelList t m
   -> m ()
 channelSearchResults cs = do
     mRooms <- maybeDyn <=< watch . ffor (value (_channelList_input cs)) $ \q ->
-      key V_Chatrooms ~> key (ChatroomQuery q) ~> semiMapP
+      privateP ~> key V_Chatrooms ~> key (ChatroomQuery q) ~> semiMapP
 
     channelClick <- (switchHold never =<<) $ dyn $ ffor mRooms $ \case
       Nothing -> pure never

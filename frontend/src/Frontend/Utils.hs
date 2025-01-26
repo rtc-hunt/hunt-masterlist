@@ -26,7 +26,7 @@ buttonClassIcon :: DomBuilder t m => Text -> Text -> m (Event t ())
 buttonClassIcon cls = fmap (domEvent Click . fst) . elAttr' "button" ("type" =: "button" <> "class" =: cls) . flip (elClass "i") blank
 
 -- TODO move to reflex-dom-core and maybe explain why/when this is necessary
-onRender :: (Prerender js t m, Monad m) => m (Event t ())
+onRender :: (Prerender t m, Monad m) => m (Event t ())
 onRender = fmap updated (prerender blank blank)
 
 semToggle theLabel isChecked =

@@ -27,8 +27,8 @@ import Rhyolite.Api
 import Rhyolite.Backend.App
 import Rhyolite.DB.NotifyListen.Beam
 import Web.ClientSession as CS
-import Network.Google.Drive (driveFileScope, filesCreate, file, fMimeType, fName, fParents, fId)
-import qualified Network.Google as Google
+-- import Gogol.Drive (Drive'File, DriveFilesCreate, file, fMimeType, fName, fParents, fId)
+import qualified Gogol as Google
 import Network.HTTP.Req hiding (req)
 import qualified Network.HTTP.Req as Req
 import System.Directory
@@ -42,16 +42,17 @@ import Backend.Schema
 import Common.Request
 import Common.Schema
 
--- import Debug.Trace
+import Debug.Trace
 
 createSheet :: Text -> IO (Maybe Text)
 createSheet name = handle failedCreateSheet $ do
     canonicalizePath "config/backend" >>= setEnv "CLOUDSDK_CONFIG"
     lgr  <- Google.newLogger Google.Debug stderr
-    env  <- Google.newEnv <&> (Google.envLogger .~ lgr) . (Google.envScopes .~ driveFileScope) -- (2) (3)
-    qqq  <- Google.runResourceT . Google.runGoogle env $
-      Google.send $ filesCreate $ file & (fMimeType ?~ "application/vnd.google-apps.spreadsheet") . (fName ?~ name) . (fParents .~ ["1F40xJAGFXFE8Z64xw_gxSR_P8TBYrwsi"])
-    return $ qqq ^. fId
+    -- env  <- Google.newEnv <&> (Google.envLogger .~ lgr) . (Google.envScopes .~ driveFileScope) -- (2) (3)
+--    qqq  <- Google.runResourceT . Google.runGoogle env $
+--      Google.send $ filesCreate $ file & (fMimeType ?~ "application/vnd.google-apps.spreadsheet") . (fName ?~ name) . (fParents .~ ["1F40xJAGFXFE8Z64xw_gxSR_P8TBYrwsi"])
+--    return $ qqq ^. fId
+    error "Oops, not implemented"
   where failedCreateSheet (e :: SomeException) = putStrLn "Failed to create google sheet, please check configuration." >> pure Nothing
 
 type RequestHandlerType = RequestHandler (ApiRequest AuthToken PublicRequest PrivateRequest) IO
@@ -276,6 +277,7 @@ requestHandler pool csk authAudience allowForcedLogins = RequestHandler $ \case
 
 checkGoogleAuthToken :: (Pool Connection) -> Text -> Key -> Text -> IO (Either Text (Data.Signed.Signed (PrimaryKey Account Identity)))
 checkGoogleAuthToken pool authAudience csk token = do
+      traceM "Handling a login"
       let googuri = https "www.googleapis.com" /: "oauth2" /: "v3" /: "certs"
       lastGSK <- runDb pool $ runSelectReturningOne $ select $ limit_ 1 $ do
           k <- all_ (_db_googleKeys db)

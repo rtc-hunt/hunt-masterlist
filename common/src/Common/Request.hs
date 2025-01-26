@@ -1,3 +1,4 @@
+{-# LANGUAGE ConstraintKinds #-}
 module Common.Request where
 
 import Data.Aeson

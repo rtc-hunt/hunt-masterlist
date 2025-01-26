@@ -106,7 +106,7 @@ headerDropdownSettings :: Reflex t => DropdownConfig t a
 headerDropdownSettings = def & dropdownConfig_attributes .~ (constDyn $ "class" =: "grow shrink w-4/5 max-w-xs min-w-4")
 
 
-puzzlesTable :: forall js t m. (Template t m, MonadHold t m, MonadFix m, MonadIO (Performable m), TriggerEvent t m, PerformEvent t m, Prerender js t m
+puzzlesTable :: forall js t m. (Template t m, MonadHold t m, MonadFix m, MonadIO (Performable m), TriggerEvent t m, PerformEvent t m, Prerender t m
      , SetRoute t (R FrontendRoute) m, RouteToUrl (R FrontendRoute) m )
   =>
   PuzzleTableConfig t m -> m ()

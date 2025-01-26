@@ -52,7 +52,7 @@ data PuzzlePageTab
   | PuzzlePageTab_Config
   deriving (Enum, Ord, Bounded, Eq, Show)
 
-puzzleView :: forall t m js. (Template t m, MonadHold t m, MonadFix m, Prerender js t m) => PuzzleConfig t m -> m ()
+puzzleView :: forall t m js. (Template t m, MonadHold t m, MonadFix m, Prerender t m) => PuzzleConfig t m -> m ()
 puzzleView (PuzzleConfig
   { _puzzleConfig_puzzle = puzData
   , _puzzleConfig_tab = puzTabD
@@ -94,7 +94,7 @@ backsolve1 = elAttr "span" ("class" =: "tooltip" <> "style" =: "font-family: 'Sy
 Puzzle _ (LensFor puzzleTitle) (LensFor puzzleUri) (LensFor puzzleSheetURI) (LensFor puzzleIsMeta) _ _ _ _ (LensFor puzzleVoiceLink) = tableLenses
 
 puzzleConfigurator
-  :: forall t m js. (Template t m, MonadHold t m, MonadFix m, Prerender js t m)
+  :: forall t m js. (Template t m, MonadHold t m, MonadFix m, Prerender t m)
   => PuzzleConfiguratorConfig t
   -> m (PuzzleConfiguratorOut t)
 puzzleConfigurator PuzzleConfiguratorConfig
@@ -189,7 +189,7 @@ puzzleConfigurator PuzzleConfiguratorConfig
 -- | A widget to construct a tabbed view that shows only one of its child widgets at a time.
 --   Creates a header bar containing a <ul> with one <li> per child; clicking a <li> displays
 --   the corresponding child and hides all others.
-myTabDisplay :: forall k t m js. (MonadFix m, DomBuilder t m, MonadHold t m, PostBuild t m, Prerender js t m, Enum k)
+myTabDisplay :: forall k t m js. (MonadFix m, DomBuilder t m, MonadHold t m, PostBuild t m, Prerender t m, Enum k)
   => Text               -- ^ Class applied to <ul> element
   -> Text               -- ^ Class applied to currently active <li> element
   -> Dynamic t k 

@@ -41,6 +41,19 @@ import Backend.Listen
 
 import Common.Schema
 import Common.View
+import Data.Vessel.Void
+import Rhyolite.Vessel.App
+import Rhyolite.Vessel.AuthenticatedV
+import Rhyolite.Vessel.AuthMapV
+import Debug.Trace
+import Data.Aeson
+
+fullQueryHandler :: (Ord token, ToJSON token)
+  => (token -> (Maybe (Id Account)))
+  -> Pool Connection
+  -> AuthenticatedV VoidV (AuthMapV token PrivateChatV) (AuthMapV token VoidV) Proxy
+  -> IO (AuthenticatedV VoidV (AuthMapV token PrivateChatV) (AuthMapV token VoidV) Identity)
+fullQueryHandler auth db q = (traceM "In fullQueryHandler" ) >> (traceM $ ("Query in handler" <>) $ show $ encode q) >> handleAuthenticatedQuery auth (const $ traceM "Auth error" >> pure VoidV) (privateQueryHandler db) (const $ pure mempty) q
 
 privateQueryHandler
   :: Pool Connection

@@ -36,7 +36,7 @@ library
                , patch
                , rhyolite-common
                , signed-data
-               , rhyolite-groundhog-legacy-types
+               -- , rhyolite-groundhog-legacy-types
                , reflex
                , vessel
                , monoidal-containers
@@ -46,6 +46,7 @@ library
                , aeson
                , witherable
                , unbounded-delays
+               , commutative-semigroups
                , transformers
   exposed-modules:
     Frontend

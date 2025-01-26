@@ -1,8 +1,8 @@
 {
-  "owner": "jonored",
+  "owner": "obsidiansystems",
   "repo": "rhyolite",
-  "branch": "hunt-masterlist-server-render",
+  "branch": "develop",
   "private": false,
-  "rev": "a237a4fbfa2c1b49e78014390072e79040c3b429",
-  "sha256": "18bjirvxkncqm4rwb7vm65c12h6zk3dpaq76r2bq8m81g50wm405"
+  "rev": "8a10a67835c80a4a838e5ddd6b69451a77998c9b",
+  "sha256": "1dp51nkfgb0cvd90nfa5k7xm6q0jjfji6vd8q8mydwa9s2vm6l28"
 }

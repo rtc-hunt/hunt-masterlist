@@ -5,4 +5,4 @@ import Control.Monad.Identity
 
 import Common.Schema
 
-newtype AuthToken = AuthToken { unAuthToken :: PrimaryKey Account Identity } deriving (Typeable)
+newtype NotAuthToken = AuthToken { unAuthToken :: PrimaryKey Account Identity } deriving (Typeable)

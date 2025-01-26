@@ -19,12 +19,29 @@ import Database.Beam.Schema
 import Common.Request
 import Common.Schema
 import Common.View
+import Rhyolite.Frontend.Auth.App
+import Reflex.Dom.Prerender
+
+type AuthenticatedMonadQuery t m =
+   ( MonadQuery t (FullAppAuthV MasterlistApp (Const SelectedCount)) m
+   , MonadQuery t (FullAppAuthV MasterlistApp (Const SelectedCount)) (Client m)
+   )
+
+type AuthReq t m =
+   ( Requester t m
+   , Response m ~ Identity
+   , Reflex.Request m ~ FullAuthApi MasterlistApp
+   )
+
+type UnauthorizedMonadQuery t m = MonadQuery t (FullAppV MasterlistApp (Const SelectedCount))
+
+type MasterlistWidget = FullAppWidget MasterlistApp
 
 data Logout = Logout
 
-type ExampleWidget = RhyoliteWidget
-  (AuthMapV AuthToken PrivateChatV (Const SelectedCount))
-  (ApiRequest AuthToken PublicRequest PrivateRequest)
+-- type ExampleWidget = RhyoliteWidget
+--   (AuthMapV AuthToken PrivateChatV (Const SelectedCount))
+--   (ApiRequest AuthToken PublicRequest PrivateRequest)
 
 type family HKD f a where
   HKD Identity a = a

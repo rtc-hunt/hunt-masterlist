@@ -42,7 +42,7 @@ import Control.Exception (catch, SomeException, handle, try)
 
 import Backend.Listen
 import Backend.View
-import Backend.Loadtest
+-- import Backend.Loadtest
 import Common.Schema
 import Debug.Trace
 import Snap
@@ -62,22 +62,22 @@ backend = Backend
           Right (Right cgk) -> return cgk
           _ -> putStr "No google client key, some google features may not work" >> return ""
     allowForcedLogins <- doesFileExist "config/common/allows_forced_login"
-    let checkToken t = do
-          let x = readSignedWithKey @(Id Account) csk t
-          pure x
+    let checkToken t = traceShowId $ readSignedWithKey @(Id Account) (traceShowId csk) $ traceShowId t
     -- forkIO (addLoad csk)
     withDb "db" $ \pool -> do
+      traceM "DB started"
       catch (withResource pool $ \conn -> withTransactionSerializable conn $
         runMigrations conn) $ \(e :: SomeException) -> (putStr "Waiting for DB fixes\n" >> threadDelay 100000000)
-      let queryHandlerFn = \q -> fromMaybe emptyV <$> mapDecomposedV (handleAuthMapQuery checkToken (privateQueryHandler pool)) q
-      atomicWriteIORef Common.View.globalMagicQueryHandler $ Just (fmap ((\case { a:b -> a; [] -> mempty {- error "not quite head" -}}) . Data.Map.Monoidal.elems . disperseV) . queryHandlerFn . condenseV . Data.Map.Monoidal.singleton (ClientKey 0))
+      traceM "DB fixes done"
+      let queryHandlerFn = \q -> fromMaybe emptyV <$> mapDecomposedV (fullQueryHandler checkToken pool) (trace "Got a query in\n" q)
+       -- atomicWriteIORef Common.View.globalMagicQueryHandler $ Just (fmap ((\case { a:b -> a; [] -> mempty {- error "not quite head" -}}) . Data.Map.Monoidal.elems . disperseV) . queryHandlerFn . condenseV . Data.Map.Monoidal.singleton (ClientKey 0))
       (listen, _) <- liftIO $ serveDbOverWebsockets
         (coerce pool)
         (requestHandler pool csk cgk allowForcedLogins)
-        (\nm q -> fmap (fromMaybe emptyV) $ mapDecomposedV (handleAuthMapQuery checkToken (notifyHandler pool nm)) q)
+        (\nm q -> fmap (fromMaybe emptyV) $ mapDecomposedV (notifyHandler pool checkToken nm) q)
         (QueryHandler $ queryHandlerFn)-- fromMaybe emptyV <$> mapDecomposedV (handleAuthMapQuery checkToken (privateQueryHandler pool)) q)
         vesselFromWire
-        (vesselPipeline . observePipelineQuery (trackActiveUsers csk pool))
+        (vesselPipeline) -- . observePipelineQuery (trackActiveUsers csk pool))
       serve $ \case
         BackendRoute_Login :/ () -> loginHandler pool csk cgk
         BackendRoute_Listen :/ () -> listen

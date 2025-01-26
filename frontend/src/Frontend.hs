@@ -17,7 +17,9 @@ import Control.Monad
 import Control.Monad.Identity
 import Control.Monad.IO.Class
 import Control.Monad.Fix
+import Data.Either.Combinators
 import qualified Data.Aeson as A
+import Data.Either
 import qualified Data.List as L
 import Data.Text (Text)
 import qualified Data.Map as Map
@@ -33,6 +35,7 @@ import GHCJS.DOM.Node (Node)
 import GHCJS.DOM.NodeList (IsNodeList, item, getLength)
 import GHCJS.DOM.ParentNode (querySelectorAll)
 import Control.Monad.Trans.Maybe
+import Data.Signed
 import Obelisk.Configs
 import Obelisk.Frontend
 import Obelisk.Generated.Static
@@ -42,7 +45,7 @@ import Prelude hiding ((.), id)
 import Reflex.Dom.Core
 import Rhyolite.Api (ApiRequest(..))
 import Rhyolite.Frontend.App
-import Rhyolite.Frontend.Cookie
+import Rhyolite.Frontend.Cookie hiding (getCookie, getCookieJson)
 import qualified GHCJS.DOM.Element as JS
 import qualified Language.Javascript.JSaddle as JS
 import Data.Vessel
@@ -64,6 +67,7 @@ import Frontend.Puzzle (puzzles, huntselect)
 import Frontend.Types
 import Frontend.Utils
 import Frontend.ViewCache
+import Rhyolite.Frontend.Auth.App
 -- import OldFrontend
 import Debug.Trace hiding (traceEvent)
 
@@ -117,7 +121,7 @@ frontend = Frontend
 
 initGauth
   :: ( DomBuilder t m
-     , Prerender js t m
+     , Prerender t m
      , MonadHold t m
      , PostBuild t m
      , Request m ~ ApiRequest AuthToken PublicRequest PrivateRequest
@@ -160,9 +164,11 @@ initGauth = do
   loginResponse <- requestingIdentity $ leftmost [ loginRequest, forcedLoginRequest ]
   let loginSuccess = fmapMaybe (^? _Right) $ traceEvent "Login Response" $ loginResponse
   prerender blank $
-    performEvent_ $ ffor loginSuccess $ \token -> do
+    performEvent_ $ ffor loginSuccess $ \(token) -> do
+      -- traceM $ ("Token serialized as " <>) $ show $ unSigned token
       doc <- currentDocumentUnchecked
-      cookie <- defaultCookieJson authCookieName (Just token)
+      cookie <- defaultCookieJson authCookieName (Just $ token)
+      -- traceM $ show cookie
       setPermanentCookie doc (cookie { setCookiePath = Just "/" })
       JS.liftJSM $ do 
          JS.eval ( "console.log(\"Reloading due to login\"); location.reload();" :: Text )
@@ -179,7 +185,7 @@ auth :: forall js t m.
   , DomBuilder t m
   , RouteToUrl (R FrontendRoute) m
   , SetRoute t (R FrontendRoute) m
-  , Prerender js t m
+  , Prerender t m
   )
   => Dynamic t LoginMode
   -> Event t (Maybe Text)
@@ -198,8 +204,9 @@ auth mode serverError =  do
   pure $ tag (current $ (,) <$> value user <*> value pass) submit
 -}
 
+{-
 -- | Handle setting the user's cookie to the given auth token (if any)
-manageAuthCookie :: (DomBuilder t m, Prerender js t m)
+manageAuthCookie :: (DomBuilder t m, Prerender t m)
   => Event t (Maybe AuthToken)
   -> m ()
 manageAuthCookie authChange = do
@@ -207,13 +214,35 @@ manageAuthCookie authChange = do
     doc <- currentDocumentUnchecked
     performEvent_ $ ffor authChange $ \newAuth -> do
       cookie <- defaultCookieJson authCookieName newAuth
+      traceM cookie
       setPermanentCookie doc (cookie { setCookiePath = Just "/" })
+-}
+
+-- | Retrieve the value of the given cookie
+getCookie :: HasCookies m => Text -> m (Either GetCookieFailed Text)
+getCookie key = do
+  cookies <- askCookies
+  pure $ case Prelude.lookup (T.encodeUtf8 key) $ cookies of
+    Nothing -> Left GetCookieFailed_NotFound
+    Just c -> mapBoth GetCookieFailed_Base64DecodeFailed T.decodeUtf8 $
+      base64Decode c
+
+-- | Read a cookie. You may want to use 'Obelisk.Frontend.Cookie.askCookies'
+-- along with 'base64Decode' instead.
+getCookieJson :: (A.FromJSON v, Monad m, HasCookies m) => Text -> m (Either GetCookieJsonFailed v)
+getCookieJson k = do
+  r <- fmap (A.eitherDecode . LBS.fromStrict . T.encodeUtf8) <$> getCookie k
+  pure $ case r of
+    Left failure -> Left $ GetCookieJsonFailed_GetCookieFailed failure
+    Right (Left parseFailure) -> Left $ GetCookieJsonFailed_ParseFailure parseFailure
+    Right (Right v) -> Right v
+
 
 frontendBody
   :: forall js t m.
-     ( ObeliskWidget js t (R FrontendRoute) m
+     ( ObeliskWidget t (R FrontendRoute) m
      )
-  => RoutedT t (R FrontendRoute) (ExampleWidget t m) ()
+  => RoutedT t (R FrontendRoute) (FullAppWidget MasterlistApp t m) ()
 frontendBody = do
   cookies <- askCookies
   -- display $ constDyn cookies
@@ -224,12 +253,19 @@ frontendBody = do
          pure ()
     _ -> blank
 
-  let mAuthCookie0 = A.decodeStrict . (\t -> if BS.head t == 34 then t else (34 `cons` t) `snoc` 34) =<< L.lookup (T.encodeUtf8 authCookieName) cookies
+  -- let mAuthCookie0 = A.decodeStrict . (\t -> if BS.head t == 34 then t else (34 `cons` t) `snoc` 34) =<< L.lookup (T.encodeUtf8 authCookieName) cookies
+  -- let mAuthCookie0 = L.lookup (T.encodeUtf8 authCookieName) cookies >>= ((\case {Left _ -> Nothing; Right a -> Just a; }) . B64.decode) >>= A.decodeStrict
+  -- let mAuthCookie0 = getCookieJson 
+  mAuthCookie0 <- getCookieJson (authCookieName)
+  -- display $ constDyn mAuthCookie0
   case mAuthCookie0 of
-    Nothing -> subRoute_ $ \case
+    Left _ -> subRoute_ $ \case
         FrontendRoute_Main -> blank
         _ -> void $ initGauth
-    Just token -> void $ mapRoutedT (authenticatedWidget token) $ handleAuthFailure (void renderInvalid) $ subRoute_ $ \case
+    Right token -> do
+      traceM $ ("TOKEN: " <>) $ show $ token
+      -- display $ constDyn token
+      void $ mapRoutedT (authenticatedWidget (Proxy :: Proxy MasterlistApp) token) $ handleAuthFailure (void renderInvalid) $ subRoute_ $ \case
         FrontendRoute_Templates -> void $ templateViewer
         FrontendRoute_Channel -> void $ channel
         FrontendRoute_Puzzle -> void $ puzzles
@@ -314,7 +350,7 @@ runExampleWidget
      , MonadHold t m
      , PostBuild t m
      , MonadFix m
-     , Prerender x t m
+     , Prerender t m
      , MonadIO (Performable m)
      , Adjustable t m
      , A.ToJSON MyQueryResultType
@@ -322,11 +358,11 @@ runExampleWidget
      )
   => RoutedT t
       (R FrontendRoute)
-      (ExampleWidget t m)
+      (FullAppWidget MasterlistApp t m)
       a
   -- ^ Child widget
   -> RoutedT t (R FrontendRoute) m a
-runExampleWidget = fmap snd . runObeliskRhyoliteWidget (\a -> do
+runExampleWidget = fmap snd . runObeliskRhyoliteWidget {- (\a -> do
   let queryAction av = do
         let avKey = A.encode $ _queryMorphism_mapQuery vesselToWire av
         handler <- liftIO $ readIORef Common.View.globalMagicQueryHandler
@@ -356,7 +392,7 @@ runExampleWidget = fmap snd . runObeliskRhyoliteWidget (\a -> do
   performEvent_ $ traceM "nubbedValueUpdates updated" <$ updated nubbedValueUpdates
   pure $ snd <$> updated nubbedValueUpdates
   )
-
+  -}
 
 --(fromMaybe (\a -> pure mempty) $ fmap (liftIO .) $ liftIO $ readIORef Common.View.globalMagicQueryHandler)--pure mempty) -- (liftIO . fromMaybe (\q -> traceM "In the magic query handler" >> return mempty) magicQueryHandler)
   vesselToWire

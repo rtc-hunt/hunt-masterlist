@@ -46,3 +46,4 @@ library
     TemplateHaskell
     TypeFamilies
     UndecidableInstances
+    ConstraintKinds
