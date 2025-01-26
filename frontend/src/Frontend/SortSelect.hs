@@ -6,7 +6,8 @@ module Frontend.SortSelect where
 import Control.Monad
 import Reflex
 import qualified Data.Array as A
-import Data.Map as Map
+import qualified Data.Map as Map
+import Data.Map (Map)
 import Data.Graph
 import Data.Tree
 import Data.Foldable as F
@@ -18,32 +19,52 @@ import Common.Schema
 import Data.Functor.Identity
 import Data.Maybe
 
+import Data.Array ((!))
+
 import Debug.Trace
 
 toSortKeys
-  :: forall t. (Reflex t)
-  => Dynamic t PuzzleOrdering
-  -> Dynamic t (Map (Id Puzzle) (PuzzleDataT Identity))
-  -> Dynamic t (Map (PuzzleSortKey) (PuzzleDataT Identity))
-toSortKeys puzzleOrdering puzzleData = toSortKeysInner <$> puzzleOrdering <*> puzzleData
+  :: PuzzleOrdering
+  -> Map (Id Puzzle) (PuzzleDataT Identity)
+  -> Map (PuzzleSortKey) (PuzzleDataT Identity)
+toSortKeys puzzleOrdering puzzleData = toSortKeysInner puzzleOrdering puzzleData
   where
     toSortKeysInner :: PuzzleOrdering -> Map (Id Puzzle) (PuzzleDataT Identity) -> Map PuzzleSortKey (PuzzleDataT Identity)
     toSortKeysInner = \case
       PuzzleOrdering_Any -> Map.mapKeys PuzzleSortKey_Id
       PuzzleOrdering_ByMeta -> \pdMap ->
         let
-          rootElems = Map.keys $ fmapMaybe id $ ffor pdMap $ \pd ->
-                        case (Map.null (Map.intersection (_puzzleData_metas pd) pdMap)) of
-                            False -> Nothing
-                            True -> Just ()
-          qq = (\(i, pd) -> (pd, i, Map.keys $ _puzzleData_metas pd)) <$> Map.toAscList pdMap
+          -- First get a topo-sort-ish ordering (strongly connected components ordered in topological order) to use as a bias for depth-first search
+          rekey_pre k = (_puzzle_IsMeta $ _puzzleData_puzzle $ pdMap Map.! k, k)
+          qq_pre = (\(i, pd) -> let pks = Map.keys $ _puzzleData_metas pd in (pd, rekey_pre i, rekey_pre <$> pks)) <$> Map.toAscList pdMap
+          (g_pre , vertexToData_pre, keyToVertex_pre) = graphFromEdges qq_pre
+
+          -- Actually compute the components, using meta->puzzle edges:
+          pre_scc_order = Map.fromList $ flip zip [(1 :: Int)..] $ (\(_,k,_) -> snd k) . vertexToData_pre <$> ((scc $ transposeG g_pre) >>= flatten)
+
+          -- and make a remapping function for keys:
+          keyremap k = pre_scc_order Map.! k
+
+          -- then we use that ordering to make new keys, and build up our meta graph again:
+          -- keyremap k = let v = pdMap Map.! k in (_puzzle_IsMeta $ _puzzleData_puzzle v, negate . Map.size . _puzzleData_metas $ v, k)
+          qq = (\(i, pd) -> let pks = Map.keys $ _puzzleData_metas pd in (pd, keyremap i, keyremap <$> pks)) <$> Map.toAscList pdMap
           (g , vertexToData, keyToVertex) = graphFromEdges qq
-          unfoldingFun :: Graph -> Vertex -> (Vertex, [Vertex])
-          unfoldingFun g v = (v, g A.! v)
-          notQuiteDFS gr ve = unfoldForest (unfoldingFun gr) ve
-          theDFS = traceShowId $ dfs (transposeG g) (fmapMaybe keyToVertex (traceShowId rootElems))
-          forest :: Map PuzzleSortKey (PuzzleDataT Identity) = Map.fromList $ zipWith (\k v -> (PuzzleSortKey_Synthetic k, (\(pd, _, _) -> pd) $ vertexToData v)) (negate <$> [1..]) $ (theDFS >>= F.toList)
-        in forest
+          -- get connected components again with the new vertex numbering
+          gscc = scc g
+          -- find all components that have no out-edges in puzzle -> meta and pick an element of each to use as a root
+          rootComponents = rootLabel <$> ffilter (\comp -> all (\v -> all (`elem` comp) (g ! v)) comp) gscc
+          rootElems = (\(_, a, _) -> a) . vertexToData <$> rootComponents
+
+          -- unfoldingFun :: Graph -> Vertex -> (Vertex, [Vertex])
+          -- unfoldingFun g v = (v, g A.! v)
+          -- notQuiteDFS gr ve = unfoldForest (unfoldingFun gr) ve
+          
+          -- and do a depth-first search on the graph, using meta->puzzle edges:
+          theDFS = dfs (transposeG g) (fmapMaybe keyToVertex (rootElems))
+          
+          -- and zip it up with a number key, for the UI to use ordering:
+          sorted :: Map PuzzleSortKey (PuzzleDataT Identity) = Map.fromList $ zipWith (\k v -> (PuzzleSortKey_Synthetic k, (\(pd, _, _) -> pd) $ vertexToData v)) (negate <$> [1..]) $ (theDFS >>= F.toList)
+        in sorted
 
 prunePuzzles
   :: forall t k. (Reflex t, Ord k)

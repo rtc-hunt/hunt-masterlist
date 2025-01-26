@@ -179,7 +179,7 @@ masterlist huntId queryD = do
         
         myTabDisplay "ui top attached tabular menu" "activeTab" activeTab $
           MasterlistPage_List =: ("List", do
-            puzzleListI <- puzzleListBuilder huntId
+            puzzleListI <- puzzleListBuilder huntId queryD
             performEvent_ $ (liftIO (Data.Time.Clock.getCurrentTime >>= (print . ((,) "puzzleListD updated: ")))) <$ updatedIncremental puzzleListI
             prerender_ (
              puzzlesTable PuzzleTableConfig
@@ -532,8 +532,8 @@ puzzleListBuilder
      , AuthenticatedMonadQuery t m
      )
   -- => Id Hunt -> m (Incremental t (PatchMapWithPatchingMove (Id Puzzle) PuzzleDataPatch)) -- (Dynamic t (StrictMap.Map (Id Puzzle) (PuzzleDataT Identity)))
-  => Id Hunt -> m (Incremental t (PatchMapWithMove PuzzleSortKey (PuzzleDataT Identity)))-- m (Dynamic t (StrictMap.Map (Id Puzzle) (PuzzleData t)))
-puzzleListBuilder hunt = do
+  => Id Hunt -> Dynamic t PuzzleQuery -> m (Incremental t (PatchMapWithMove PuzzleSortKey (PuzzleDataT Identity)))-- m (Dynamic t (StrictMap.Map (Id Puzzle) (PuzzleData t)))
+puzzleListBuilder hunt pqD = do
   puzzleIds <- watch $ pure $ privateP ~> key V_HuntPuzzles ~> key hunt ~> postMap (traverse (fmap getMonoidalMap . getComplete))
 
   puzzleIds2 <- fmap (fmap (Map.keysSet . fromMaybe mempty)) $ watch $ pure $ privateP ~> key V_HuntPuzzles ~> key hunt ~> postMap (traverse (fmap getMonoidalMap . getComplete))
@@ -578,7 +578,8 @@ puzzleListBuilder hunt = do
       , _puzzleData_currentSolvers = fromMaybe mempty $ fmap getMonoidalMap $ getComplete $ currentSolvers
       }
 
-  let puzzlesD = toSortKeys (constDyn PuzzleOrdering_ByMeta) puzzlesDUnsorted
+  -- let puzzlesD = Map.mapKeys PuzzleSortKey_Id <$> {- toSortKeys (constDyn PuzzleOrdering_ByMeta) -} puzzlesDUnsorted
+  let puzzlesD = toSortKeys <$> (_puzzleQuery_ordering <$> pqD) <*> puzzlesDUnsorted
 
   initialPuzzles <- sample $ current puzzlesD
   traceM "Building puzzle list"
