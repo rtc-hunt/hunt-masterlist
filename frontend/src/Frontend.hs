@@ -362,7 +362,7 @@ runExampleWidget
       a
   -- ^ Child widget
   -> RoutedT t (R FrontendRoute) m a
-runExampleWidget = fmap snd . runObeliskRhyoliteWidget {- (\a -> do
+runExampleWidget = fmap snd . runObeliskRhyoliteWidget (\a -> do
   let queryAction av = do
         let avKey = A.encode $ _queryMorphism_mapQuery vesselToWire av
         handler <- liftIO $ readIORef Common.View.globalMagicQueryHandler
@@ -392,7 +392,6 @@ runExampleWidget = fmap snd . runObeliskRhyoliteWidget {- (\a -> do
   performEvent_ $ traceM "nubbedValueUpdates updated" <$ updated nubbedValueUpdates
   pure $ snd <$> updated nubbedValueUpdates
   )
-  -}
 
 --(fromMaybe (\a -> pure mempty) $ fmap (liftIO .) $ liftIO $ readIORef Common.View.globalMagicQueryHandler)--pure mempty) -- (liftIO . fromMaybe (\q -> traceM "In the magic query handler" >> return mempty) magicQueryHandler)
   vesselToWire

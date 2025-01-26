@@ -107,15 +107,17 @@ instance ToJSONKey ()
 
 type PrivateChatV = Vessel V
 
-type MyQueryType = AuthenticatedV VoidV (AuthMapV AuthToken PrivateChatV) VoidV (Const SelectedCount)
+type MyQueryType = FullAppV MasterlistApp (Const SelectedCount) -- AuthenticatedV VoidV (AuthMapV AuthToken PrivateChatV) VoidV (Const SelectedCount)
 type MyQueryResultType = QueryResult MyQueryType -- AuthenticatedV VoidV (AuthMapV AuthToken PrivateChatV) VoidV (Const SelectedCount)
 -- type MyQueryResultType = QueryResult (AuthMapV AuthToken PrivateChatV (Const SelectedCount))
 -- type MagicQueryHandler m = ((AuthMapV AuthToken PrivateChatV (Const SelectedCount)) -> m (QueryResult (AuthMapV AuthToken PrivateChatV (Const SelectedCount))))
 
+type MagicQueryHandler m = FullAppV MasterlistApp (Const SelectedCount) -> m (QueryResult (FullAppV MasterlistApp (Const SelectedCount)))
+
 -- globalMagicQueryHandler :: IORef (Maybe (MagicQueryHandler IO))
 -- globalMagicQueryHandler = unsafePerformIO $ newIORef Nothing
 
-globalMagicQueryHandler :: IORef (Maybe ())
+globalMagicQueryHandler :: IORef (Maybe (MagicQueryHandler IO))
 globalMagicQueryHandler = unsafePerformIO $ newIORef Nothing
 
 -- hotQueryHandler :: IORef (Maybe ((AuthMapV AuthToken PrivateChatV (Const SelectedCount)) -> IO (QueryResult (AuthMapV AuthToken PrivateChatV (Const SelectedCount)))))

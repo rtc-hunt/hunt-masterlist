@@ -70,7 +70,7 @@ backend = Backend
         runMigrations conn) $ \(e :: SomeException) -> (putStr "Waiting for DB fixes\n" >> threadDelay 100000000)
       traceM "DB fixes done"
       let queryHandlerFn = \q -> fromMaybe emptyV <$> mapDecomposedV (fullQueryHandler checkToken pool) (trace "Got a query in\n" q)
-       -- atomicWriteIORef Common.View.globalMagicQueryHandler $ Just (fmap ((\case { a:b -> a; [] -> mempty {- error "not quite head" -}}) . Data.Map.Monoidal.elems . disperseV) . queryHandlerFn . condenseV . Data.Map.Monoidal.singleton (ClientKey 0))
+      atomicWriteIORef Common.View.globalMagicQueryHandler $ Just (fmap ((\case { a:b -> a; [] -> mempty {- error "not quite head" -}}) . Data.Map.Monoidal.elems . disperseV) . queryHandlerFn . condenseV . Data.Map.Monoidal.singleton (ClientKey 0))
       (listen, _) <- liftIO $ serveDbOverWebsockets
         (coerce pool)
         (requestHandler pool csk cgk allowForcedLogins)
