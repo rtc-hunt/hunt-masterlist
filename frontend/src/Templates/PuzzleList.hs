@@ -167,7 +167,7 @@ puzzlesTable PuzzleTableConfig { _puzzleTableConfig_query = query, _puzzleTableC
               )
             , ("Meta", \_ puzDat -> void $
                 -- listWithKey (_puzzleData_metas <$> puzDat) $ \k dV -> puzzleLink (constDyn k) $ dynText $ dV
-                dyn_ $ ffor (_puzzleData_metas <$> puzDat) $ \metMap -> forM_ (Map.toList metMap) $ \(metId, met) -> puzzleLink (constDyn metId) $ text met
+                el "ul" $ dyn_ $ ffor (_puzzleData_metas <$> puzDat) $ \metMap -> forM_ (Map.toList metMap) $ \(metId, met) -> el "li" $ puzzleLink (constDyn metId) $ text met
                 , 
                   elClass "span" "flex flex-row" $ do
                     startValue <- sample $ current $ ((\metas a -> fromMaybe mempty $ matchSubSelect (_puzzleQuery_select a) $ (\case { PuzzleSelect_HasMeta _ -> True; _ -> False }))) <$> knownMetas <*> query
