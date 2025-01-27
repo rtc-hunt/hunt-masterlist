@@ -224,7 +224,7 @@ getCookie key = do
   cookies <- askCookies
   pure $ case Prelude.lookup (T.encodeUtf8 key) $ cookies of
     Nothing -> Left GetCookieFailed_NotFound
-    Just c -> mapBoth GetCookieFailed_Base64DecodeFailed T.decodeUtf8 $
+    Just c -> join $ mapBoth GetCookieFailed_Base64DecodeFailed (mapLeft (const $ GetCookieFailed_Base64DecodeFailed "utf decode failed") . T.decodeUtf8') $
       base64Decode c
 
 -- | Read a cookie. You may want to use 'Obelisk.Frontend.Cookie.askCookies'
@@ -257,6 +257,14 @@ frontendBody = do
   -- let mAuthCookie0 = L.lookup (T.encodeUtf8 authCookieName) cookies >>= ((\case {Left _ -> Nothing; Right a -> Just a; }) . B64.decode) >>= A.decodeStrict
   -- let mAuthCookie0 = getCookieJson 
   mAuthCookie0 <- getCookieJson (authCookieName)
+  let clearCookie = prerender blank $ do
+        doc <- currentDocumentUnchecked
+        cookie <- defaultCookie authCookieName Nothing
+        setPermanentCookie doc (cookie { setCookiePath = Just "/" })
+        JS.liftJSM $ do 
+           JS.eval ( "console.log(\"Reloading due to login\"); location.reload();" :: Text )
+           pure ()
+
   -- display $ constDyn mAuthCookie0
   case mAuthCookie0 of
     Left _ -> subRoute_ $ \case
@@ -265,7 +273,7 @@ frontendBody = do
     Right token -> do
       traceM $ ("TOKEN: " <>) $ show $ token
       -- display $ constDyn token
-      void $ mapRoutedT (authenticatedWidget (Proxy :: Proxy MasterlistApp) token) $ handleAuthFailure (void renderInvalid) $ subRoute_ $ \case
+      void $ mapRoutedT (authenticatedWidget (Proxy :: Proxy MasterlistApp) token) $ handleAuthFailure (void (renderInvalid >> clearCookie)) $ subRoute_ $ \case
         FrontendRoute_Templates -> void $ templateViewer
         FrontendRoute_Channel -> void $ channel
         FrontendRoute_Puzzle -> void $ puzzles

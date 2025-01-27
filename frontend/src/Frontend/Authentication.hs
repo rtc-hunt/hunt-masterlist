@@ -111,5 +111,5 @@ renderInvalid
   :: (DomBuilder t m)
   => m (Event t x)
 renderInvalid = do
-  el "p" $ text $ "Your token is invalid."
+  el "p" $ text $ "Your auth token is invalid, clearing."
   pure never
