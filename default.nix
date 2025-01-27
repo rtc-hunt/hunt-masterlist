@@ -20,6 +20,7 @@ project ./. ({ pkgs, hackGet, ... }@args: {
     (pkgs.callPackage (hackGet ./dep/rhyolite) args).haskellOverrides
     (self: super: with pkgs.haskell.lib; {
       lens-aeson = self.callHackage "lens-aeson" "1.2.2" {};
+      reflex-dom-core = super.reflex-dom-core.overrideAttrs (attrs: {src = (hackGet ./dep/reflex-dom) + "/reflex-dom-core";});
       gogol = (self.callCabal2nix "gogol" ((hackGet ./dep/gogol) + "/lib/gogol") {});
       gogol-core = (self.callCabal2nix "gogol-core" ((hackGet ./dep/gogol) + "/lib/gogol-core") {});
       gogol-drive = (self.callCabal2nix "gogol-drive" ((hackGet ./dep/gogol) + "/lib/services/gogol-drive") {});

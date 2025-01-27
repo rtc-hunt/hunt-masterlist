@@ -7,6 +7,7 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE EmptyDataDecls #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Common.View where
 
@@ -28,7 +29,6 @@ import Data.IORef
 import Reflex.Query.Class (QueryResult, SelectedCount)
 import System.IO.Unsafe
 import Rhyolite.Api
-import Rhyolite.Frontend.App
 import Common.Request
 import Data.Vessel.Void
 import Rhyolite.Vessel.App

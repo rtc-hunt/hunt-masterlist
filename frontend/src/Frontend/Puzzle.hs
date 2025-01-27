@@ -181,7 +181,7 @@ masterlist huntId queryD = do
           MasterlistPage_List =: ("List", do
             puzzleListI <- puzzleListBuilder huntId queryD
             performEvent_ $ (liftIO (Data.Time.Clock.getCurrentTime >>= (print . ((,) "puzzleListD updated: ")))) <$ updatedIncremental puzzleListI
-            prerender_ (
+            {- prerender_ (
              puzzlesTable PuzzleTableConfig
               { _puzzleTableConfig_query = queryD
               , _puzzleTableConfig_modifyQuery = \e -> do
@@ -193,8 +193,8 @@ masterlist huntId queryD = do
               , _puzzleTableConfig_metas = knownMetas
               , _puzzleTableConfig_tags = knownTags
               }
-              ) (
-             puzzlesTable PuzzleTableConfig
+              ) ( -}
+            puzzlesTable PuzzleTableConfig
               { _puzzleTableConfig_query = queryD
               , _puzzleTableConfig_modifyQuery = \e -> do
                    modifyRoute $ (\(Endo mod) -> \case
@@ -206,7 +206,7 @@ masterlist huntId queryD = do
               , _puzzleTableConfig_tags = knownTags
               }
               )
-	    )
+	   -- )
            <> MasterlistPage_HuntPage =: ("frontpage", do
                frameURI $ _hunt_rootpage <$> hunt
               )
