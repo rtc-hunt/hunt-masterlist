@@ -102,7 +102,7 @@ shouldShowPuzzle puzzleSelect puzzleData = prunePuzzlesInner puzzleSelect puzzle
       PuzzleSelect_WithTag tag -> Map.member tag . _puzzleData_tags
       PuzzleSelect_Not f -> not . prunePuzzlesInner f
       PuzzleSelect_HasVoice -> isJust . _puzzle_voicelink . _puzzleData_puzzle
-      PuzzleSelect_HasMeta meta -> Map.member meta . _puzzleData_metas
+      PuzzleSelect_HasMeta meta -> \p -> Map.member meta (_puzzleData_metas p) || (meta == (PuzzleId $ _puzzle_id $ _puzzleData_puzzle p))
       PuzzleSelect_IsMeta -> _puzzle_IsMeta . _puzzleData_puzzle
       PuzzleSelect_HasSolution -> not . Map.null . _puzzleData_solutions
       PuzzleSelect_HasSolvers -> not . Map.null . _puzzleData_currentSolvers
