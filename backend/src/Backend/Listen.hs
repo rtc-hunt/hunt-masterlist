@@ -33,6 +33,9 @@ import Backend.View.Chatroom (searchForChatroom)
 import Common.Schema
 import Common.View
 import Rhyolite.Vessel.App
+import Rhyolite.Vessel.AuthenticatedV
+import Rhyolite.Vessel.AuthMapV
+import Data.Vessel.Void
 
 data Notify a where
   Notify_Account :: Notify (Id Account)
@@ -83,11 +86,16 @@ getChatroom = runSelectReturningOne . lookup_ (_db_chatroom db)
 
 notifyHandler
   :: Pool Connection
-  -> (token -> (Maybe (Id Account)))
+  -> (AuthToken -> (Maybe (Id Account)))
   -> DbNotification Notify
   -> FullAppV MasterlistApp Proxy
-  -> m (FullAppV MasterlistApp Identity)
-notifyHandler = undefined
+  -> IO (FullAppV MasterlistApp Identity)
+notifyHandler pool auth nm q = do
+  handleAuthenticatedQuery auth
+    (const $ pure VoidV) -- (publicNotifyHandler nm)
+    (privateNotifyHandler pool nm)
+    (const $ pure VoidV) -- (personalNotifyHandler nm)
+    q
 
 privateNotifyHandler
   :: Pool Connection
