@@ -16,6 +16,7 @@ import Control.Monad.IO.Class
 import Control.Lens
 import Data.Semigroup (Endo(..))
 import Data.Functor.Identity
+import Control.Monad.Reader
 import Data.Map (Map)
 import qualified Data.Either
 import qualified Data.Map as Map
@@ -101,6 +102,7 @@ puzzles :: (Monad m, MonadFix m, Reflex t, Routed t (Id Hunt, Either PuzzleQuery
      , RouteToUrl (R FrontendRoute) (Client m)
      , AuthenticatedMonadQuery t m
      , AuthReq t m
+     , MonadReader (Dynamic t (UserSettings Identity)) m
   ) => m (Event t ())
 puzzles = do
   routeD <- askRoute
@@ -134,6 +136,7 @@ masterlist :: (Monad m, MonadHold t m, PostBuild t m, Reflex t, DomBuilder t m, 
      , MonadIO (Performable m)
      , AuthReq t m
      , AuthenticatedMonadQuery t m
+     , MonadReader (Dynamic t (UserSettings Identity)) m
   )
   => Id Hunt -> Dynamic t PuzzleQuery -> m ()
 masterlist huntId queryD = do
@@ -364,6 +367,7 @@ puzzle :: (Monad m, Reflex t, DomBuilder t m
      , MonadIO (Performable m)
      , AuthenticatedMonadQuery t m
      , AuthReq t m
+     , MonadReader (Dynamic t (UserSettings Identity)) m
   ) => Id Puzzle -> m ()
 puzzle puz = do
   puzzleDataDM <- (puzzleBuilder $ constDyn puz) >>= maybeDyn

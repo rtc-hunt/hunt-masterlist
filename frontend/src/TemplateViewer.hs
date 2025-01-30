@@ -142,7 +142,7 @@ puzzleListTemplateViewer = do
   
 fakePuzzles :: Reflex t => Map (PrimaryKey Puzzle Identity) (PuzzleData t)
 fakePuzzles = Map.fromList [ (PuzzleId 1, PuzzleData {
-    _puzzleData_puzzle = constDyn $ Puzzle 1 "test" "http://hackaday.com/" (Just "somesheet") False Nothing (ChatroomId $ Just 0) (HuntId 1) Nothing Nothing,
+    _puzzleData_puzzle = constDyn $ Puzzle 1 "test" "http://hackaday.com/" (Just "somesheet") (Nothing) False Nothing (ChatroomId $ Just 0) (HuntId 1) Nothing Nothing,
     _puzzleData_metas = constDyn $ PuzzleId 2 =: "Noodle Bowl" <> PuzzleId 3 =: "Cheezeburger",
     _puzzleData_tags = constDyn $ "Oddball" =: () <> "Extraction" =: (),
     _puzzleData_solutions = constDyn $ Map.fromList $ (\a -> (primaryKey a, a)) <$> [Solution (PuzzleId 1) "JEANLUCPICARD" False, Solution (PuzzleId 1) "LOMEIN" True],

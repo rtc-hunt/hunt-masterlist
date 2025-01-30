@@ -27,6 +27,7 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Set as Set
 import Data.Maybe
+import Control.Monad.Reader
 import qualified Data.Text.Encoding as T
 import qualified Data.Witherable as W
 import GHCJS.DOM (currentDocumentUnchecked, currentDocument)
@@ -70,6 +71,8 @@ import Frontend.ViewCache
 import Rhyolite.Frontend.Auth.App
 -- import OldFrontend
 import Debug.Trace hiding (traceEvent)
+import Common.View
+import Rhyolite.Vessel.AuthenticatedV
 
 import TemplateViewer
 import Templates.Login
@@ -273,12 +276,14 @@ frontendBody = do
     Right token -> do
       traceM $ ("TOKEN: " <>) $ show $ token
       -- display $ constDyn token
-      void $ mapRoutedT (authenticatedWidget (Proxy :: Proxy MasterlistApp) token) $ handleAuthFailure (void (renderInvalid >> clearCookie)) $ subRoute_ $ \case
-        FrontendRoute_Templates -> void $ templateViewer
-        FrontendRoute_Channel -> void $ channel
-        FrontendRoute_Puzzle -> void $ puzzles
-        FrontendRoute_HuntSelection -> void $ huntselect
-        FrontendRoute_Main -> blank
+      void $ mapRoutedT (authenticatedWidget (Proxy :: Proxy MasterlistApp) token) $ handleAuthFailure (void (renderInvalid >> clearCookie)) $ do
+        userSettings <- fmap (fmap $ fromMaybe def) $ watch $ constDyn $ personalP ~> key PV_Settings ~> singleV ~> postMap (\a -> Just $ Identity $ fromMaybe def $ runIdentity a)
+        mapRoutedT (flip runReaderT userSettings) $ subRoute_ $ \case
+          FrontendRoute_Templates -> void $ templateViewer
+          FrontendRoute_Channel -> void $ channel
+          FrontendRoute_Puzzle -> void $ puzzles
+          FrontendRoute_HuntSelection -> void $ huntselect
+          FrontendRoute_Main -> blank
  {-
 -- do
   -- display $ constDyn mAuthCookie0

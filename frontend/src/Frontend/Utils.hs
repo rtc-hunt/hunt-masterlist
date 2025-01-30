@@ -29,10 +29,12 @@ buttonClassIcon cls = fmap (domEvent Click . fst) . elAttr' "button" ("type" =: 
 onRender :: (Prerender t m, Monad m) => m (Event t ())
 onRender = fmap updated (prerender blank blank)
 
-semToggle theLabel isChecked =
+semToggle theLabel isCheckedD =
   divClass "field" $ divClass "ui toggle checkbox" $ do
+    isChecked <- sample $ current isCheckedD
     ie <- inputElement $ def & inputElementConfig_elementConfig . elementConfig_initialAttributes .~ ("type" =: "checkbox")
                              & inputElementConfig_initialChecked .~ isChecked
+                             & inputElementConfig_setChecked .~ updated isCheckedD
     el "label" $ text theLabel
     return $ _inputElement_checked ie
 

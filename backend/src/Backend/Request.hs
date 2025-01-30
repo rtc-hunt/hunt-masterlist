@@ -1,5 +1,8 @@
 {-# OPTIONS_GHC -Werror=missing-fields -Werror=incomplete-patterns #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedLabels #-}
 module Backend.Request where
 
 import Control.Monad.Except
@@ -20,6 +23,7 @@ import Data.Signed.ClientSession
 import Data.Text (Text)
 import Database.Beam
 import Database.Beam.Postgres
+import Database.Beam.Postgres.Full hiding (insert)
 import Database.PostgreSQL.Simple
 import Database.PostgreSQL.Simple.Class
 import System.IO (stderr)
@@ -27,8 +31,7 @@ import Rhyolite.Api
 import Rhyolite.Backend.App
 import Rhyolite.DB.NotifyListen.Beam
 import Web.ClientSession as CS
--- import Gogol.Drive (Drive'File, DriveFilesCreate, file, fMimeType, fName, fParents, fId)
-import qualified Gogol as Google
+import Data.Proxy
 import Network.HTTP.Req hiding (req)
 import qualified Network.HTTP.Req as Req
 import System.Directory
@@ -41,19 +44,9 @@ import Backend.Schema
 -- import Common.Auth
 import Common.Request
 import Common.Schema
+import Backend.Google
 
 import Debug.Trace
-
-createSheet :: Text -> IO (Maybe Text)
-createSheet name = handle failedCreateSheet $ do
-    canonicalizePath "config/backend" >>= setEnv "CLOUDSDK_CONFIG"
-    lgr  <- Google.newLogger Google.Debug stderr
-    -- env  <- Google.newEnv <&> (Google.envLogger .~ lgr) . (Google.envScopes .~ driveFileScope) -- (2) (3)
---    qqq  <- Google.runResourceT . Google.runGoogle env $
---      Google.send $ filesCreate $ file & (fMimeType ?~ "application/vnd.google-apps.spreadsheet") . (fName ?~ name) . (fParents .~ ["1F40xJAGFXFE8Z64xw_gxSR_P8TBYrwsi"])
---    return $ qqq ^. fId
-    error "Oops, not implemented"
-  where failedCreateSheet (e :: SomeException) = putStrLn "Failed to create google sheet, please check configuration." >> pure Nothing
 
 type RequestHandlerType = RequestHandler (ApiRequest AuthToken PublicRequest PrivateRequest) IO
 
@@ -107,8 +100,9 @@ requestHandler pool csk authAudience allowForcedLogins = RequestHandler $ \case
           [Only n] -> pure . Right $ (cid, n)
           _ -> pure . Left $ "PrivateRequest_LatestMessage: got more than one row"
       PrivateRequest_AddPuzzle title ismeta url hunt -> auth $ \_user -> runDb pool $ do
-        sheet <- liftIO $ do
-          createSheet title
+        huntRecord <- runSelectReturningOne $ lookup_ (_db_hunt db) hunt
+        (folderId, sheet) <- liftIO $ do
+          createPuzzleFiles (huntRecord >>= _hunt_folderId) title
         -- Also queue create new puzzle spreadsheet here through job system.
         channelId <-  insertAndNotify (_db_chatroom db) Chatroom
           { _chatroom_id = default_
@@ -121,6 +115,7 @@ requestHandler pool csk authAudience allowForcedLogins = RequestHandler $ \case
           , _puzzle_IsMeta = val_ ismeta
           , _puzzle_StartedAt = val_ Nothing
           , _puzzle_SheetURI = val_ $ (\a->"https://docs.google.com/spreadsheets/d/" <> a <> "/edit") <$> sheet
+          , _puzzle_FolderId = val_ $ folderId
           , _puzzle_Channel = val_ $ (ChatroomId . fmap unChatroomId) $ channelId
           , _puzzle_Hunt = val_ $ hunt
           , _puzzle_removed = val_ $ Nothing
@@ -141,6 +136,7 @@ requestHandler pool csk authAudience allowForcedLogins = RequestHandler $ \case
           { _chatroom_id = default_
           , _chatroom_title = val_ $ hunt_title
           }
+        huntFolder <- liftIO $ createFolder hunt_title
         case channelId of
           Nothing -> return $ Left "Couldn't create channel for hunt"
           Just channelId -> do
@@ -150,10 +146,17 @@ requestHandler pool csk authAudience allowForcedLogins = RequestHandler $ \case
               , _hunt_rootpage = val_ $ hunt_rootpage
               , _hunt_channel = val_ $ channelId
               , _hunt_live = val_ $ True
+              , _hunt_folderId = val_ $ huntFolder
               }
             pure $ case huntId of
               Nothing -> Left "Couldn't create hunt"
               Just cid -> Right cid
+      PrivateRequest_SaveSettings newSettings -> auth $ \user -> runDb pool $ do
+        _ <- runInsert $ insertOnConflict (_db_userSettings db)
+               (insertValues [UserSettingsTable (user) (newSettings)])
+               (conflictingFields $ \tbl -> primaryKey tbl)
+               (onConflictUpdateSet (\fields old -> fields <-. val_ (UserSettingsTable user newSettings)))
+        pure $ Right ()
       PrivateRequest_PuzzleCommand (PuzzleCommand_Tag pzl tag) -> auth $ \_user -> runDb pool $ do
         _ <- insertAndNotifyChange (_db_tags db) $ Tag (val_ pzl) (val_ tag)
         pure $ Right ()

@@ -20,6 +20,7 @@ library
                , common
                , constraints-extras
                , containers
+               , data-default
                , frontend
                , jose
                , monoidal-containers
@@ -64,6 +65,7 @@ library
     Backend.View.Chatroom
     Backend.View.Messages
     Backend.Schema
+    Backend.Google
     Backend.View
     -- Backend.Loadtest
   ghc-options: -Wall -Wredundant-constraints -Wincomplete-uni-patterns -Wincomplete-record-updates -O -fno-show-valid-hole-fits

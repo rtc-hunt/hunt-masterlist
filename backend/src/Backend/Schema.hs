@@ -33,6 +33,7 @@ data Db f = Db
   , _db_metas :: f (TableEntity Metapuzzle)
   , _db_activeUsers :: f (TableEntity ActiveUser)
   , _db_googleKeys :: f (TableEntity GoogleKey)
+  , _db_userSettings :: f (TableEntity UserSettingsTable)
   }
   deriving (Generic, Database be)
 

@@ -107,6 +107,18 @@ instance ToJSONKey ()
 
 type PrivateChatV = Vessel V
 
+data PersV a where
+  PV_Settings :: PersV (SingleV (UserSettings Identity))
+
+deriving instance Show (PersV a)
+deriveArgDict ''PersV
+deriveJSONGADT ''PersV
+deriveGEq ''PersV
+deriveGShow ''PersV
+deriveGCompare ''PersV
+
+type HMLPersonalV = Vessel PersV
+
 type MyQueryType = FullAppV MasterlistApp (Const SelectedCount) -- AuthenticatedV VoidV (AuthMapV AuthToken PrivateChatV) VoidV (Const SelectedCount)
 type MyQueryResultType = QueryResult MyQueryType -- AuthenticatedV VoidV (AuthMapV AuthToken PrivateChatV) VoidV (Const SelectedCount)
 -- type MyQueryResultType = QueryResult (AuthMapV AuthToken PrivateChatV (Const SelectedCount))
@@ -130,6 +142,6 @@ instance RhyoliteAuthApp MasterlistApp where
   type PublicApi MasterlistApp = PublicRequest
   type PrivateApi MasterlistApp = PrivateRequest
   type PrivateV MasterlistApp = PrivateChatV
-  type PersonalV MasterlistApp = VoidV
+  type PersonalV MasterlistApp = HMLPersonalV
   type PublicV MasterlistApp = VoidV
 

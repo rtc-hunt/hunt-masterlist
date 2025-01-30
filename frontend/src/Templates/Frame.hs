@@ -7,6 +7,8 @@ import Data.Text (Text)
 import Data.Text as T
 import Obelisk.Route.Frontend
 import Common.Route
+import Control.Monad.Reader
+import Data.Functor.Identity
 import Common.Schema
 import Frontend.Utils
 
@@ -32,7 +34,7 @@ reloadingRouteLink routeD a = do
     toUrl <- askRouteToUrl
     elDynAttr "a" ((\route -> "href" =: (toUrl $ route)) <$> routeD) $ a
 
-framed :: (Monad m, DomBuilder t m, MonadFix m, SetRoute t (R FrontendRoute) m, RouteToUrl (R FrontendRoute) m, PostBuild t m, MonadHold t m, Prerender t m) => Framed m t a -> m ()
+framed :: (Monad m, DomBuilder t m, MonadFix m, SetRoute t (R FrontendRoute) m, RouteToUrl (R FrontendRoute) m, PostBuild t m, MonadHold t m, Prerender t m, MonadReader (Dynamic t (UserSettings Identity)) m) => Framed m t a -> m ()
 framed Framed
   { _framed_headerItems = header
   , _framed_body = body
@@ -58,8 +60,9 @@ framed Framed
               True -> "active transition visible"
               False -> ""
         menuRes <- elDynAttr "div" (ffor menuItemOpenClass $ \c -> "class" =: ("menu " <> c)) $ do
-          switchLayout <- elClass "div" "item" $ semToggle "Show Chat" False
-          muteChat <- elClass "div" "item" $ semToggle "Mute Chat" False
+          userSettings <- ask
+          switchLayout <- elClass "div" "item" $ semToggle "Show Chat" (constDyn False) -- (_userSettings_chatSidebar <$> userSettings)
+          muteChat <- elClass "div" "item" $ semToggle "Mute Chat" (constDyn False) -- (_userSettings_chatMuted <$> userSettings)
           divClass "item" $ text "Settings"
           -- switchLayout <- button "Switch layout" >>= toggle False
           -- muteChat <- button "Mute Chat" >>= toggle False

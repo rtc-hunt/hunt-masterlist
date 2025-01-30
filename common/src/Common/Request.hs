@@ -20,6 +20,7 @@ data PrivateRequest a where
   PrivateRequest_UpdatePuzzle :: Puzzle Identity -> PrivateRequest (Either Text ())
   PrivateRequest_Renick :: Text -> PrivateRequest (Either Text ())
   PrivateRequest_NewHunt :: Text -> Text -> PrivateRequest (Either Text (Id Hunt))
+  PrivateRequest_SaveSettings :: UserSettings Identity -> PrivateRequest (Either Text ())
 
 data PuzzleCommand a where
   PuzzleCommand_Tag :: Id Puzzle -> Text -> PuzzleCommand (Id Puzzle, Text)

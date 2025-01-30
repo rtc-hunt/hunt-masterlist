@@ -94,7 +94,7 @@ notifyHandler pool auth nm q = do
   handleAuthenticatedQuery auth
     (const $ pure VoidV) -- (publicNotifyHandler nm)
     (privateNotifyHandler pool nm)
-    (const $ pure VoidV) -- (personalNotifyHandler nm)
+    (personalNotifyHandler pool nm)
     q
 
 privateNotifyHandler
@@ -368,3 +368,10 @@ privateNotifyHandler pool nm v = case _dbNotification_message nm of
             (Nothing, NotificationType_Delete) -> MapV $ Map.singleton () $ pure $ SemiMap_Partial $ Map.singleton (_tagId_Tag sid) $ First (Nothing)
             (Nothing, _) -> MapV $ Map.singleton () $ pure $ SemiMap_Partial $ Map.singleton (_tagId_Tag sid) $ First (Just ())
             (Just _, _) -> emptyV
+
+personalNotifyHandler
+  :: Pool Connection
+  -> DbNotification Notify
+  -> HMLPersonalV (Compose (Map.MonoidalMap (Id Account)) Proxy)
+  -> IO (HMLPersonalV (Compose (Map.MonoidalMap (Id Account)) Identity))
+personalNotifyHandler pool nm v = return mempty -- case _dbNotification_message nm of

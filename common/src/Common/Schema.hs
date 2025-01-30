@@ -14,6 +14,7 @@ import Data.Time
 import Database.Beam.Backend.SQL.Types
 import Database.Beam.Schema
 import GHC.Generics
+import Type.Reflection (Typeable)
 -- import Rhyolite.Account
 
 authCookieName :: Text
@@ -98,6 +99,7 @@ data Puzzle f = Puzzle
   , _puzzle_Title :: Columnar f Text
   , _puzzle_URI :: Columnar f Text
   , _puzzle_SheetURI :: Columnar f (Maybe Text)
+  , _puzzle_FolderId :: Columnar f (Maybe Text)
   , _puzzle_IsMeta :: Columnar f Bool
   , _puzzle_StartedAt :: Columnar f (Maybe UTCTime)
   , _puzzle_Channel :: PrimaryKey Chatroom (Nullable f)
@@ -230,6 +232,7 @@ data Hunt f = Hunt
   , _hunt_rootpage :: Columnar f Text
   , _hunt_channel :: PrimaryKey Chatroom f
   , _hunt_live :: Columnar f Bool
+  , _hunt_folderId :: Columnar f (Maybe Text)
   }
   deriving (Generic, Beamable)
 
@@ -270,3 +273,36 @@ instance FromJSONKey (PrimaryKey ActiveUser Identity)
 instance ToJSON (ActiveUser Identity)
 instance FromJSON (ActiveUser Identity)
 
+data UserSettingsTable f = UserSettingsTable
+  { _userSettings_account :: PrimaryKey Account f
+  , _us_v :: UserSettings f
+  } deriving (Generic, Beamable)
+
+data UserSettings f = UserSettings
+  { _userSettings_currentHunt :: PrimaryKey Hunt f
+  , _userSettings_chatMuted :: Columnar f Bool
+  , _userSettings_chatSidebar :: Columnar f Bool
+  , _userSettings_enableNotifications :: Columnar f Bool
+  , _userSettings_enableAudio :: Columnar f Bool
+  , _userSettings_openInNewTab :: Columnar f Bool
+  } deriving (Generic, Beamable)
+
+instance Table UserSettingsTable where
+  data PrimaryKey UserSettingsTable f = UserSettingsId { _userSettingsId_account :: PrimaryKey Account f }
+    deriving (Generic, Beamable)
+  primaryKey a = UserSettingsId $ _userSettings_account a
+
+instance Default (UserSettings Identity) where
+  def = UserSettings (HuntId 4) False False False False True
+
+deriving instance Show (PrimaryKey UserSettingsTable Identity)
+deriving instance Eq (PrimaryKey UserSettingsTable Identity)
+deriving instance Ord (PrimaryKey UserSettingsTable Identity)
+instance ToJSON (PrimaryKey UserSettingsTable Identity)
+instance FromJSON (PrimaryKey UserSettingsTable Identity)
+instance ToJSONKey (PrimaryKey UserSettingsTable Identity)
+instance FromJSONKey (PrimaryKey UserSettingsTable Identity)
+instance ToJSON (UserSettings Identity)
+instance FromJSON (UserSettings Identity)
+deriving instance Show (UserSettings Identity)
+deriving instance Eq (UserSettings Identity)

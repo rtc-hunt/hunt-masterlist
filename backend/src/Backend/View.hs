@@ -9,10 +9,13 @@ import Data.Functor.Identity
 import qualified Data.Map.Monoidal as Map
 import Data.Int
 import Data.Pool
+import Data.Default
+import Data.Coerce
 import Data.Semigroup
 import Data.Maybe
 import Data.Vessel
 import Data.Vessel.SubVessel
+import Data.Vessel.Single
 import Database.PostgreSQL.Simple
 import Database.PostgreSQL.Simple.Beam ()
 import Database.Beam
@@ -51,9 +54,9 @@ import Data.Aeson
 fullQueryHandler :: (Ord token, ToJSON token)
   => (token -> (Maybe (Id Account)))
   -> Pool Connection
-  -> AuthenticatedV VoidV (AuthMapV token PrivateChatV) (AuthMapV token VoidV) Proxy
-  -> IO (AuthenticatedV VoidV (AuthMapV token PrivateChatV) (AuthMapV token VoidV) Identity)
-fullQueryHandler auth db q = (traceM "In fullQueryHandler" ) >> (traceM $ ("Query in handler" <>) $ show $ encode q) >> handleAuthenticatedQuery auth (const $ traceM "Auth error" >> pure VoidV) (privateQueryHandler db) (const $ pure mempty) q
+  -> AuthenticatedV VoidV (AuthMapV token PrivateChatV) (AuthMapV token HMLPersonalV) Proxy
+  -> IO (AuthenticatedV VoidV (AuthMapV token PrivateChatV) (AuthMapV token HMLPersonalV) Identity)
+fullQueryHandler auth db q = (traceM "In fullQueryHandler" ) >> (traceM $ ("Query in handler" <>) $ show $ encode q) >> handleAuthenticatedQuery auth (const $ traceM "Auth error" >> pure VoidV) (privateQueryHandler db) (personalQueryHandler db) q
 
 privateQueryHandler
   :: Pool Connection
@@ -157,4 +160,18 @@ trackActiveUsers csk pool query = do
         print $ ("Updating Active User Count For: ", acctId, someChat, someCount)
 
 
-
+personalQueryHandler
+  :: Pool Connection
+  -> HMLPersonalV (Compose (Map.MonoidalMap (Id Account)) Proxy)
+  -> IO (HMLPersonalV (Compose (Map.MonoidalMap (Id Account)) Identity))
+personalQueryHandler pool q = (>>= (\a -> (print $ "Passed private query" <> show a) >> return a)) $ (print q >>) $ buildV q $ \case
+    PV_Settings -> \kv -> do -- flip fmap (fromMaybe mempty $ lookupSingleV kv) $ \(k :: _) -> do
+     let k :: [PrimaryKey Account Identity]
+         k = Map.keys $ getCompose $ unSingleV kv
+     qq <- runDb pool $ runSelectReturningList $ select $ do
+       us <- all_ (_db_userSettings db)
+       let keys = val_ <$> k
+       guard_ $ _userSettings_account us `in_` keys
+       pure (_userSettings_account us, _us_v us)
+     let withDefaults = (Identity . First . Just <$> Map.fromList qq) <> ((Identity . First . Just $ def) <$ getCompose (unSingleV kv))
+     pure $ SingleV $ Compose $ withDefaults

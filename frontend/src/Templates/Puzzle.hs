@@ -91,7 +91,7 @@ backsolve1 :: DomBuilder t m => m ()
 backsolve1 = elAttr "span" ("class" =: "tooltip" <> "style" =: "font-family: 'SymbolaRegular'" <> "data-tooltip" =: "This solution was backsolved.") $ do
   text " 🝡⃪"
 
-Puzzle _ (LensFor puzzleTitle) (LensFor puzzleUri) (LensFor puzzleSheetURI) (LensFor puzzleIsMeta) _ _ _ _ (LensFor puzzleVoiceLink) = tableLenses
+Puzzle _ (LensFor puzzleTitle) (LensFor puzzleUri) (LensFor puzzleSheetURI) (LensFor puzzleFolderId) (LensFor puzzleIsMeta) _ _ _ _ (LensFor puzzleVoiceLink) = tableLenses
 
 puzzleConfigurator
   :: forall t m js. (Template t m, MonadHold t m, MonadFix m, Prerender t m)

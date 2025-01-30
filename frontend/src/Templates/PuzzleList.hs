@@ -173,7 +173,7 @@ puzzlesTable PuzzleTableConfig { _puzzleTableConfig_query = query, _puzzleTableC
                     startValue <- sample $ current $ ((\metas a -> fromMaybe mempty $ matchSubSelect (_puzzleQuery_select a) $ (\case { PuzzleSelect_HasMeta _ -> True; _ -> False }))) <$> knownMetas <*> query
                     queryByMeta <- fmap (flip PuzzleQuery PuzzleOrdering_Any) . _dropdown_value <$> dropdown startValue (( (mempty =: " - ") <>) . Map.mapKeys PuzzleSelect_HasMeta <$> knownMetas) headerDropdownSettings
                     startSortValue <- sample $ current $ (\(PuzzleQuery _ ord) -> ord == PuzzleOrdering_ByMeta) <$> query
-                    sortByMeta <- elClass "span" "flex-initial max-w-min" $ fmap (PuzzleQuery PuzzleSelect_All . (\a -> if a then PuzzleOrdering_ByMeta else PuzzleOrdering_Any)) <$> semToggle "" startSortValue
+                    sortByMeta <- elClass "span" "flex-initial max-w-min" $ fmap (PuzzleQuery PuzzleSelect_All . (\a -> if a then PuzzleOrdering_ByMeta else PuzzleOrdering_Any)) <$> semToggle "" (constDyn startSortValue)
                     modifyQuery $ (\(PuzzleQuery old _) (PuzzleQuery new _) -> Endo $ \(PuzzleQuery all ord) -> PuzzleQuery (new <> subPuzzleSelect all old) ord) <$> current queryByMeta <@> updated queryByMeta
                     modifyQuery $ (\(PuzzleQuery _ n) -> Endo $ \(PuzzleQuery all _) -> PuzzleQuery all n) <$> updated sortByMeta
                     pure $ sortByMeta <> queryByMeta
