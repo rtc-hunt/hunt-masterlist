@@ -116,7 +116,8 @@ frontend = Frontend
 --          \ }"
       subRoute_ $ \case
         FrontendRoute_Main -> 
-          elAttr "meta" ("http-equiv" =: "refresh" <> "content" =: ("0; url=" <> "https://hunt-masterlist.tcita.com/hunt/4/" )) blank
+          -- elAttr "meta" ("http-equiv" =: "refresh" <> "content" =: ("0; url=" <> "https://hunt-masterlist.tcita.com/hunt/4/" )) blank
+          blank
         _ -> blank
       blank
   , _frontend_body = runExampleWidget frontendBody
@@ -143,7 +144,11 @@ initGauth = do
       client_id <- fromMaybe "" . (>>= A.decodeStrict') <$> getConfig "common/clientGoogleKey"
       elAttr "script" ("src" =: "https://accounts.google.com/gsi/client" <> "async" =: "") blank
       el "div" $ do
-        elAttr "div" ("id" =: "g_id_onload" <> "data-auto_prompt" =: "true" <> "data-client_id" =: client_id <> {- "data-ux_mode" =: "redirect" <> -} "data-callback" =: "handleGoogleLogin") $ blank -- text "googly appendage"
+        elAttr "div" ("id" =: "g_id_onload" <> "data-auto_prompt" =: "true"
+                        <> "data-use_fedcm_for_prompt" =: "true"
+                        <> "data-use_fedcm_for_button" =: "true"
+                        <> "data-client_id" =: client_id
+                        <> {- "data-ux_mode" =: "redirect" <> -} "data-callback" =: "handleGoogleLogin") $ blank -- text "googly appendage"
         elAttr "div" ("class" =: "g_id_signin" <> "data-type" =: "standard" <> "data-size" =: "large" <> "data-theme" =: "outline" <> "data-text" =: "sign_in_with") $ blank
 
   updatedUserE <- fmap switchDyn $ prerender (return never) $ do
@@ -353,7 +358,8 @@ redirectIfAuthenticated mAuthCookie = do
         , updated mAuthCookie
         ]
   liveHunts <- fmap (fmap (fromMaybe mempty)) $ watch $ constDyn $ key V_LiveHunts ~> key () ~> postMap (traverse (fmap (Map.keysSet . getMonoidalMap) . getComplete))
-  setRoute $ fmap (\hunt -> FrontendRoute_Puzzle :/ (hunt, Left mempty)) $ (fromMaybe (HuntId 4) <$> current (Set.lookupMax <$> liveHunts) <@ hasAuth)
+  -- setRoute $ fmap (\hunt -> FrontendRoute_Puzzle :/ (hunt, Left mempty)) $ (fromMaybe (HuntId 4) <$> current (Set.lookupMax <$> liveHunts) <@ hasAuth)
+  pure ()
 
 runExampleWidget
   :: ( DomBuilder t m
