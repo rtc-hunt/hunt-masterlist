@@ -131,14 +131,21 @@ privateQueryHandler pool q = (>>= (\a -> print "Passed" >> return a)) $ (print q
       guard_ $ _hunt_live hunt ==. val_ True
       return $ primaryKey hunt
 
+type SigIdToken = (Data.Signed.Signed (Id Account))
+
 trackActiveUsers
   :: CS.Key
   -> Pool Connection
-  -> Data.Map.Monoidal.MonoidalMap ClientKey (AuthMapV (Data.Signed.Signed (Id Account)) PrivateChatV (Const Reflex.Query.Class.SelectedCount))
+  -> Data.Map.Monoidal.MonoidalMap ClientKey (AuthenticatedV VoidV (AuthMapV SigIdToken PrivateChatV) (AuthMapV SigIdToken HMLPersonalV) (Const Reflex.Query.Class.SelectedCount))
+{-  -> Data.Map.Monoidal.MonoidalMap ClientKey i
+       (AuthenticatedV VoidV 
+          (AuthMapV (Data.Signed.Signed (Id Account)) PrivateChatV (Const Reflex.Query.Class.SelectedCount))
+          (AuthMapV (Data.Signed.Signed (Id Account)) HMLPersonalV (Const Reflex.Query.Class.SelectedCount)))
+-}
   -> IO ()
 trackActiveUsers csk pool query = do
-    let v = DF.fold query
-    let acct = fmap getChatCount $ getSubVessel $ unAuthMapV v
+    let v = DF.fold $ query
+    let acct = fmap getChatCount $ getSubVessel $ unAuthMapV (fromMaybe mempty $ lookupV AuthenticatedVKey_Private $ unAuthenticatedV v)
     iforM acct $ \someToken someMapM -> do
       let acctIdM = readSignedWithKey csk someToken
       iforM someMapM $ \_ someMap -> iforM someMap $ \someChat someCount -> do
