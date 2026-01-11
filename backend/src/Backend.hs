@@ -77,7 +77,7 @@ backend = Backend
         (\nm q -> fmap (fromMaybe emptyV) $ mapDecomposedV (notifyHandler pool checkToken nm) q)
         (QueryHandler $ queryHandlerFn)-- fromMaybe emptyV <$> mapDecomposedV (handleAuthMapQuery checkToken (privateQueryHandler pool)) q)
         vesselFromWire
-        (vesselPipeline) -- . observePipelineQuery (trackActiveUsers csk pool))
+        (vesselPipeline) . observePipelineQuery (trackActiveUsers csk pool))
       serve $ \case
         BackendRoute_Login :/ () -> loginHandler pool csk cgk
         BackendRoute_Listen :/ () -> listen
