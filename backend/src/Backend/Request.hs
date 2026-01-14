@@ -191,7 +191,9 @@ requestHandler pool csk authAudience allowForcedLogins = RequestHandler $ \case
       PrivateRequest_PuzzleCommand (PuzzleCommand_Voice puzId chatUrl) -> auth $ \_user -> runDb pool $ do
         _ <- updateAndNotifyChange (_db_puzzles db) puzId $ (\p -> _puzzle_voicelink p <-. val_ chatUrl)
         pure $ Right ()
-
+      PrivateRequest_PuzzleCommand (PuzzleCommand_HuntTools puzId query) -> do
+        traceShowM $ ("Had a query", query)
+        pure $ Left query
 
 
   {-ApiRequest_Public (PublicRequest_Login user pass) -> do

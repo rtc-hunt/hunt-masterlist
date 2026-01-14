@@ -26,6 +26,8 @@ import Common.Request
 import Data.Proxy
 import Data.Some
 import Reflex.Dom.Core hiding (value)
+import qualified Data.Set as Set
+import Frontend.Types
 
 import Rhyolite.Api (ApiRequest(..))
 
@@ -56,7 +58,11 @@ cliCommandParser theRoute = info (hsubparser commands <**> helper) fullDesc
           info (fmap ((CliCommandTag_Renick ==>) . T.intercalate " ") $ 
             some $ fmap T.pack $ strArgument $ metavar "NAME") $ fullDesc <> noIntersperse
       (CliCommandTag_PuzzleCommand :=> _) -> mconcat
-        [ command "tag" $ info (
+        [ command "status" $ info (
+          fmap ((CliCommandTag_PuzzleCommand ==>) . mkSome) $ 
+             hsubparser statusCommands
+           ) $ fullDesc
+        , command "tag" $ info (
           fmap ((CliCommandTag_PuzzleCommand ==>) . mkSome) $
              (PuzzleCommand_Tag <$> puzzleOption <*> (fmap T.pack $ strArgument $ metavar "TAG"))
            ) $ fullDesc
@@ -83,12 +89,27 @@ cliCommandParser theRoute = info (hsubparser commands <**> helper) fullDesc
           fmap ((CliCommandTag_PuzzleCommand ==>) . mkSome) $
              (PuzzleCommand_Voice <$> puzzleOption <*> optional (fmap T.pack $ strArgument $ metavar "VOICE_CHAT_URL"))
            ) $ fullDesc
+        , command "ht" $ info (
+          fmap ((CliCommandTag_PuzzleCommand ==>) . mkSome) $
+             (PuzzleCommand_HuntTools <$> puzzleOption <*> fmap (T.intercalate " ") (some (fmap T.pack $ strArgument $ metavar "Hunttools query")))
+           ) $ fullDesc
         ]
     puzzleOption :: Parser (PrimaryKey Puzzle Identity)
     puzzleOption = option (PuzzleId . SqlSerial <$> auto) (short 'p' <> long "puzzle" <> metavar "PUZZLE" <> puzzleOptionMod <> help "Puzzle identifier. Auto-fills on puzzle pages, which is the expected use.")
     puzzleOptionMod :: Mod OptionFields (PrimaryKey Puzzle Identity) = case theRoute of
       (Just puz) -> value puz
       _ -> idm
+    -- statusCommands :: Mod CommandFields (PuzzleCommand (Id Puzzle, Text))
+    statusCommands :: Mod CommandFields (PuzzleCommand (Id Puzzle, Text))
+    statusCommands = mconcat $ Set.toList statusTags >>= \theTag -> [
+          command (T.unpack theTag) $ info (
+             (PuzzleCommand_Tag <$> puzzleOption <*> pure theTag)
+           ) $ fullDesc,
+          command ("not-" ++ T.unpack theTag) $ info (
+             (PuzzleCommand_Untag <$> puzzleOption <*> pure theTag)
+           ) $ fullDesc
+           ]
+      -- (\tag -> flip PuzzleCommand_Tag tag <$> command (T.unpack tag) (info mempty fullDesc)) <$> Set.toList statusTags
 
 cliWords :: Text -> [String]
 cliWords a = case words $ T.unpack a of -- Fuggles hack.
@@ -103,15 +124,18 @@ parseCli routeD iE = fmap (fan . fmap (DMap.fromList . pure)) $ fanEither $ ffor
   where
     parseWithRoute route = execParserPure defaultPrefs (cliCommandParser route) . cliWords
 
-requestingSimpleCommands :: (Requester t m, Request m ~ ApiRequest () PublicRequest PrivateRequest, MonadHold t m, PostBuild t m, Adjustable t m, NotReady t m)  => EventSelector t CliCommandTag -> m ()
+requestingSimpleCommands :: (PerformEvent t m, AuthReq t m, Request m ~ ApiRequest () PublicRequest PrivateRequest, MonadHold t m, PostBuild t m, Adjustable t m, NotReady t m)  => EventSelector t CliCommandTag -> m (Event t Text)
 requestingSimpleCommands cmdsE = do
-  (holdDyn blank $ someReqFor <$> select cmdsE CliCommandTag_PuzzleCommand) >>= dyn_
+  res <- (holdDyn (pure never) $ someReqFor <$> select cmdsE CliCommandTag_PuzzleCommand) >>= dyn
+  (res2, _) <- fanEither . fmap runIdentity . Reflex.switch . current <$> holdDyn never res
   requesting_ $ ApiRequest_Private () . PrivateRequest_Renick <$> select cmdsE CliCommandTag_Renick
+  
+  pure $ res2
   where 
     someReqFor a = withSome a reqFor
     reqFor evt = do
       pb <- getPostBuild
-      requesting_ $ ApiRequest_Private () (PrivateRequest_PuzzleCommand evt) <$ pb
+      requesting $ ApiRequest_Private () (PrivateRequest_PuzzleCommand evt) <$ pb
 
 {-
 instance ArgDict c PuzzleCommand => ArgDict c CliCommandTag where

@@ -253,9 +253,9 @@ masterlist huntId queryD = do
         divClass "chat-sidebar" $ chatWidget "flex flex-col flex-grow p-4 overflow-y-scroll"
         
         let (cliErrors, cmdSel) = parseCli Nothing cmdString
-        requestingSimpleCommands cmdSel
+        errs <- requestingSimpleCommands cmdSel
         _ <- requestingIdentity $ attachWithMaybe (\c a -> case c of { Just c' -> Just $ ApiRequest_Private () $ PrivateRequest_SendMe c' a; Nothing -> Nothing; }) (current mcid) $ select cmdSel CliCommandTag_Me -- attachWithMaybe (\c m -> mkMsgReq c m) (current mcid) msgString
-        pure cliErrors
+        pure $ cliErrors <> errs
 
           
     , _framed_layout = \ (MenuSettings layout) tab -> (\t l -> if t == MasterlistPage_Chat then MutedChat else l) <$> tab <*> layout
@@ -461,9 +461,9 @@ puzzle puz = do
             divClass "chat-sidebar" $ chatWidget "flex flex-col flex-grow p-4 overflow-y-scroll"
 
             let (cliErrors, cmdSel) = parseCli (Just puz) cmd
-            requestingSimpleCommands cmdSel
+            errs <- requestingSimpleCommands cmdSel
             _ <- requestingIdentity $ attachWithMaybe (\c a -> case c of { Just c' -> Just $ ApiRequest_Private () $ PrivateRequest_SendMe c' a; Nothing -> Nothing; }) (current mcid) $ select cmdSel CliCommandTag_Me -- attachWithMaybe (\c m -> mkMsgReq c m) (current mcid) msgString
-            pure cliErrors
+            pure $ cliErrors <> errs
         , _framed_layout = \ (MenuSettings layout) tab -> (\t l -> if t == PuzzlePageTab_Chat then MutedChat else l) <$> tab <*> layout
         }
 

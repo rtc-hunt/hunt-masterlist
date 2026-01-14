@@ -155,20 +155,24 @@ puzzleConfigurator PuzzleConfiguratorConfig
               addMeta <- dropdown Nothing ((<> Nothing =: "Add Meta") . Map.mapKeys Just <$> metas) $ def
               pure (MetapuzzleId <$> current (puzData >>= fmap primaryKey . _puzzleData_puzzle) <@> (switchDyn $ leftmost . Map.elems . imap (\i evt -> i <$ evt) <$> removeEvts), fmapMaybe id ( _dropdown_change addMeta))
       (removeTagEvents, addTag) <- divClass "ui vertical segment" $ do
-            el "h2" $ text "Tags"
+            el "h2" $ text "Tags and Statuses"
             removeTagEvents <- divClass "ui basic segment" $ do
               listWithKey (puzData >>= _puzzleData_tags) $ \tag _ -> elClass "span" "item" $ do
                 elAttr "span" ("class" =: "ui left labeled button") $ do
                   divClass "ui large label" $ text $ tag
                   buttonClassIcon "ui tiny icon button" "minus square icon"
-            addTag <- dropdown Nothing ((<> Nothing =: "Add Tag") . Map.mapKeys Just . Map.fromSet id <$> knownTags) $ def
+            addTag1 <- dropdown Nothing (constDyn ((<> Nothing =: "Add Status") $ Map.mapKeys Just $ Map.fromSet id statusTags)) $ def
+            el "br" blank
+            addTag2 <- dropdown Nothing ((<> Nothing =: "Add Tag") . Map.mapKeys Just . Map.fromSet id <$> knownTags) $ def
+            el "br" blank
             ipt <- inputElement $ def -- & inputElementConfig_ .~ 
             --  & inputElementConfig_setValue .~ ("" <$ e)
             addE <- button "add"
 
             pure ((switchDyn $ leftmost . Map.elems . imap (\i evt -> i <$ evt) <$> removeTagEvents)
                  , leftmost 
-                   [ fmapMaybe id (_dropdown_change addTag)
+                   [ fmapMaybe id (_dropdown_change addTag1)
+                   , fmapMaybe id (_dropdown_change addTag2)
                    , current (_inputElement_value ipt) <@ addE
                    ])
       (newNote, setNoteVisibility) <- divClass "ui vertical segment" $ do
