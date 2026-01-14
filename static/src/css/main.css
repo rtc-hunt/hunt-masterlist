@@ -372,3 +372,23 @@ select {
     padding: revert;
 }
 
+dialog {
+    border-radius: 1em;
+    border: 3px solid darkgray;
+    padding: 2em;
+}
+dialog > * {
+    margin: 1em;
+}
+dialog > h1 {
+    border-bottom: 2px solid grey !important;
+}
+.commandOutput {
+    width:100%;
+    position: relative !important;
+}
+
+textarea {
+    border-radius: 0.5em !important;
+    border: 1px solid grey !important;
+}

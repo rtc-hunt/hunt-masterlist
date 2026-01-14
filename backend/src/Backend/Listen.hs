@@ -15,6 +15,7 @@ import Data.Text
 import Data.These
 import Data.These.Combinators
 import Data.Time
+import Data.Default
 import Data.Vessel
 import Database.Beam
 import Database.Beam.Postgres
@@ -48,6 +49,7 @@ data Notify a where
   Notify_Note :: Notify (Change Note)
   Notify_Meta :: Notify (Change Metapuzzle)
   Notify_ActiveUser :: Notify (Id ActiveUser)
+  Notify_UserSettings :: Notify (Id UserSettingsTable)
 
 deriveArgDict ''Notify
 deriveJSONGADT ''Notify
@@ -80,6 +82,9 @@ instance HasChangeNotification Notify Metapuzzle where
 
 instance HasNotification Notify ActiveUser where
   notification _ = Notify_ActiveUser
+
+instance HasNotification Notify UserSettingsTable where
+  notification _ = Notify_UserSettings
 
 getChatroom  :: Id Chatroom -> Pg (Maybe (Chatroom Identity))
 getChatroom = runSelectReturningOne . lookup_ (_db_chatroom db)
@@ -289,6 +294,7 @@ privateNotifyHandler pool nm v = case _dbNotification_message nm of
             (Just p, Just u) | Map.member (_activeUser_chat p) cids && _activeUser_openCount p > 0 -> MapV $ Map.singleton (_activeUserId_chat auid) $ pure $ SemiMap_Partial $ Map.singleton (_activeUserId_user auid) $ First (Just $ _account_name u)
             (Just p, Just u) | Map.member (_activeUser_chat p) cids -> MapV $ Map.singleton (_activeUserId_chat auid) $ pure $ SemiMap_Partial $ Map.singleton (_activeUserId_user auid) $ First Nothing
             _ -> emptyV
+  Notify_UserSettings :/ _ -> pure emptyV
   where 
     nt = _dbNotification_notificationType nm
     byForeignKey 
@@ -374,4 +380,15 @@ personalNotifyHandler
   -> DbNotification Notify
   -> HMLPersonalV (Compose (Map.MonoidalMap (Id Account)) Proxy)
   -> IO (HMLPersonalV (Compose (Map.MonoidalMap (Id Account)) Identity))
-personalNotifyHandler pool nm v = return mempty -- case _dbNotification_message nm of
+personalNotifyHandler pool nm v = case _dbNotification_message nm of
+  Notify_UserSettings :/ theId -> buildV v $ \case
+    PV_Settings -> \kv -> do -- flip fmap (fromMaybe mempty $ lookupSingleV kv) $ \(k :: _) -> do
+     let k :: [PrimaryKey Account Identity]
+         k = Map.keys $ getCompose $ unSingleV kv
+     qq <- runDb pool $ runSelectReturningList $ select $ do
+       us <- all_ (_db_userSettings db)
+       guard_ $ primaryKey us ==. val_ theId
+       pure (_userSettings_account us, _us_v us)
+     let withDefaults = (Identity . First . Just <$> Map.fromList qq) --  <> ((Identity . First . Just $ def) <$ getCompose (unSingleV kv))
+     pure $ SingleV $ Compose $ withDefaults
+  _ -> pure emptyV

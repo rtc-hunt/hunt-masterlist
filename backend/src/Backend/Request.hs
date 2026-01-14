@@ -21,9 +21,11 @@ import Data.Pool
 import Data.Signed (Signed)
 import Data.Signed.ClientSession
 import Data.Text (Text)
+import Data.Dependent.Sum
 import Database.Beam
 import Database.Beam.Postgres
 import Database.Beam.Postgres.Full hiding (insert)
+import qualified Database.Beam.Postgres.Full as Pg
 import Database.PostgreSQL.Simple
 import Database.PostgreSQL.Simple.Class
 import System.IO (stderr)
@@ -152,7 +154,9 @@ requestHandler pool csk authAudience allowForcedLogins = RequestHandler $ \case
               Nothing -> Left "Couldn't create hunt"
               Just cid -> Right cid
       PrivateRequest_SaveSettings newSettings -> auth $ \user -> runDb pool $ do
-        _ <- runInsert $ insertOnConflict (_db_userSettings db)
+        traceM "Saving settings"
+        let toNotify = map $ \x -> notification (_db_userSettings db) :=> Identity x
+        _ <- runPgInsertReturningListWithNotify toNotify $ flip Pg.returning primaryKey $ insertOnConflict (_db_userSettings db)
                (insertValues [UserSettingsTable (user) (newSettings)])
                (conflictingFields $ \tbl -> primaryKey tbl)
                (onConflictUpdateSet (\fields old -> fields <-. val_ (UserSettingsTable user newSettings)))
@@ -164,7 +168,10 @@ requestHandler pool csk authAudience allowForcedLogins = RequestHandler $ \case
         _ <- deleteAndNotifyChange (_db_tags db) $ TagId pzl tag
         pure $ Right ()
       PrivateRequest_PuzzleCommand (PuzzleCommand_Note pzl note) -> auth $ \_user -> runDb pool $ do
-        _ <- insertAndNotifyChange (_db_notes db) $ Note default_ (val_ pzl) (val_ note)
+        _ <- insertAndNotifyChange (_db_notes db) $ Note default_ (val_ pzl) (val_ note) (val_ True)
+        pure $ Right ()
+      PrivateRequest_PuzzleCommand (PuzzleCommand_SetNoteVisibility (note, vis)) -> auth $ \_user -> runDb pool $ do
+        _ <- updateAndNotifyChange (_db_notes db) note $ (\n -> _note_active n <-. val_ vis)
         pure $ Right ()
       PrivateRequest_PuzzleCommand (PuzzleCommand_Solve pzl solution isBack) -> auth $ \_user -> runDb pool $ do
         _ <- insertAndNotifyChange (_db_solves db) $ Solution (val_ pzl) (val_ solution) (val_ isBack)

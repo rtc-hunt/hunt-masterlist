@@ -12,6 +12,7 @@ import Data.Int
 import Data.Time
 import Database.Beam
 import Database.Beam.AutoMigrate hiding (zipTables, Table)
+import Database.Beam.Schema ( dbModification )
 import Database.Beam.Backend.SQL.Types
 import Database.Beam.Postgres
 import Database.PostgreSQL.Simple.FromField
@@ -41,7 +42,8 @@ db :: DatabaseSettings Postgres Db
 db = defaultDbSettings
 
 dbAnn :: AnnotatedDatabaseSettings Postgres Db
-dbAnn = defaultAnnotatedDbSettings db
+dbAnn = defaultAnnotatedDbSettings db `withDbModification` dbModification
+          { _db_notes = annotateTableFields tableModification { _note_active = defaultsTo (val_ True) } }
 
 runMigrations :: Connection -> IO ()
 runMigrations conn = do

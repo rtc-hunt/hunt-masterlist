@@ -41,6 +41,8 @@ import Rhyolite.Vessel.Path as P
 import Data.Map.Monoidal as MMap hiding (keys)
 import Data.Functor.Misc (Const2(..))
 import Rhyolite.SemiMap
+import Language.Javascript.JSaddle hiding (MonadJSM)
+import GHCJS.DOM.Node (toNode, IsNode)
 
 import Frontend.Types
 import Rhyolite.Frontend.Auth.App
@@ -73,6 +75,7 @@ import Frontend.Types
 import Frontend.Utils
 import Frontend.Patch
 import Frontend.SortSelect
+import Frontend.UserSettings
 
 import Control.Monad.Fix
 
@@ -102,7 +105,9 @@ puzzles :: (Monad m, MonadFix m, Reflex t, Routed t (Id Hunt, Either PuzzleQuery
      , RouteToUrl (R FrontendRoute) (Client m)
      , AuthenticatedMonadQuery t m
      , AuthReq t m
+     , AuthReq t (Client m)
      , MonadReader (Dynamic t (UserSettings Identity)) m
+     , MonadReader (Dynamic t (UserSettings Identity)) (Client m)
   ) => m (Event t ())
 puzzles = do
   routeD <- askRoute
@@ -134,9 +139,12 @@ masterlist :: (Monad m, MonadHold t m, PostBuild t m, Reflex t, DomBuilder t m, 
      , SetRoute t (R FrontendRoute) (Client m)
      , Prerender t m
      , MonadIO (Performable m)
+     , MonadJSM (Performable (Client m))
      , AuthReq t m
+     , AuthReq t (Client m)
      , AuthenticatedMonadQuery t m
      , MonadReader (Dynamic t (UserSettings Identity)) m
+     , MonadReader (Dynamic t (UserSettings Identity)) (Client m)
   )
   => Id Hunt -> Dynamic t PuzzleQuery -> m ()
 masterlist huntId queryD = do
@@ -146,6 +154,7 @@ masterlist huntId queryD = do
   manageDocumentTitle $ ("Hunt Master List " <>) . review puzzleQueryStringOrPuzzle_prism . Left <$> queryD
   framed $ Framed
     { _framed_hunt = constDyn huntId
+    , _framed_settingspanel = userSettingsPanel
     , _framed_headerItems = mdo
             let tabs = [MasterlistPage_List .. MasterlistPage_Chat]
             evts <- fmap (zipWith (<$) tabs) $ 
@@ -242,16 +251,16 @@ masterlist huntId queryD = do
                   Right newPuzzle -> Just ( FrontendRoute_Puzzle :/ ( huntId, Right newPuzzle) )
                 blank
         divClass "chat-sidebar" $ chatWidget "flex flex-col flex-grow p-4 overflow-y-scroll"
+        
         let (cliErrors, cmdSel) = parseCli Nothing cmdString
-        clearErrors <- fmap switchDyn $ prerender (return never) $ debounce 10 $ "" <$ cliErrors
-        lastError <- holdDyn "" $ leftmost [cliErrors, clearErrors]
         requestingSimpleCommands cmdSel
         _ <- requestingIdentity $ attachWithMaybe (\c a -> case c of { Just c' -> Just $ ApiRequest_Private () $ PrivateRequest_SendMe c' a; Nothing -> Nothing; }) (current mcid) $ select cmdSel CliCommandTag_Me -- attachWithMaybe (\c m -> mkMsgReq c m) (current mcid) msgString
-        elClass "pre" "commandOutput" $ dynText lastError
+        pure cliErrors
 
           
     , _framed_layout = \ (MenuSettings layout) tab -> (\t l -> if t == MasterlistPage_Chat then MutedChat else l) <$> tab <*> layout
     }
+    
 
 huntselect :: (Monad m, MonadHold t m, PostBuild t m, Reflex t, DomBuilder t m, MonadFix m
      , SetRoute t (R FrontendRoute) m, RouteToUrl (R FrontendRoute) m, Prerender t m
@@ -263,6 +272,7 @@ huntselect :: (Monad m, MonadHold t m, PostBuild t m, Reflex t, DomBuilder t m, 
      , SetRoute t (R FrontendRoute) (Client m)
      , Prerender t m
      , MonadIO (Performable m)
+     , MonadJSM (Performable (Client m))
      , AuthenticatedMonadQuery t m
   )
   => m (Event t ())
@@ -313,6 +323,7 @@ buildHunt
      , MonadIO (Performable m)
      , AuthenticatedMonadQuery t m
      , AuthReq t m
+     , AuthReq t (Client m)
      )
 --  :: ( Reflex t
 --     , Monad m
@@ -348,9 +359,9 @@ manageDocumentTitle
       )
    => Dynamic t Text
    -> m ()
-manageDocumentTitle titleD = do
+manageDocumentTitle titleD = prerender_ blank $ do
       pb <- getPostBuild
-      prerender_ blank $ performEvent_ $ ffor (leftmost [updated titleD, current titleD <@ pb ]) $ \title -> do
+      performEvent_ $ ffor (leftmost [updated titleD, current titleD <@ pb ]) $ \title -> do
         doc <- currentDocumentUnchecked
         setTitle doc title
 
@@ -365,9 +376,12 @@ puzzle :: (Monad m, Reflex t, DomBuilder t m
      , MonadJSM (Performable (Client m))
      , Prerender t m
      , MonadIO (Performable m)
+     , MonadJSM (Performable (Client m))
      , AuthenticatedMonadQuery t m
      , AuthReq t m
+     , AuthReq t (Client m)
      , MonadReader (Dynamic t (UserSettings Identity)) m
+     , MonadReader (Dynamic t (UserSettings Identity)) (Client m)
   ) => Id Puzzle -> m ()
 puzzle puz = do
   puzzleDataDM <- (puzzleBuilder $ constDyn puz) >>= maybeDyn
@@ -381,6 +395,7 @@ puzzle puz = do
       manageDocumentTitle $ ("H.M.L.: " <>) . _puzzle_Title <$> (puzzleData >>= _puzzleData_puzzle)
       framed $ Framed
         { _framed_hunt = huntId
+        , _framed_settingspanel = userSettingsPanel
         , _framed_headerItems = mdo
             evts <- fmap (zipWith (<$) puzzlePageTabs) $ 
              sequence $ ffor puzzlePageTabs $ \tab ->
@@ -421,13 +436,6 @@ puzzle puz = do
                             Nothing -> Nothing
                             Just c' -> Just $ ApiRequest_Private () $ PrivateRequest_SendMessage c' m
             _ <- requestingIdentity $ attachWithMaybe (\c m -> mkMsgReq c m) (current mcid) newMsg
-            
-            let (cliErrors, cmdSel) = parseCli (Just puz) cmd
-            clearErrors <- fmap switchDyn $ prerender (return never) $ debounce 10 $ "" <$ cliErrors
-            lastError <- holdDyn "" $ leftmost [cliErrors, clearErrors]
-            requestingSimpleCommands cmdSel
-            _ <- requestingIdentity $ attachWithMaybe (\c a -> case c of { Just c' -> Just $ ApiRequest_Private () $ PrivateRequest_SendMe c' a; Nothing -> Nothing; }) (current mcid) $ select cmdSel CliCommandTag_Me -- attachWithMaybe (\c m -> mkMsgReq c m) (current mcid) msgString
-
 
             puzzleView PuzzleConfig
               { _puzzleConfig_puzzle = puzzleData
@@ -447,10 +455,15 @@ puzzle puz = do
                   _ <- requestingIdentity $ ApiRequest_Private () . PrivateRequest_PuzzleCommand . PuzzleCommand_Tag puz <$> _puzzleConfiguratorOut_addTag cfgOut
                   _ <- requestingIdentity $ ApiRequest_Private () . PrivateRequest_PuzzleCommand . PuzzleCommand_Untag puz <$> _puzzleConfiguratorOut_removeTag cfgOut
                   _ <- requestingIdentity $ ApiRequest_Private () . PrivateRequest_PuzzleCommand . PuzzleCommand_Note puz <$> _puzzleConfiguratorOut_addNote cfgOut
+                  _ <- requestingIdentity $ ApiRequest_Private () . PrivateRequest_PuzzleCommand . PuzzleCommand_SetNoteVisibility <$> _puzzleConfiguratorOut_setNoteVisibility cfgOut
                   blank
               }
             divClass "chat-sidebar" $ chatWidget "flex flex-col flex-grow p-4 overflow-y-scroll"
-            elClass "pre" "commandOutput" $ dynText lastError
+
+            let (cliErrors, cmdSel) = parseCli (Just puz) cmd
+            requestingSimpleCommands cmdSel
+            _ <- requestingIdentity $ attachWithMaybe (\c a -> case c of { Just c' -> Just $ ApiRequest_Private () $ PrivateRequest_SendMe c' a; Nothing -> Nothing; }) (current mcid) $ select cmdSel CliCommandTag_Me -- attachWithMaybe (\c m -> mkMsgReq c m) (current mcid) msgString
+            pure cliErrors
         , _framed_layout = \ (MenuSettings layout) tab -> (\t l -> if t == PuzzlePageTab_Chat then MutedChat else l) <$> tab <*> layout
         }
 
@@ -570,6 +583,8 @@ puzzleListBuilder hunt pqD = do
   let queryD = allTheThingsQuery <$> puzzleIds2 <*> channels
   puzDataD <- watch $ queryD
 
+  let filterHiddenNotes note = if _note_active note then Just note else Nothing
+
   let 
    puzzlesDUnsorted = ffor puzDataD $ \puzzles -> (flip Map.mapWithKey) (fromMaybe mempty puzzles) $ \puzId (puz, metas, tags, solutions, notes, currentSolvers) ->
     PuzzleData
@@ -578,7 +593,7 @@ puzzleListBuilder hunt pqD = do
       , _puzzleData_metas = metas -- (constDyn $ getMonoidalMap $ fromMaybe mempty $ getComplete metas)
       , _puzzleData_tags = Map.mapKeys _tagId_Tag $ fmap (const ()) $ fromMaybe mempty $ fmap getMonoidalMap $ getComplete $ tags
       , _puzzleData_solutions = fromMaybe mempty $ fmap getMonoidalMap $ getComplete $ solutions
-      , _puzzleData_notes = fromMaybe mempty $ fmap getMonoidalMap $ getComplete $ notes
+      , _puzzleData_notes = fromMaybe mempty $ fmap (fmapMaybe filterHiddenNotes . getMonoidalMap) $ getComplete $ notes
       , _puzzleData_currentSolvers = fromMaybe mempty $ fmap getMonoidalMap $ getComplete $ currentSolvers
       }
 

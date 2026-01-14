@@ -21,6 +21,7 @@ library
                , constraints-extras
                , containers
                , data-default
+               , dependent-sum
                , frontend
                , jose
                , monoidal-containers

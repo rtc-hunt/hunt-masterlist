@@ -1,6 +1,8 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Templates.Frame where
 
 import Reflex.Dom.Core
+import Reflex.Dom.Builder.Class(Element(..))
 import Reflex
 import Control.Monad.Fix
 import Data.Text (Text)
@@ -10,7 +12,11 @@ import Common.Route
 import Control.Monad.Reader
 import Data.Functor.Identity
 import Common.Schema
+import Control.Lens ((^.))
+import Language.Javascript.JSaddle
 import Frontend.Utils
+import GHCJS.DOM.Node (toNode, IsNode)
+import Data.Maybe
 
 data TabLayout
   = FullTab
@@ -24,9 +30,10 @@ data MenuSettings t = MenuSettings
 
 data Framed m t a = Framed
   { _framed_headerItems :: m (a)
-  , _framed_body :: a -> Event t Text -> Event t Text -> MenuSettings t -> m ()
+  , _framed_body :: a -> Event t Text -> Event t Text -> MenuSettings t -> m (Event t Text)
   , _framed_layout :: MenuSettings t -> a -> Dynamic t TabLayout
   , _framed_hunt :: Dynamic t (Id Hunt)
+  , _framed_settingspanel :: (Client m) (Event t ())
   }
 
 reloadingRouteLink :: (Monad m, DomBuilder t m, MonadFix m, SetRoute t (R FrontendRoute) m, RouteToUrl (R FrontendRoute) m, PostBuild t m, MonadHold t m, Prerender t m) => Dynamic t (R FrontendRoute) -> m () -> m ()
@@ -34,12 +41,14 @@ reloadingRouteLink routeD a = do
     toUrl <- askRouteToUrl
     elDynAttr "a" ((\route -> "href" =: (toUrl $ route)) <$> routeD) $ a
 
-framed :: (Monad m, DomBuilder t m, MonadFix m, SetRoute t (R FrontendRoute) m, RouteToUrl (R FrontendRoute) m, PostBuild t m, MonadHold t m, Prerender t m, MonadReader (Dynamic t (UserSettings Identity)) m) => Framed m t a -> m ()
+framed :: (Monad m, DomBuilder t m, MonadFix m, SetRoute t (R FrontendRoute) m, RouteToUrl (R FrontendRoute) m, PostBuild t m, MonadHold t m, Prerender t m, MonadReader (Dynamic t (UserSettings Identity)) m, MonadReader (Dynamic t (UserSettings Identity)) (Client m), PerformEvent t m, MonadJSM (Performable (Client m)))
+   => Framed m t a -> m ()
 framed Framed
   { _framed_headerItems = header
   , _framed_body = body
   , _framed_layout = layout
   , _framed_hunt = huntId
+  , _framed_settingspanel = userSettingsPanel
   }
   = mdo
     (menuStuff, a) <- elClass "nav" "app ui fixed inverted menu" $ mdo
@@ -50,6 +59,12 @@ framed Framed
 
 
       rv <- header
+      dialogResult <- prerender (pure Nothing) $ fmap (Just) $ elAttr' "dialog" ("id" =: "myModal" <> "closedby" =: "any") $ do
+         userSettingsPanel
+      let dialogEl = fmap (fmap fst) dialogResult
+      prerender blank $
+         performEvent_ $ fmapMaybe (fmap $ \dialogEl -> (void $ liftJSM $ (pToJSVal $ toNode $ _element_raw $ dialogEl) ^. js0 ("close"::Text))) $ current dialogEl <@ switch (current $ fromMaybe never . fmap snd <$> dialogResult)
+      
       (menuElem, (layoutD, menuOpenD)) <- elClass "div" "right menu" $ elDynAttr' "div" (ffor menuOpenD $ \c -> "class" =: ("ui icon top right dropdown button item " <> c)) $ do
         openToggle <- elClass' "i" "dropdown icon p-4" blank
         isOpen <- toggle False $ () <$ domEvent Click menuElem
@@ -61,9 +76,12 @@ framed Framed
               False -> ""
         menuRes <- elDynAttr "div" (ffor menuItemOpenClass $ \c -> "class" =: ("menu " <> c)) $ do
           userSettings <- ask
-          switchLayout <- elClass "div" "item" $ semToggle "Show Chat" (constDyn False) -- (_userSettings_chatSidebar <$> userSettings)
-          muteChat <- elClass "div" "item" $ semToggle "Mute Chat" (constDyn False) -- (_userSettings_chatMuted <$> userSettings)
-          divClass "item" $ text "Settings"
+          switchLayout <- elClass "div" "item" $ semToggleOverride "Show Chat" (_userSettings_chatSidebar <$> userSettings)
+          muteChat <- elClass "div" "item" $ semToggleOverride "Mute Chat" (_userSettings_chatMuted <$> userSettings)
+ 
+          (showSettingsBtn, _) <- elClass' "div" "item" $ text "Settings"
+          prerender blank $
+             performEvent_ $ fmapMaybe (fmap $ \dialogEl -> (void $ liftJSM $ (pToJSVal $ toNode $ _element_raw $ dialogEl) ^. js0 ("showModal"::Text))) $ current dialogEl <@ (domEvent Click showSettingsBtn)
           -- switchLayout <- button "Switch layout" >>= toggle False
           -- muteChat <- button "Mute Chat" >>= toggle False
           let layoutD = ffor ((,) <$> muteChat <*> switchLayout) $ \case
@@ -77,19 +95,31 @@ framed Framed
       return (layoutD, rv)
 
     divClass "appMain" $ elDynAttr "div" (("class" =:) . T.pack . show <$> layout menuStuff a) $ mdo
-      body a msg cmd menuStuff
-      (msg, cmd) <- chatInput "Send a message..."
+      cmdResults <- body a msg cmd menuStuff
+      commandOutputWidget cmdResults esc
+      (msg, cmd, esc) <- chatInput "Send a message..."
       pure ()
     pure ()
 
-chatInput :: (DomBuilder t m, MonadFix m) => Text -> m (Event t Text, Event t Text)
+
+commandOutputWidget cliErrors esc = prerender_ blank $ do
+        clearErrors <- fmap switchDyn $ prerender (return never) $ debounce 10 $ "" <$ cliErrors
+        lastError <- holdDyn "" $ leftmost [cliErrors, clearErrors, "" <$ esc]
+        -- lastError <- holdDyn "" cliErrors
+        (el, _) <- elAttr' "pre" ("class" =: "commandOutput") $ dynText lastError
+        blank
+        -- performEvent_ $ (liftIO $ putStrLn "cliErrors called") <$ cliErrors
+        -- performEvent_ $ (void $ liftJSM $ (toNode $ _element_raw el) ^. js0 ("showPopover" :: Text)) <$ cliErrors
+
+chatInput :: (DomBuilder t m, MonadFix m) => Text -> m (Event t Text, Event t Text, Event t ())
 chatInput placeholder = do
   rec i <- inputElement $ def
-        & initialAttributes .~ ("placeholder" =: placeholder <> "class" =: "chatInput" <> "tabindex" =: "1")
+        & initialAttributes .~ ("placeholder" =: placeholder <> "class" =: "chatInput" <> "tabindex" =: "1" <> "popovertarget" =: "cliOutput")
         & inputElementConfig_setValue .~ ("" <$ e)
       let e = leftmost [keypress Enter i]
+      let esc = keypress Escape i
   let v  = current $ value i
       enteredE = gate (not . T.null <$> v) $ v <@ e
       chatMessage = ffilter (not . T.isPrefixOf "/") enteredE
       textCmd = fmapMaybe (T.stripPrefix "/") enteredE
-  return (chatMessage, textCmd)
+  return (chatMessage, textCmd, esc)

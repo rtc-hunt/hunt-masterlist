@@ -56,10 +56,13 @@ library
     Frontend.Channel
     Frontend.ChannelList
     Frontend.Cli
+    Frontend.Patch
     Frontend.Puzzle
     Frontend.SortSelect
     Frontend.Types
+    Frontend.UserSettings
     Frontend.Utils
+    Frontend.ViewCache
     TemplateViewer
     Templates
     Templates.Channel

@@ -38,7 +38,15 @@ semToggle theLabel isCheckedD =
     el "label" $ text theLabel
     return $ _inputElement_checked ie
 
-
+semToggleOverride theLabel isCheckedD =
+  divClass "field" $ divClass "ui toggle checkbox" $ mdo
+    isChecked <- sample $ current isCheckedD
+    notLocallySet <- hold True $ False <$ _inputElement_checkedChange ie
+    ie <- inputElement $ def & inputElementConfig_elementConfig . elementConfig_initialAttributes .~ ("type" =: "checkbox")
+                             & inputElementConfig_initialChecked .~ isChecked
+                             & inputElementConfig_setChecked .~ gate notLocallySet (updated isCheckedD)
+    el "label" $ text theLabel
+    return $ _inputElement_checked ie
 
 data ConfiguratorField t m a = ConfiguratorField (Dynamic t a -> m (Dynamic t a))
 

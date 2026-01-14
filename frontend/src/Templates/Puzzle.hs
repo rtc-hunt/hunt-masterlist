@@ -5,6 +5,7 @@ module Templates.Puzzle where
 
 import Data.Default
 import Data.Text
+import qualified Data.Char
 import qualified Data.ByteString.Lazy as LBS
 import Data.Text.Encoding as T
 import Data.Map (Map)
@@ -85,6 +86,7 @@ data PuzzleConfiguratorOut t = PuzzleConfiguratorOut
   , _puzzleConfiguratorOut_addTag :: Event t (Text)
   , _puzzleConfiguratorOut_removeTag :: Event t Text
   , _puzzleConfiguratorOut_addNote :: Event t Text
+  , _puzzleConfiguratorOut_setNoteVisibility :: Event t (Id Note, Bool)
   }
 
 backsolve1 :: DomBuilder t m => m ()
@@ -169,12 +171,19 @@ puzzleConfigurator PuzzleConfiguratorConfig
                    [ fmapMaybe id (_dropdown_change addTag)
                    , current (_inputElement_value ipt) <@ addE
                    ])
-      newNote <- divClass "ui vertical segment" $ do
+      (newNote, setNoteVisibility) <- divClass "ui vertical segment" $ do
             el "h2" $ text "Notes"
-            newNote <- el "div" $ textAreaElement $ def & textAreaElementConfig_elementConfig . elementConfig_initialAttributes .~ ("class" =: "w-full")
-            addNoteButton <- button "Add Note"
-            listWithKey (puzData >>= _puzzleData_notes) $ \id note -> elClass "div" "border-solid p-4 border-black rounded border-2" $ dynText $ _note_Note <$> note
-            pure (current (_textAreaElement_value newNote) <@ addNoteButton)
+            newNote <- elClass "div" "ui form" $ textAreaElement $ def & textAreaElementConfig_elementConfig . elementConfig_initialAttributes .~ ("class" =: "w-full")
+            addNoteButton <- buttonClass "ui button right aligned" "Add Note"
+            hideButtons <- listWithKey (puzData >>= _puzzleData_notes) $ \id note -> elClass "div" "border-solid p-4 border-black rounded border-2 flex" $ do
+                dynText $ _note_Note <$> note
+                click <- fmap (domEvent Click . fst) $ elClass' "button" "ui button right aligned" $ dynText $ ffor (_note_active <$> note) $ \case
+                      True -> "Hide Note"
+                      False -> "Show Note"
+                pure $ (not . _note_active <$> current note) <@ click
+            let newNoteE = fmapMaybe (\a -> if (Data.Text.all Data.Char.isSpace a) then Nothing else Just a) (current (_textAreaElement_value newNote) <@ addNoteButton)
+            let setNoteVisibility = switch $ current $ ffor hideButtons $ \m -> leftmost $ ffor (toList m) $ (\(k, v) -> ((,) k) <$> v)
+            pure (newNoteE, setNoteVisibility)
       return $ PuzzleConfiguratorOut
         { _puzzleConfiguratorOut_puzzle = updatePuzzle
         , _puzzleConfiguratorOut_addSolution = addSolution
@@ -184,6 +193,7 @@ puzzleConfigurator PuzzleConfiguratorConfig
         , _puzzleConfiguratorOut_addTag = addTag
         , _puzzleConfiguratorOut_removeTag = removeTagEvents
         , _puzzleConfiguratorOut_addNote = newNote
+        , _puzzleConfiguratorOut_setNoteVisibility = setNoteVisibility
         }
 
 -- | A widget to construct a tabbed view that shows only one of its child widgets at a time.

@@ -130,7 +130,7 @@ puzzleListTemplateViewer = do
     _puzzleData_metas = constDyn $ PuzzleId 2 =: "Noodle Bowl" <> PuzzleId 3 =: "Cheezeburger",
     _puzzleData_tags = constDyn $ "Oddball" =: () <> "Extraction" =: (),
     _puzzleData_solutions = constDyn $ Map.fromList $ (\a -> (primaryKey a, a)) <$> [Solution (PuzzleId 1) "JEANLUCPICARD" False, Solution (PuzzleId 1) "LOMEIN" True],
-    _puzzleData_notes = constDyn $ Map.fromList $ (\a -> (primaryKey a, a)) <$> [Note 1 (PuzzleId 1) "WTF is up with this pasta?"],
+    _puzzleData_notes = constDyn $ Map.fromList $ (\a -> (primaryKey a, a)) <$> [Note 1 (PuzzleId 1) "WTF is up with this pasta?" True],
     _puzzleData_currentSolvers = constDyn $ AccountId 1 =: "jonored" <> AccountId 2 =: "tuttleturtle",
     _puzzleData_status = constDyn ["InProgress"]
     }) ] -}
@@ -146,7 +146,7 @@ fakePuzzles = Map.fromList [ (PuzzleId 1, PuzzleData {
     _puzzleData_metas = constDyn $ PuzzleId 2 =: "Noodle Bowl" <> PuzzleId 3 =: "Cheezeburger",
     _puzzleData_tags = constDyn $ "Oddball" =: () <> "Extraction" =: (),
     _puzzleData_solutions = constDyn $ Map.fromList $ (\a -> (primaryKey a, a)) <$> [Solution (PuzzleId 1) "JEANLUCPICARD" False, Solution (PuzzleId 1) "LOMEIN" True],
-    _puzzleData_notes = constDyn $ Map.fromList $ (\a -> (primaryKey a, a)) <$> [Note 1 (PuzzleId 1) "WTF is up with this pasta?"],
+    _puzzleData_notes = constDyn $ Map.fromList $ (\a -> (primaryKey a, a)) <$> [Note 1 (PuzzleId 1) "WTF is up with this pasta?" True],
     _puzzleData_currentSolvers = constDyn $ AccountId 1 =: "jonored" <> AccountId 2 =: "tuttleturtle" -- ,
     -- _puzzleData_status = constDyn "InProgress"
     }) ]

@@ -205,6 +205,7 @@ data Note f = Note
   { _note_id :: Columnar f (SqlSerial Int64)
   , _note_Puzzle :: (PrimaryKey Puzzle f)
   , _note_Note :: Columnar f Text
+  , _note_active :: Columnar f Bool
   }
   deriving (Generic, Beamable)
 
