@@ -121,13 +121,15 @@ data MasterlistPage
   = MasterlistPage_List
   | MasterlistPage_HuntPage
   | MasterlistPage_Chat
-  deriving (Enum, Ord, Eq)
+  | MasterlistPage_Info
+  deriving (Enum, Ord, Eq, Bounded)
 
 masterlistPageToText :: MasterlistPage -> Text
 masterlistPageToText = \case
   MasterlistPage_List -> "List"
   MasterlistPage_HuntPage -> "Hunt Frontpage"
   MasterlistPage_Chat -> "Chat"
+  MasterlistPage_Info -> "Info/Help"
 
 masterlist :: (Monad m, MonadHold t m, PostBuild t m, Reflex t, DomBuilder t m, MonadFix m
      , SetRoute t (R FrontendRoute) m, RouteToUrl (R FrontendRoute) m, Prerender t m, RouteToUrl (R FrontendRoute) (Client m)
@@ -156,7 +158,7 @@ masterlist huntId queryD = do
     { _framed_hunt = constDyn huntId
     , _framed_settingspanel = userSettingsPanel
     , _framed_headerItems = mdo
-            let tabs = [MasterlistPage_List .. MasterlistPage_Chat]
+            let tabs :: [MasterlistPage] = [minBound .. maxBound] -- [MasterlistPage_List .. MasterlistPage_Info]
             evts <- fmap (zipWith (<$) tabs) $ 
              sequence $ ffor tabs $ \tab ->
               let itemClass = ffor activeTab $ \aTab ->
@@ -169,7 +171,7 @@ masterlist huntId queryD = do
                                 lattr = ((\l -> ("target":: Text) =: "_blank" <> "href" =: l) <$> lnk)
                             elDynAttr "a" lattr $ elClass "i" "external alternate icon px-4" $ blank
                          _ -> blank
-            activeTab :: Dynamic t MasterlistPage <- holdDyn MasterlistPage_List $ leftmost $ zipWith (<$) [MasterlistPage_List, MasterlistPage_HuntPage, MasterlistPage_Chat] evts
+            activeTab :: Dynamic t MasterlistPage <- holdDyn MasterlistPage_List $ leftmost $ zipWith (<$) tabs evts
             -- activeSolverList puzId puzzlesData
             return $ activeTab
     , _framed_body = \(activeTab :: Dynamic t MasterlistPage) msgString cmdString _ -> do
@@ -191,6 +193,7 @@ masterlist huntId queryD = do
         
         myTabDisplay "ui top attached tabular menu" "activeTab" activeTab $
           MasterlistPage_List =: ("List", do
+            blank
             puzzleListI <- puzzleListBuilder huntId queryD
             performEvent_ $ (liftIO (Data.Time.Clock.getCurrentTime >>= (print . ((,) "puzzleListD updated: ")))) <$ updatedIncremental puzzleListI
             {- prerender_ (
@@ -224,6 +227,9 @@ masterlist huntId queryD = do
               )
            <> MasterlistPage_Chat =: ("Chat",
                       chatWidget "ui container p-4 flex-grow flex flex-col overflow-y-scroll"
+                 )
+           <> MasterlistPage_Info =: ("Info/Help",
+                      infoPage
                  )
         let showAddPuzzle = \case
               MasterlistPage_List -> "class" =: "bottomwidget"
@@ -261,6 +267,15 @@ masterlist huntId queryD = do
     , _framed_layout = \ (MenuSettings layout) tab -> (\t l -> if t == MasterlistPage_Chat then MutedChat else l) <$> tab <*> layout
     }
     
+infoPage :: (Monad m, DomBuilder t m) => m ()
+infoPage = divClass "ui container p-4 flex-grow flex flex-col overflow-y-scroll" $ divClass "ui centered middle aligned grid" $ divClass "column" $ do
+     elClass "h1" "ui header" $ text "Useful Links"
+     elClass "ul" "ui bulleted list" $ do
+       let item href title = el "li" $ elClass "h3" "ui header" $ elAttr "a" ("href" =: href <> "target" =: "_blank") $ text title
+       item "https://drive.google.com/drive/u/0/folders/1reg0IZNBXBvl129M6b_nyNsJzSS8FOvY" "Team Google Drive"
+       item "https://chat.tcita.com" "Team Mattermost chat"
+       item "https://drive.google.com/drive/u/0/folders/10mb9MZlHJFL1_AllqV6hjVpHx3hz0SnU" "Resources and Tutorials"
+       item "https://docs.google.com/document/d/1ZLM1rLMaRLylIWkio2Zz8mbv6gh8mQXDn_oDkVGh_iM" "README for masterlist (this site)"
 
 huntselect :: (Monad m, MonadHold t m, PostBuild t m, Reflex t, DomBuilder t m, MonadFix m
      , SetRoute t (R FrontendRoute) m, RouteToUrl (R FrontendRoute) m, Prerender t m
