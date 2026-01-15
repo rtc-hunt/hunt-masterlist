@@ -81,9 +81,17 @@ backend = Backend
       serve $ \case
         BackendRoute_Login :/ () -> loginHandler pool csk cgk
         BackendRoute_Listen :/ () -> listen
-        BackendRoute_Missing :/ () -> return ()
+        BackendRoute_Missing :/ () -> fourOFour
   , _backend_routeEncoder = fullRouteEncoder
   }
+
+fourOFour :: Snap ()
+fourOFour = do
+    route <- liftIO $ BS.readFile "config/common/route"
+    modifyResponse $ setResponseStatus 404 "Not found, Route Parse Error"
+    writeBS $ "<html><body><h1>404, Route Parse Error.</h1><a href=\"" <> route <> "\">Go Back To The Homepage</a></body></html>"
+    r <- getResponse
+    finishWith r
 
 loginHandler :: (Pool Connection) -> CS.Key -> T.Text -> Snap ()
 loginHandler pool csk authAudience = do
