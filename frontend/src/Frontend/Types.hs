@@ -91,4 +91,4 @@ deriving instance Show (PuzzleDataT Identity)
 --   show a = "<PuzzleData For " <> show (_puzzleData_id a) <> ">"
 
 statusTags :: Set Text
-statusTags = [ "solved", "in-progress", "stalled", "extraction", "done" ]
+statusTags = [ "solved", "in-progress", "stalled", "extraction", "solved (post-hunt)" ] --, "done" ]
