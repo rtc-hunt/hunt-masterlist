@@ -10,6 +10,8 @@ import Control.Lens
 import Data.Coerce
 import Data.Functor.Identity
 import Data.Int
+import qualified Data.Map as Map
+import Data.Maybe (isJust)
 import Database.Beam.Backend.SQL.Types
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -23,7 +25,7 @@ import Common.Schema
 
 data BackendRoute :: * -> * where
   -- | Used to handle unparseable routes.
-  BackendRoute_Missing :: BackendRoute ()
+  BackendRoute_Missing :: BackendRoute () -- ([Text], Map.Map Text (Maybe Text))
   -- You can define any routes that will be handled specially by the backend here.
   -- i.e. These do not serve the frontend, but do something different, such as serving static files.
   BackendRoute_Listen :: BackendRoute ()
@@ -87,9 +89,14 @@ puzzleQueryStringOrPuzzle_prism = prism' fromInput toQuery
       , PuzzleSelect_HasSolution <$ string "hasSolution"
       , PuzzleSelect_HasSolvers <$ string "hasSolvers"
       , PuzzleSelect_HasMeta . (coerce :: Int64 -> PrimaryKey Puzzle Identity) . read <$> (string "hasMeta(" >> someTill digitChar (string ")"))
-      , PuzzleSelect_WithTag . T.pack <$> (string "tag(" >> someTill printChar (string ")"))
+      , PuzzleSelect_WithTag . T.pack <$> (string "tag" >> parensText)
       , PuzzleSelect_Not . mconcat <$> (string "not(" >> someTill puzzleSelParser (string ")"))
       ]
+    parensText = do
+      char '('
+      fmap (\a -> "(" <> a <> ")")
+         (fmap mconcat $
+            manyTill ( fmap (:[]) (Text.Megaparsec.noneOf ("()" :: String)) <|> parensText) (char ')'))
     puzzleOrdParser = choice [ PuzzleOrdering_Any <$ string "unordered", pure PuzzleOrdering_ByMeta ]
 
 data PuzzleSelect
@@ -108,7 +115,10 @@ instance Semigroup PuzzleSelect where
   PuzzleSelect_All <> PuzzleSelect_All = PuzzleSelect_All
   PuzzleSelect_All <> a = a
   a <> PuzzleSelect_All = a
-  a <> b = PuzzleSelect_And a b
+  a <> b = normalizeSum a b
+
+normalizeSum a b = if isSubset a b then b else if isSubset b a then a else PuzzleSelect_And a b
+  where isSubset a b = isJust $ matchSubSelect b (== a)
 
 instance Monoid PuzzleSelect where
   mempty = PuzzleSelect_All
@@ -186,7 +196,7 @@ fullRouteEncoder
 fullRouteEncoder = mkFullRouteEncoder
   (FullRoute_Backend BackendRoute_Missing :/ ())
   (\case
-      BackendRoute_Missing -> PathSegment "missing" $ unitEncoder mempty
+      BackendRoute_Missing -> PathSegment "missing" $ unitEncoder mempty -- pageNameEncoder -- unitEncoder "UnknownRoute" -- unitEncoder mempty
       BackendRoute_Login -> PathSegment "login" $ unitEncoder mempty
       BackendRoute_Listen -> PathSegment "listen" $ unitEncoder mempty
   )

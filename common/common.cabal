@@ -11,6 +11,7 @@ library
                , beam-core
                , constraints
                , constraints-extras
+               , containers
                , data-default
                , dependent-sum-template
                , lens
