@@ -386,6 +386,8 @@ dialog > h1 {
 .commandOutput {
     width:100%;
     position: relative !important;
+    white-space: pre-wrap;
+    word-wrap: break-word;
 }
 
 textarea {

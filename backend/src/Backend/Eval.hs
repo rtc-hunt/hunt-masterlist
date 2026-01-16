@@ -15,6 +15,8 @@ import Data.Yaml
 import Data.Maybe (fromMaybe)
 import Data.Int
 import Data.Pool
+import Data.Dependent.Sum (DSum(..))
+import Data.Functor.Identity
 import Database.PostgreSQL.Simple
 import Database.PostgreSQL.Simple.Beam ()
 import Database.Beam hiding (set)
@@ -132,3 +134,17 @@ workerMain :: IO ()
 workerMain = do
   evalJobIds <- fmap read <$> getArgs
   fmap mconcat $ sequence $ doEval <$> evalJobIds
+
+loopWorkerMain :: IO ()
+loopWorkerMain = withDb "db" $ \pool -> do
+  (notifs, done) <- startNotificationListener pool
+  forever $ do
+    notif <- notifs
+    case notif of
+      (DbNotification
+        { _dbNotification_notificationType = NotificationType_Insert
+        , _dbNotification_message = (Notify_EvalJob :=> Identity jobId) -- (na :: DSum Notify Identity)
+        }) -> do
+             evalExternally pool $ unSerial $ _evalJobId_id jobId
+             pure ()
+      _ -> pure ()

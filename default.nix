@@ -37,11 +37,13 @@ let proj = project ./. ({ pkgs, hackGet, ... }@args: {
     });
   packages = {
     hunttools = hackGet ./dep/hunttools;
+    hunttools-utils = (hackGet ./dep/hunttools) + "/hunttools-utils";
     hunttools-dicts-if = hackGet ./dep/hunttools-dicts-if;
     packed-dawg-big = hackGet ./dep/packed-dawg-big;
   };
   tools = pkgs: [
-    proj.ghc.backend
+    proj.ghc.hunttools-utils
+  #  proj.ghc.backend
   ];
   staticFiles = import ./static {inherit pkgs; };
   android.applicationId = "systems.obsidian.obelisk.examples.rhyolite";

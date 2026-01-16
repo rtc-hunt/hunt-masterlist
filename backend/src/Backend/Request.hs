@@ -208,9 +208,9 @@ requestHandler pool csk authAudience allowForcedLogins = RequestHandler $ \case
                     , _evalJob_error = val_ Nothing
                     }
         -- runDb pool $ notify NotificationType_Insert Notify_CLIOutput $ CLIOutput user $ T.pack $ show rv
-        case jobid of 
-          Just (EvalJobId jobid) -> evalExternally pool $ unSerial jobid
-          _ -> pure ()
+        --case jobid of 
+        --  Just (EvalJobId jobid) -> evalExternally pool $ unSerial jobid
+        --  _ -> pure ()
         pure $ Left query
 
 

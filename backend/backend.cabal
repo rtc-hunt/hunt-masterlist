@@ -111,8 +111,22 @@ executable worker
                , common
                , frontend
                , obelisk-backend
+
 executable muworker
   main-is: muworker.hs
+  hs-source-dirs: src-bin
+  ghc-options: -Wall -Wredundant-constraints -Wincomplete-uni-patterns -Wincomplete-record-updates -O -threaded -fno-show-valid-hole-fits
+  if impl(ghcjs)
+    buildable: False
+  build-depends: base
+               , backend
+               , common
+               , frontend
+               , obelisk-backend
+               , text
+
+executable loopworker
+  main-is: loopworker.hs
   hs-source-dirs: src-bin
   ghc-options: -Wall -Wredundant-constraints -Wincomplete-uni-patterns -Wincomplete-record-updates -O -threaded -fno-show-valid-hole-fits
   if impl(ghcjs)
