@@ -3,6 +3,7 @@
 module Backend.Eval where
 
 import Language.Haskell.Interpreter hiding (eval)
+import Language.Haskell.Interpreter.Unsafe
 -- import Language.Haskell.Interpreter.Unsafe
 
 import Common.Schema
@@ -44,9 +45,9 @@ instance FromJSON EvalConfig
 instance ToJSON EvalConfig
 
 withInterpreter m = do
-    EvalConfig { imports, qimports } <- decodeFileThrow "config/backend/tools"
+    EvalConfig { ghcLibraries, imports, qimports } <- decodeFileThrow "config/backend/tools"
     let finalImports = (fromMaybe [] qimports) <> (flip (,) Nothing <$> imports)
-    runInterpreter $ do
+    unsafeRunInterpreterWithArgsLibdir [] ghcLibraries $ do
       setImportsQ finalImports
       set $ [ languageExtensions := [Safe] ]
       m
