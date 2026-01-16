@@ -118,6 +118,7 @@ doEval :: Int64 -> IO ()
 doEval id = withDb "db" $ \pool ->
   runDb pool $ do
     Just cmd <- runSelectReturningOne $ lookup_ (_db_evalJobs db) $ EvalJobId $ SqlSerial id
+    liftIO $ putStrLn $ "Evaluating expression: " <> T.unpack (_evalJob_expression cmd)
     res <- liftIO $ eval $ _evalJob_expression cmd
     case res of
       Right res -> updateAndNotify (_db_evalJobs db) (primaryKey cmd) $ (\u -> _evalJob_result u <-. val_ (Just res))
@@ -145,6 +146,7 @@ loopWorkerMain = withDb "db" $ \pool -> do
         { _dbNotification_notificationType = NotificationType_Insert
         , _dbNotification_message = (Notify_EvalJob :=> Identity jobId) -- (na :: DSum Notify Identity)
         }) -> do
+             putStrLn $ "Spawning job number: " <> show jobId
              evalExternally pool $ unSerial $ _evalJobId_id jobId
              pure ()
       _ -> pure ()
