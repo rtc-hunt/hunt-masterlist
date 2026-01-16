@@ -92,6 +92,7 @@ runProcessInInterpreterEnv myProc myFail = void $ forkIO $ do
   let newproc = case cmdspec myProc of
         RawCommand fp args -> myProc { cmdspec = RawCommand (fromMaybe fp ((<> fp) <$> path)) args }
         _ -> myProc
+  putStrLn $ show ("Running worker", newproc)
   let newRawCommand = cmdspec myProc
   (_, _, _, ph) <- createProcess $ newproc {
     env = Just updatedEnv
