@@ -58,9 +58,13 @@ library
                -- , websockets
                , rhyolite-frontend
                , reflex
+               , hint
+               , yaml
+               , process
   exposed-modules:
     Backend
     Backend.Db
+    Backend.Eval
     Backend.Listen
     Backend.Request
     Backend.View.Chatroom
@@ -95,3 +99,27 @@ executable backend
                , common
                , frontend
                , obelisk-backend
+
+executable worker
+  main-is: worker.hs
+  hs-source-dirs: src-bin
+  ghc-options: -Wall -Wredundant-constraints -Wincomplete-uni-patterns -Wincomplete-record-updates -O -threaded -fno-show-valid-hole-fits
+  if impl(ghcjs)
+    buildable: False
+  build-depends: base
+               , backend
+               , common
+               , frontend
+               , obelisk-backend
+executable muworker
+  main-is: muworker.hs
+  hs-source-dirs: src-bin
+  ghc-options: -Wall -Wredundant-constraints -Wincomplete-uni-patterns -Wincomplete-record-updates -O -threaded -fno-show-valid-hole-fits
+  if impl(ghcjs)
+    buildable: False
+  build-depends: base
+               , backend
+               , common
+               , frontend
+               , obelisk-backend
+               , text

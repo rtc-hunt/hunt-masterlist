@@ -307,3 +307,27 @@ instance ToJSON (UserSettings Identity)
 instance FromJSON (UserSettings Identity)
 deriving instance Show (UserSettings Identity)
 deriving instance Eq (UserSettings Identity)
+
+data EvalJob f = EvalJob
+  { _evalJob_id :: Columnar f (SqlSerial Int64)
+  , _evalJob_puzzle :: PrimaryKey Puzzle f
+  , _evalJob_user :: PrimaryKey Account f
+  , _evalJob_expression :: Columnar f Text
+  , _evalJob_result :: Columnar f (Maybe Text)
+  , _evalJob_type :: Columnar f (Maybe Text)
+  , _evalJob_error :: Columnar f (Maybe Text)
+  } deriving (Generic, Beamable)
+
+instance Table EvalJob where
+  data PrimaryKey EvalJob f = EvalJobId { _evalJobId_id :: Columnar f (SqlSerial Int64) }
+    deriving (Generic, Beamable)
+  primaryKey a = EvalJobId $ _evalJob_id a
+
+
+deriving instance Show (PrimaryKey EvalJob Identity)
+deriving instance Eq (PrimaryKey EvalJob Identity)
+deriving instance Ord (PrimaryKey EvalJob Identity)
+instance ToJSON (PrimaryKey EvalJob Identity)
+instance FromJSON (PrimaryKey EvalJob Identity)
+instance ToJSONKey (PrimaryKey EvalJob Identity)
+instance FromJSONKey (PrimaryKey EvalJob Identity)

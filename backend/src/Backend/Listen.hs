@@ -1,4 +1,5 @@
-{-# options_ghc -fno-warn-orphans #-}
+{-# options_ghc -fno-warn-orphans -Werror=incomplete-patterns #-}
+{-# LANGUAGE DeriveGeneric #-}
 module Backend.Listen where
 
 import Control.Monad.Logger
@@ -22,6 +23,7 @@ import Database.Beam.Postgres
 import Database.PostgreSQL.Simple (Connection)
 import Database.PostgreSQL.Simple.Beam ()
 import Database.PostgreSQL.Simple.Class
+import Database.Beam.Backend.SQL.Types
 import Obelisk.Route
 -- import Rhyolite.Account
 import Rhyolite.DB.NotifyListen
@@ -50,6 +52,13 @@ data Notify a where
   Notify_Meta :: Notify (Change Metapuzzle)
   Notify_ActiveUser :: Notify (Id ActiveUser)
   Notify_UserSettings :: Notify (Id UserSettingsTable)
+  Notify_CLIOutput :: Notify CLIOutput
+  Notify_EvalJob :: Notify (Id EvalJob)
+
+data CLIOutput = CLIOutput (Id Account) Text
+  deriving (Generic)
+instance ToJSON CLIOutput
+instance FromJSON CLIOutput
 
 deriveArgDict ''Notify
 deriveJSONGADT ''Notify
@@ -85,6 +94,9 @@ instance HasNotification Notify ActiveUser where
 
 instance HasNotification Notify UserSettingsTable where
   notification _ = Notify_UserSettings
+
+instance HasNotification Notify EvalJob where
+  notification _ = Notify_EvalJob
 
 getChatroom  :: Id Chatroom -> Pg (Maybe (Chatroom Identity))
 getChatroom = runSelectReturningOne . lookup_ (_db_chatroom db)
@@ -295,6 +307,8 @@ privateNotifyHandler pool nm v = case _dbNotification_message nm of
             (Just p, Just u) | Map.member (_activeUser_chat p) cids -> MapV $ Map.singleton (_activeUserId_chat auid) $ pure $ SemiMap_Partial $ Map.singleton (_activeUserId_user auid) $ First Nothing
             _ -> emptyV
   Notify_UserSettings :/ _ -> pure emptyV
+  Notify_CLIOutput :/ _ -> pure emptyV
+  Notify_EvalJob :/ _ -> pure emptyV -- FIXME: make this actually return them.
   where 
     nt = _dbNotification_notificationType nm
     byForeignKey 
@@ -391,4 +405,16 @@ personalNotifyHandler pool nm v = case _dbNotification_message nm of
        pure (_userSettings_account us, _us_v us)
      let withDefaults = (Identity . First . Just <$> Map.fromList qq) --  <> ((Identity . First . Just $ def) <$ getCompose (unSingleV kv))
      pure $ SingleV $ Compose $ withDefaults
+    PV_CLIOutput -> \kv -> pure mempty
+  Notify_CLIOutput :/ CLIOutput acct txt -> buildV v $ \case
+    PV_CLIOutput -> \kv -> do
+     pure $ SingleV $ Compose $ Identity . First . Just <$> Map.singleton acct txt
+    PV_Settings -> \kv -> pure mempty
+  Notify_EvalJob :/ theId -> buildV v $ \case
+    PV_CLIOutput -> \kv -> do
+     res <- runDb pool $ runSelectReturningOne $ lookup_ (_db_evalJobs db) $ theId
+     case res of
+       Just res -> pure $ SingleV $ Compose $ Identity . First . Just <$> Map.singleton (_evalJob_user res) ((fromMaybe "" $ _evalJob_result res) <> (fromMaybe "" $ _evalJob_error res))-- acct txt
+       Nothing -> pure mempty
+    PV_Settings -> \kv -> pure mempty
   _ -> pure emptyV

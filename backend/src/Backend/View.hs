@@ -1,3 +1,4 @@
+{-# options_ghc -fno-warn-orphans -Werror=incomplete-patterns #-}
 {-# Language TypeApplications #-}
 {-# Language StandaloneDeriving #-}
 {-# Language GeneralizedNewtypeDeriving #-}
@@ -182,3 +183,4 @@ personalQueryHandler pool q = (>>= (\a -> (print $ "Passed private query" <> sho
        pure (_userSettings_account us, _us_v us)
      let withDefaults = (Identity . First . Just <$> Map.fromList qq) <> ((Identity . First . Just $ def) <$ getCompose (unSingleV kv))
      pure $ SingleV $ Compose $ withDefaults
+    PV_CLIOutput -> \_ -> pure mempty

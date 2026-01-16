@@ -195,7 +195,7 @@ puzzlesTable PuzzleTableConfig { _puzzleTableConfig_query = query, _puzzleTableC
             , ("Status", \_ puzDat -> 
                 void $ dumbList (Map.filterWithKey (\k _ -> k `elem` statusTags) <$> (_puzzleData_tags <$> puzDat)) $ \k _ -> elAttr "span" ("class" =: "ui label" <> "data-tag" =: k) $ text k
             , do
-                   startValue <- sample $ current $ ((\a -> fromMaybe mempty $ matchSubSelect a (`elem` ((PuzzleSelect_WithTag <$> ["done", "extraction", "in-progress", "solved", "stalled"]) :: [PuzzleSelect]))) . _puzzleQuery_select) <$> query
+                   startValue <- sample $ current $ ((\a -> fromMaybe mempty $ matchSubSelect a (`elem` ((PuzzleSelect_WithTag <$> Data.Set.toList statusTags) :: [PuzzleSelect]))) . _puzzleQuery_select) <$> query
                    dropdownValue <- fmap (flip PuzzleQuery PuzzleOrdering_Any) . _dropdown_value <$> dropdown startValue (( (mempty =: " - ") <>) . Map.mapKeys PuzzleSelect_WithTag . Map.fromSet (id) <$> constDyn statusTags) headerDropdownSettings
                    modifyQuery $ (\(PuzzleQuery old _) (PuzzleQuery new _) -> Endo $ \(PuzzleQuery all ord) -> PuzzleQuery (new <> subPuzzleSelect all old) ord) <$> current dropdownValue <@> updated dropdownValue
                    -- pure dropdownValue

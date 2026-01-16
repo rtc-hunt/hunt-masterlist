@@ -109,6 +109,7 @@ type PrivateChatV = Vessel V
 
 data PersV a where
   PV_Settings :: PersV (SingleV (UserSettings Identity))
+  PV_CLIOutput :: PersV (SingleV Text)
 
 deriving instance Show (PersV a)
 deriveArgDict ''PersV

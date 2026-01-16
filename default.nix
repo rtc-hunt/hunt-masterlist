@@ -15,7 +15,7 @@
   }
 }:
 with obelisk;
-project ./. ({ pkgs, hackGet, ... }@args: {
+let proj = project ./. ({ pkgs, hackGet, ... }@args: {
   overrides = pkgs.lib.composeExtensions
     (pkgs.callPackage (hackGet ./dep/rhyolite) args).haskellOverrides
     (self: super: with pkgs.haskell.lib; {
@@ -35,10 +35,21 @@ project ./. ({ pkgs, hackGet, ... }@args: {
       # beam-automigrate = doJailbreak (self.callCabal2nix "beam-automigrate" (hackGet ./dep/beam-automigrate) {});
       # websockets = self.callHackage "websockets" "0.12.6.0" {};
     });
+  packages = {
+    hunttools = hackGet ./dep/hunttools;
+    hunttools-dicts-if = hackGet ./dep/hunttools-dicts-if;
+    packed-dawg-big = hackGet ./dep/packed-dawg-big;
+  };
+  tools = pkgs: [
+    proj.ghc.backend
+  ];
   staticFiles = import ./static {inherit pkgs; };
   android.applicationId = "systems.obsidian.obelisk.examples.rhyolite";
   android.displayName = "Rhyolite Example App";
   ios.bundleIdentifier = "systems.obsidian.obelisk.examples.rhyolite";
   ios.bundleName = "Rhyolite Example App";
   # __closureCompilerOptimizationLevel = null; # Set this to `null` to skip the closure-compiler step
-})
+});
+in proj // {
+  hunttoolsEnv = proj.ghc.ghcWithPackages (pkgs: with pkgs; [hunttools hunttools-dicts-if packed-dawg-big]);
+}

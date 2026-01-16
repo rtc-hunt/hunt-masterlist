@@ -35,6 +35,7 @@ data Db f = Db
   , _db_activeUsers :: f (TableEntity ActiveUser)
   , _db_googleKeys :: f (TableEntity GoogleKey)
   , _db_userSettings :: f (TableEntity UserSettingsTable)
+  , _db_evalJobs :: f (TableEntity EvalJob)
   }
   deriving (Generic, Database be)
 

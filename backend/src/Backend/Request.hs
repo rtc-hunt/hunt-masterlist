@@ -21,6 +21,7 @@ import Data.Pool
 import Data.Signed (Signed)
 import Data.Signed.ClientSession
 import Data.Text (Text)
+import qualified Data.Text as T
 import Data.Dependent.Sum
 import Database.Beam
 import Database.Beam.Postgres
@@ -28,10 +29,12 @@ import Database.Beam.Postgres.Full hiding (insert)
 import qualified Database.Beam.Postgres.Full as Pg
 import Database.PostgreSQL.Simple
 import Database.PostgreSQL.Simple.Class
+import Database.Beam.Backend.SQL.Types (SqlSerial(..))
 import System.IO (stderr)
 import Rhyolite.Api
 import Rhyolite.Backend.App
 import Rhyolite.DB.NotifyListen.Beam
+import Rhyolite.DB.NotifyListen
 import Web.ClientSession as CS
 import Data.Proxy
 import Network.HTTP.Req hiding (req)
@@ -41,12 +44,14 @@ import System.Environment
 import Control.Exception (SomeException, handle)
 
 import Backend.Db (runDb, current_timestamp_)
-import Backend.Listen ()
+import Backend.Listen (Notify(..), CLIOutput(..))
 import Backend.Schema
 -- import Common.Auth
 import Common.Request
 import Common.Schema
 import Backend.Google
+
+import Backend.Eval
 
 import Debug.Trace
 
@@ -104,8 +109,7 @@ requestHandler pool csk authAudience allowForcedLogins = RequestHandler $ \case
       PrivateRequest_AddPuzzle title ismeta url hunt -> auth $ \_user -> runDb pool $ do
         huntRecord <- runSelectReturningOne $ lookup_ (_db_hunt db) hunt
         (folderId, sheet) <- liftIO $ do
-          createPuzzleFiles (huntRecord >>= _hunt_folderId) title
-        -- Also queue create new puzzle spreadsheet here through job system.
+          createPuzzleFiles (huntRecord >>= _hunt_folderId) title -- Also queue create new puzzle spreadsheet here through job system.
         channelId <-  insertAndNotify (_db_chatroom db) Chatroom
           { _chatroom_id = default_
           , _chatroom_title = val_ title
@@ -191,8 +195,22 @@ requestHandler pool csk authAudience allowForcedLogins = RequestHandler $ \case
       PrivateRequest_PuzzleCommand (PuzzleCommand_Voice puzId chatUrl) -> auth $ \_user -> runDb pool $ do
         _ <- updateAndNotifyChange (_db_puzzles db) puzId $ (\p -> _puzzle_voicelink p <-. val_ chatUrl)
         pure $ Right ()
-      PrivateRequest_PuzzleCommand (PuzzleCommand_HuntTools puzId query) -> do
-        traceShowM $ ("Had a query", query)
+      PrivateRequest_PuzzleCommand (PuzzleCommand_HuntTools puzId query) -> auth $ \user -> do
+        -- traceShowM $ ("Had a query", query)
+        -- rv <- doEval query
+        jobid <- runDb pool $ insertAndNotify (_db_evalJobs db) $ EvalJob
+                    { _evalJob_id = default_
+                    , _evalJob_puzzle = val_ $ puzId
+                    , _evalJob_user = val_ $ user
+                    , _evalJob_expression = val_ query
+                    , _evalJob_result = val_ Nothing
+                    , _evalJob_type = val_ Nothing
+                    , _evalJob_error = val_ Nothing
+                    }
+        -- runDb pool $ notify NotificationType_Insert Notify_CLIOutput $ CLIOutput user $ T.pack $ show rv
+        case jobid of 
+          Just (EvalJobId jobid) -> evalExternally pool $ unSerial jobid
+          _ -> pure ()
         pure $ Left query
 
 

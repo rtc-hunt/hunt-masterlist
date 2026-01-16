@@ -25,11 +25,16 @@ import Common.Schema
 import Common.Request
 import Data.Proxy
 import Data.Some
+import Data.Vessel
 import Reflex.Dom.Core hiding (value)
 import qualified Data.Set as Set
 import Frontend.Types
 
 import Rhyolite.Api (ApiRequest(..))
+import Rhyolite.Frontend.App
+import Rhyolite.Vessel.Path
+import Common.View
+import Rhyolite.Vessel.AuthenticatedV
 
 data CliCommandTag a where
  CliCommandTag_Me :: CliCommandTag Text
@@ -124,13 +129,16 @@ parseCli routeD iE = fmap (fan . fmap (DMap.fromList . pure)) $ fanEither $ ffor
   where
     parseWithRoute route = execParserPure defaultPrefs (cliCommandParser route) . cliWords
 
-requestingSimpleCommands :: (PerformEvent t m, AuthReq t m, Request m ~ ApiRequest () PublicRequest PrivateRequest, MonadHold t m, PostBuild t m, Adjustable t m, NotReady t m)  => EventSelector t CliCommandTag -> m (Event t Text)
+requestingSimpleCommands :: (PerformEvent t m, MonadFix m, AuthReq t m, Request m ~ ApiRequest () PublicRequest PrivateRequest, MonadHold t m, PostBuild t m, Adjustable t m, NotReady t m, AuthenticatedMonadQuery t m)  => EventSelector t CliCommandTag -> m (Event t Text)
 requestingSimpleCommands cmdsE = do
   res <- (holdDyn (pure never) $ someReqFor <$> select cmdsE CliCommandTag_PuzzleCommand) >>= dyn
   (res2, _) <- fanEither . fmap runIdentity . Reflex.switch . current <$> holdDyn never res
   requesting_ $ ApiRequest_Private () . PrivateRequest_Renick <$> select cmdsE CliCommandTag_Renick
+
+  (slowOutputs :: Event t Text) <- fmap (fmapMaybe id . updated . fmap join) $ watch $ constDyn $ personalP ~> key PV_CLIOutput ~> singleV
   
-  pure $ res2
+  
+  pure $ res2 <> slowOutputs
   where 
     someReqFor a = withSome a reqFor
     reqFor evt = do
