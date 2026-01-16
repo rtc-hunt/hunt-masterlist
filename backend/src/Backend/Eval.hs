@@ -44,7 +44,7 @@ instance FromJSON EvalConfig
 instance ToJSON EvalConfig
 
 withInterpreter m = do
-    EvalConfig { ghcLibraries, imports, qimports } <- decodeFileThrow "config/backend/tools"
+    EvalConfig { imports, qimports } <- decodeFileThrow "config/backend/tools"
     let finalImports = (fromMaybe [] qimports) <> (flip (,) Nothing <$> imports)
     runInterpreter $ do
       setImportsQ finalImports
@@ -87,8 +87,13 @@ runProcessInInterpreterEnv myProc myFail = void $ forkIO $ do
   myEnv <- getEnvironment
   pathEnv <- getEnv "PATH"
   let newPath = fromMaybe "" $ fmap (<> ":") path
+  putStrLn $ show newPath
   let updatedEnv = [("PATH", newPath <> pathEnv), ("NIX_GHC_LIBDIR", ghcLibraries)] <> filter ((/= "NIX_GHC_LIBDIR") . fst) myEnv 
-  (_, _, _, ph) <- createProcess $ myProc {
+  let newproc = case cmdspec myProc of
+        RawCommand fp args -> myProc { cmdspec = RawCommand (fromMaybe fp ((<> fp) <$> path)) args }
+        _ -> myProc
+  let newRawCommand = cmdspec myProc
+  (_, _, _, ph) <- createProcess $ newproc {
     env = Just updatedEnv
   }
   threadDelay 60000000
