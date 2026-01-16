@@ -35,6 +35,7 @@ import Data.List
 
 data EvalConfig = EvalConfig
   { ghcLibraries :: String
+  , path :: Maybe String
   , imports :: [String]
   , qimports :: Maybe [(String, Maybe String)]
   } deriving (Generic, Show)
@@ -82,9 +83,11 @@ evalExternally pool theId = void $ forkIO $ do
 
 runProcessInInterpreterEnv :: CreateProcess -> IO () -> IO ()
 runProcessInInterpreterEnv myProc myFail = void $ forkIO $ do
-  EvalConfig { ghcLibraries } <- decodeFileThrow "config/backend/tools"
+  EvalConfig { ghcLibraries , path } <- decodeFileThrow "config/backend/tools"
   myEnv <- getEnvironment
-  let updatedEnv = [("NIX_GHC_LIBDIR", ghcLibraries)] <> filter ((/= "NIX_GHC_LIBDIR") . fst) myEnv 
+  pathEnv <- getEnv "PATH"
+  let newPath = fromMaybe "" $ fmap (<> ":") path
+  let updatedEnv = [("PATH", newPath <> pathEnv), ("NIX_GHC_LIBDIR", ghcLibraries)] <> filter ((/= "NIX_GHC_LIBDIR") . fst) myEnv 
   (_, _, _, ph) <- createProcess $ myProc {
     env = Just updatedEnv
   }
