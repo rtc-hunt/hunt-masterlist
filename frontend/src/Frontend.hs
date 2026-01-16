@@ -116,7 +116,7 @@ frontend = Frontend
 --          \ }"
       subRoute_ $ \case
         FrontendRoute_Main ->
-          elAttr "meta" ("http-equiv" =: "refresh" <> "content" =: ("0; url=" <> "https://hunt-masterlist.tcita.com/hunt/4/" )) blank
+          elAttr "meta" ("http-equiv" =: "refresh" <> "content" =: ("0; url=" <> "https://hunt-masterlist.tcita.com/hunt/5/" )) blank
         _ -> blank
       blank
   , _frontend_body = runExampleWidget frontendBody
@@ -256,7 +256,7 @@ frontendBody = do
   subRoute_ $ \case
     FrontendRoute_Main -> void $ prerender blank $ do
       JS.liftJSM $ do 
-         JS.eval ( "location.assign(\"/hunt/4/\");" :: Text )
+         JS.eval ( "location.assign(\"/hunt/5/\");" :: Text )
          pure ()
     _ -> blank
 
