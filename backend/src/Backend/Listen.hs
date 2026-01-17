@@ -3,6 +3,7 @@
 module Backend.Listen where
 
 import Control.Monad.Logger
+import Control.Lens.Indexed
 import Data.Aeson
 import Data.Aeson.GADT.TH
 import Data.Constraint.Extras.TH
@@ -139,6 +140,7 @@ privateNotifyHandler pool nm v = case _dbNotification_message nm of
         Nothing -> emptyV
         Just c -> MapV $ Map.singleton () $ pure (SemiMap_Partial $ Map.singleton huntId $ First $ Just c)
     V_LiveHunts -> const $ pure emptyV
+    V_PuzzleEvals -> const $ pure emptyV
   Notify_Chatroom :/ cid -> buildV v $ \case
     V_Chatrooms -> \(MapV queries) -> do
       results :: Map.MonoidalMap ChatroomQuery (SemiMap (Id Chatroom) Text) <- runDb pool $ searchForChatroom $ Map.keysSet queries
@@ -163,6 +165,7 @@ privateNotifyHandler pool nm v = case _dbNotification_message nm of
     V_ActiveUsers -> const $ pure emptyV
     V_Hunts -> const $ pure emptyV
     V_LiveHunts -> const $ pure emptyV
+    V_PuzzleEvals -> const $ pure emptyV
   Notify_Message :/ mid -> do
     runNoLoggingT $ do
       msgs :: [(Id Chatroom, Int, UTCTime, Text, Text, Maybe Bool)] <- runDb pool $ [iquery|
@@ -202,6 +205,7 @@ privateNotifyHandler pool nm v = case _dbNotification_message nm of
           V_ActiveUsers -> const $ pure emptyV
           V_Hunts -> const $ pure emptyV
           V_LiveHunts -> const $ pure emptyV
+          V_PuzzleEvals -> const $ pure emptyV
   Notify_Puzzle :/ change@(Change pid theChange) -> buildV v $ \case
     V_Puzzle -> \(MapV cs) -> if Map.member pid cs
       then runDb pool (runSelectReturningOne $ lookup_ (_db_puzzles db) pid) >>= pure . \case
@@ -224,6 +228,7 @@ privateNotifyHandler pool nm v = case _dbNotification_message nm of
     V_ActiveUsers -> const $ pure emptyV
     V_Hunts -> const $ pure emptyV
     V_LiveHunts -> const $ pure emptyV
+    V_PuzzleEvals -> const $ pure emptyV
   Notify_Solve :/ change -> buildV v $ \case
     V_Solutions -> byForeignKey _solution_Puzzle _db_solves change
     V_Chatroom -> const $ pure emptyV
@@ -239,6 +244,7 @@ privateNotifyHandler pool nm v = case _dbNotification_message nm of
     V_ActiveUsers -> const $ pure emptyV
     V_Hunts -> const $ pure emptyV
     V_LiveHunts -> const $ pure emptyV
+    V_PuzzleEvals -> const $ pure emptyV
   Notify_Tag :/ change -> buildV v $ \case
     V_Tags -> byForeignKey _tag_Puzzle _db_tags change
     V_Chatroom -> const $ pure emptyV
@@ -254,6 +260,7 @@ privateNotifyHandler pool nm v = case _dbNotification_message nm of
     V_ActiveUsers -> const $ pure emptyV
     V_Hunts -> const $ pure emptyV
     V_LiveHunts -> const $ pure emptyV
+    V_PuzzleEvals -> const $ pure emptyV
   Notify_Note :/ change -> buildV v $ \case
     V_Notes -> byForeignKey _note_Puzzle _db_notes change
     V_Chatroom -> const $ pure emptyV
@@ -269,6 +276,7 @@ privateNotifyHandler pool nm v = case _dbNotification_message nm of
     V_ActiveUsers -> const $ pure emptyV
     V_Hunts -> const $ pure emptyV
     V_LiveHunts -> const $ pure emptyV
+    V_PuzzleEvals -> const $ pure emptyV
   Notify_Meta :/ change -> buildV v $ \case
     V_Metas -> setByForeignKey _meta_Puzzle _db_metas change
     V_Chatroom -> const $ pure emptyV
@@ -284,6 +292,7 @@ privateNotifyHandler pool nm v = case _dbNotification_message nm of
     V_ActiveUsers -> const $ pure emptyV
     V_Hunts -> const $ pure emptyV
     V_LiveHunts -> const $ pure emptyV
+    V_PuzzleEvals -> const $ pure emptyV
   Notify_ActiveUser :/ auid -> buildV v $ \case
     V_Chatroom -> const $ pure emptyV
     V_Chatrooms -> const $ pure emptyV
@@ -298,6 +307,7 @@ privateNotifyHandler pool nm v = case _dbNotification_message nm of
     V_Metas -> const $ pure emptyV
     V_Hunts -> const $ pure emptyV
     V_LiveHunts -> const $ pure emptyV
+    V_PuzzleEvals -> const $ pure emptyV
     V_ActiveUsers -> \(MapV cids) ->
         runDb pool $ do
           au <- runSelectReturningOne $ lookup_ (_db_activeUsers db) auid
@@ -308,7 +318,28 @@ privateNotifyHandler pool nm v = case _dbNotification_message nm of
             _ -> emptyV
   Notify_UserSettings :/ _ -> pure emptyV
   Notify_CLIOutput :/ _ -> pure emptyV
-  Notify_EvalJob :/ _ -> pure emptyV -- FIXME: make this actually return them.
+  Notify_EvalJob :/ eid -> buildV v $ \case -- pure emptyV -- FIXME: make this actually return them.
+    V_PuzzleEvals -> \(MapV puz) -> 
+      fmap MapV $ ifor puz $ \h _ -> runDb pool $ fmap (Identity . SemiMap_Partial . Map.fromList . fmap (fmap (First . Just))) $ runSelectReturningList $ select $ do
+        job <- all_ (_db_evalJobs db)
+        guard_ $ _evalJob_puzzle job ==. val_ h
+        -- guard_ $ _evalJob_id job ==. val_ $ _evalJobId_id eid
+        guard_ $ primaryKey job ==. val_ eid
+        return $ (primaryKey job, job)
+    V_Chatroom -> const $ pure emptyV
+    V_Chatrooms -> const $ pure emptyV
+    V_Messages -> const $ pure emptyV
+    V_Puzzle -> const $ pure emptyV
+    V_HuntPuzzles -> const $ pure emptyV
+    V_HuntMetas -> const $ pure emptyV
+    V_Solutions -> const $ pure emptyV
+    V_Tags -> const $ pure emptyV
+    V_UniqueTags -> const $ pure emptyV
+    V_Notes -> const $ pure emptyV
+    V_Metas -> const $ pure emptyV
+    V_Hunts -> const $ pure emptyV
+    V_LiveHunts -> const $ pure emptyV
+    V_ActiveUsers -> const $ pure emptyV
   where 
     nt = _dbNotification_notificationType nm
     byForeignKey 

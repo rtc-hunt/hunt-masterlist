@@ -51,7 +51,7 @@ body {
 .tabbedContentContainer {
   display: grid;
   column-gap: 0px;
-  grid-template-columns: repeat(4, 100%);
+  grid-template-columns: repeat(10, 100%);
   grid-template-rows: 100%;
   position: relative;
   z-index: 0;
@@ -388,9 +388,43 @@ dialog > h1 {
     position: relative !important;
     white-space: pre-wrap;
     word-wrap: break-word;
+    overflow-wrap: break-word !important;
 }
 
 textarea {
     border-radius: 0.5em !important;
     border: 1px solid grey !important;
+}
+.htblocks {
+    padding: 2em;
+    flex-grow: 1;
+    overflow-y: scroll;
+}
+.htblocks > div {
+    width: 100% !important;
+}
+
+.hunttoolsUi {
+    display: flex;
+    flex-direction: column;
+    display: flex;
+    height: 100%;
+}
+
+.htinput {
+    padding: 2em;
+    width: 100%;
+    flex-direction: row;
+}
+.htinput > textarea {
+    width: 100%;
+    flex-grow: 1;
+}
+
+.messageBody {
+    overflow-wrap: break-word !important;
+    max-width: 85dvh !important;
+}
+.chat-sidebar .messageBody {
+    max-width: 25dvw !important;
 }

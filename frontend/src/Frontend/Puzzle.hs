@@ -1,3 +1,4 @@
+{-# options_ghc -Werror=incomplete-patterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE TypeApplications #-}
@@ -361,7 +362,7 @@ tabToText :: PuzzlePageTab -> Text
 tabToText = \case
   PuzzlePageTab_Sheet -> "Sheet"
   PuzzlePageTab_Puzzle -> "Puzzle"
---  PuzzlePageTab_Tools -> "Tools"
+  PuzzlePageTab_Tools -> "Tools"
   PuzzlePageTab_Chat -> "Chat"
   PuzzlePageTab_Config -> "Puzzle Config"
 
@@ -456,6 +457,31 @@ puzzle puz = do
               { _puzzleConfig_puzzle = puzzleData
               , _puzzleConfig_tab = activeTab
               , _puzzleConfig_chatWidget = chatWidget "ui container p-4 flex-grow flex flex-col overflow-y-scroll"
+              , _puzzleConfig_toolWidget = elClass "div" "hunttoolsUi" $ do
+                  elClass "div" "htblocks" $ do
+                    evals <- fmap (fmap $ fromMaybe Map.empty) $ watch $ constDyn $ privateP ~> key V_PuzzleEvals ~> key puz ~> postMap (traverse (fmap getMonoidalMap . getComplete))
+                    list evals $ \dRes -> elClass "div" "ui card" $ do
+                      el "pre" $ do
+                         text "expr: "
+                         dynText $ _evalJob_expression <$> dRes
+                      el "pre" $ do
+                         dynText $ fromMaybe "" . fmap ("res: " <>) . _evalJob_result <$> dRes
+                      el "pre" $ do
+                         dynText $ fromMaybe "" . fmap ("err: " <>) . _evalJob_error <$> dRes
+                      el "pre" $ do
+                         text ":: "
+                         dynText $ fromMaybe "" . _evalJob_type <$> dRes
+                    blank
+                  elClass "div" "htinput" $ do
+                     prerender blank $ do 
+                       inp <- textArea $ def
+                         { _textAreaConfig_attributes = constDyn $ ("placeholder" =: "HuntTools Input: ")
+                         }
+                       send <- buttonClass "ui button" "Run"
+                       _ <- requestingIdentity $ ApiRequest_Private () . PrivateRequest_PuzzleCommand . PuzzleCommand_HuntTools puz <$> (current $ _textArea_value inp) <@ send
+                       blank
+                     blank
+                     -- evals
               , _puzzleConfig_configuratorWidget = do
                   cfgOut <- puzzleConfigurator PuzzleConfiguratorConfig
                     { _puzzleConfiguratorConfig_puzzle = puzzleData

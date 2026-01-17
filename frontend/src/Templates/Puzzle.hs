@@ -33,6 +33,7 @@ data PuzzleConfig t m = PuzzleConfig
   { _puzzleConfig_puzzle :: Dynamic t (PuzzleData t)
   , _puzzleConfig_tab :: Dynamic t PuzzlePageTab
   , _puzzleConfig_chatWidget :: m ()
+  , _puzzleConfig_toolWidget :: m ()
   , _puzzleConfig_configuratorWidget :: m ()
   , _puzzleConfig_puzzleLink :: PrimaryKey Puzzle Identity -> m () -> m ()
   }
@@ -51,6 +52,7 @@ data PuzzlePageTab
   | PuzzlePageTab_Sheet
   | PuzzlePageTab_Chat
   | PuzzlePageTab_Config
+  | PuzzlePageTab_Tools
   deriving (Enum, Ord, Bounded, Eq, Show)
 
 puzzleView :: forall t m js. (Template t m, MonadHold t m, MonadFix m, Prerender t m) => PuzzleConfig t m -> m ()
@@ -58,6 +60,7 @@ puzzleView (PuzzleConfig
   { _puzzleConfig_puzzle = puzData
   , _puzzleConfig_tab = puzTabD
   , _puzzleConfig_chatWidget = chatWidget
+  , _puzzleConfig_toolWidget = toolWidget
   , _puzzleConfig_configuratorWidget = configuratorWidget
   , _puzzleConfig_puzzleLink = puzLink
   }) = do
@@ -65,8 +68,9 @@ puzzleView (PuzzleConfig
   myTabDisplay "ui top attached tabular menu" "activeTab" puzTabD $
     PuzzlePageTab_Puzzle =: ("puzzle", frameURI $ Just . _puzzle_URI <$> (puzData >>= _puzzleData_puzzle))
     <> PuzzlePageTab_Sheet =: ("sheet", frameURI $ _puzzle_SheetURI <$> (puzData >>= _puzzleData_puzzle))
-    <> PuzzlePageTab_Chat =: ("chat", chatWidget)
+    <> PuzzlePageTab_Chat =: ("chat", divClass "framed" chatWidget)
     <> PuzzlePageTab_Config =: ("config", divClass "framed" configuratorWidget)
+    <> PuzzlePageTab_Tools =: ("tools", divClass "framed" toolWidget)
   blank
 
 data PuzzleConfiguratorConfig t = PuzzleConfiguratorConfig

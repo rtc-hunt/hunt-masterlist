@@ -93,6 +93,7 @@ data V a where
   V_HuntMetas :: V (MapV (Id Hunt) (SemiMap (Id Puzzle) Text))
   V_ActiveUsers :: V (MapV (Id Chatroom) (SemiMap (Id Account) Text))
   V_LiveHunts :: V (MapV () (SemiSet (Id Hunt)))
+  V_PuzzleEvals :: V (MapV (Id Puzzle) (SemiMap (Id EvalJob) (EvalJob Identity)))
 
 deriving instance Show (V a)
 

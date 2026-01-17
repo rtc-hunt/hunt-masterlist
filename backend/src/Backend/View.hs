@@ -131,6 +131,11 @@ privateQueryHandler pool q = (>>= (\a -> print "Passed" >> return a)) $ (print q
       hunt <- all_ (_db_hunt db)
       guard_ $ _hunt_live hunt ==. val_ True
       return $ primaryKey hunt
+  V_PuzzleEvals -> \(MapV puz) ->
+    fmap MapV $ ifor puz $ \h _ -> runDb pool $ fmap (Identity . SemiMap_Complete . Map.fromList) $ runSelectReturningList $ select $ do
+      job <- all_ (_db_evalJobs db)
+      guard_ $ _evalJob_puzzle job ==. val_ h
+      return $ (primaryKey job, job)
 
 type SigIdToken = (Data.Signed.Signed (Id Account))
 
