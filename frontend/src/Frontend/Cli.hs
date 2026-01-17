@@ -18,6 +18,7 @@ import Data.Dependent.Sum
 import Data.Constraint.Extras.TH
 import Data.GADT.Compare.TH
 import Data.GADT.Show
+import Data.Maybe (fromMaybe)
 import Control.Monad.Identity
 import qualified Data.Dependent.Map as DMap
 import Database.Beam.Backend.SQL.Types (SqlSerial(..))
@@ -110,20 +111,24 @@ cliCommandParser theRoute = info (hsubparser commands <**> helper) fullDesc
                <> progDesc "Run a hunttools haskell query"
         , command "crossword" $ info (
           fmap ((CliCommandTag_PuzzleCommand ==>) . mkSome) $
-             (PuzzleCommand_HuntTools <$> puzzleOption <*> fmap (("crossword ukacd \"" <>) . (<> "\"") . T.intercalate "") (some (fmap T.pack $ strArgument $ metavar "Crossword string")))
+             (PuzzleCommand_HuntTools <$> puzzleOption <*> (quickCmd "crossword" <*> (some (fmap T.pack $ strArgument $ metavar "Crossword string"))))
            ) $ fullDesc
                <> progDesc "Run a crossword clue through hunttools"
         , command "anagram" $ info (
           fmap ((CliCommandTag_PuzzleCommand ==>) . mkSome) $
-             (PuzzleCommand_HuntTools <$> puzzleOption <*> fmap (("anagramFull ukacd \"" <>) . (<> "\"") . T.intercalate "") (some (fmap T.pack $ strArgument $ metavar "Anagram letters")))
+             (PuzzleCommand_HuntTools <$> puzzleOption <*> (quickCmd "anagramFull" <*> (some (fmap T.pack $ strArgument $ metavar "Anagram letters"))))
            ) $ fullDesc
-             <> progDesc "Run an anagram through hunttools"
+               <> progDesc "Run an anagram through hunttools"
         ]
     puzzleOption :: Parser (PrimaryKey Puzzle Identity)
     puzzleOption = option (PuzzleId . SqlSerial <$> auto) (short 'p' <> long "puzzle" <> metavar "PUZZLE" <> puzzleOptionMod <> help "Puzzle identifier. Auto-fills on puzzle pages, which is the expected use.")
     puzzleOptionMod :: Mod OptionFields (PrimaryKey Puzzle Identity) = case theRoute of
       (Just puz) -> value puz
       _ -> idm
+    dictOption :: Parser (Text)
+    dictOption = option (fromMaybe "ukacd" <$> auto) (short 'd' <> long "dictionary" <> metavar "DICT" <> help "Dictionary identifier, defaults to ukacd")
+    quickCmd :: Text -> Parser ([Text] -> Text)
+    quickCmd cmd = fmap (\dict qs -> T.intercalate " " [cmd, dict, "\"" <> T.intercalate " " qs <> "\""]) dictOption
     -- statusCommands :: Mod CommandFields (PuzzleCommand (Id Puzzle, Text))
     statusCommands :: Mod CommandFields (PuzzleCommand (Id Puzzle, Text))
     statusCommands = mconcat $ Set.toList statusTags >>= \theTag -> [
