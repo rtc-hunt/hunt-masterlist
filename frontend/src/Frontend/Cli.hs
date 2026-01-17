@@ -58,27 +58,33 @@ cliCommandParser theRoute = info (hsubparser commands <**> helper) fullDesc
         command "me" $ 
           info (fmap ((CliCommandTag_Me ==>) . T.intercalate " ") $ 
             some $ fmap T.pack $ strArgument $ metavar "TEXT") $ fullDesc <> noIntersperse
+              <> progDesc "Send an \"action\" chat message"
       CliCommandTag_Renick :=> _ ->
         command "nick" $
           info (fmap ((CliCommandTag_Renick ==>) . T.intercalate " ") $ 
             some $ fmap T.pack $ strArgument $ metavar "NAME") $ fullDesc <> noIntersperse
+              <> progDesc "Change the display name of the current user"
       (CliCommandTag_PuzzleCommand :=> _) -> mconcat
         [ command "status" $ info (
           fmap ((CliCommandTag_PuzzleCommand ==>) . mkSome) $ 
              hsubparser statusCommands
            ) $ fullDesc
+               <> progDesc "Set a status on the puzzle. (Sets a tag from the special status list)"
         , command "tag" $ info (
           fmap ((CliCommandTag_PuzzleCommand ==>) . mkSome) $
              (PuzzleCommand_Tag <$> puzzleOption <*> (fmap T.pack $ strArgument $ metavar "TAG"))
            ) $ fullDesc
+               <> progDesc "Set a tag on the puzzle"
         , command "untag" $ info (
           fmap ((CliCommandTag_PuzzleCommand ==>) . mkSome) $
              (PuzzleCommand_Untag <$> puzzleOption <*> (fmap T.pack $ strArgument $ metavar "TAG"))
            ) $ fullDesc
+               <> progDesc "Remove a tag from the puzzle"
         , command "note" $ info (
           fmap ((CliCommandTag_PuzzleCommand ==>) . mkSome) $
              (PuzzleCommand_Note <$> puzzleOption <*> fmap (T.intercalate " ") (some (fmap T.pack $ strArgument $ metavar "MULTI-WORD NOTE")))
            ) $ fullDesc
+               <> progDesc "Add a note to the puzzle"
         , command "solve" $ info (
           fmap ((CliCommandTag_PuzzleCommand ==>) . mkSome) $
              ((\p b s -> PuzzleCommand_Solve p s b)
@@ -86,18 +92,32 @@ cliCommandParser theRoute = info (hsubparser commands <**> helper) fullDesc
                 <*> Opt.switch (long "backsolve" <> short 'b' <> help "Solution was backsolved"))
                 <*> fmap (T.intercalate " ") (some (fmap T.pack $ strArgument $ metavar "SOLUTION")) 
            ) $ fullDesc
+               <> progDesc "Add a solution to the puzzle, -b to mark backsolves"
         , command "delete-puzzle" $ info (
           fmap ((CliCommandTag_PuzzleCommand ==>) . mkSome) $
              (PuzzleCommand_DeletePuzzle <$> puzzleOption )
            ) $ fullDesc
+               <> progDesc "Mark a puzzle as deleted (manually reversible)"
         , command "voice" $ info (
           fmap ((CliCommandTag_PuzzleCommand ==>) . mkSome) $
              (PuzzleCommand_Voice <$> puzzleOption <*> optional (fmap T.pack $ strArgument $ metavar "VOICE_CHAT_URL"))
            ) $ fullDesc
+               <> progDesc "Set voice char URL for a puzzle"
         , command "ht" $ info (
           fmap ((CliCommandTag_PuzzleCommand ==>) . mkSome) $
              (PuzzleCommand_HuntTools <$> puzzleOption <*> fmap (T.intercalate " ") (some (fmap T.pack $ strArgument $ metavar "Hunttools query")))
            ) $ fullDesc
+               <> progDesc "Run a hunttools haskell query"
+        , command "crossword" $ info (
+          fmap ((CliCommandTag_PuzzleCommand ==>) . mkSome) $
+             (PuzzleCommand_HuntTools <$> puzzleOption <*> fmap (("crossword ukacd \"" <>) . (<> "\"") . T.intercalate "") (some (fmap T.pack $ strArgument $ metavar "Crossword string")))
+           ) $ fullDesc
+               <> progDesc "Run a crossword clue through hunttools"
+        , command "anagram" $ info (
+          fmap ((CliCommandTag_PuzzleCommand ==>) . mkSome) $
+             (PuzzleCommand_HuntTools <$> puzzleOption <*> fmap (("anagramFull ukacd \"" <>) . (<> "\"") . T.intercalate "") (some (fmap T.pack $ strArgument $ metavar "Anagram letters")))
+           ) $ fullDesc
+             <> progDesc "Run an anagram through hunttools"
         ]
     puzzleOption :: Parser (PrimaryKey Puzzle Identity)
     puzzleOption = option (PuzzleId . SqlSerial <$> auto) (short 'p' <> long "puzzle" <> metavar "PUZZLE" <> puzzleOptionMod <> help "Puzzle identifier. Auto-fills on puzzle pages, which is the expected use.")
