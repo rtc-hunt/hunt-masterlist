@@ -126,7 +126,7 @@ cliCommandParser theRoute = info (hsubparser commands <**> helper) fullDesc
       (Just puz) -> value puz
       _ -> idm
     dictOption :: Parser (Text)
-    dictOption = option (fromMaybe "ukacd" <$> auto) (short 'd' <> long "dictionary" <> metavar "DICT" <> help "Dictionary identifier, defaults to ukacd")
+    dictOption = fmap (T.pack . fromMaybe "ukacd") $ optional $ strOption (short 'd' <> long "dictionary" <> metavar "DICT" <> help "Dictionary identifier, defaults to ukacd")
     quickCmd :: Text -> Parser ([Text] -> Text)
     quickCmd cmd = fmap (\dict qs -> T.intercalate " " [cmd, dict, "\"" <> T.intercalate " " qs <> "\""]) dictOption
     -- statusCommands :: Mod CommandFields (PuzzleCommand (Id Puzzle, Text))
