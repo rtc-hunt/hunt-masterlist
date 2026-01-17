@@ -428,3 +428,9 @@ textarea {
 .chat-sidebar .messageBody {
     max-width: 25dvw !important;
 }
+pre.cliOut {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-wrap: break-word !important;
+    width: 100%;
+}

@@ -461,14 +461,14 @@ puzzle puz = do
                   elClass "div" "htblocks" $ do
                     evals <- fmap (fmap $ fromMaybe Map.empty) $ watch $ constDyn $ privateP ~> key V_PuzzleEvals ~> key puz ~> postMap (traverse (fmap getMonoidalMap . getComplete))
                     list evals $ \dRes -> elClass "div" "ui card" $ do
-                      el "pre" $ do
+                      elClass "pre" "cliOut" $ do
                          text "expr: "
                          dynText $ _evalJob_expression <$> dRes
-                      el "pre" $ do
+                      elClass "pre" "cliOut" $ do
                          dynText $ fromMaybe "" . fmap ("res: " <>) . _evalJob_result <$> dRes
-                      el "pre" $ do
+                      elClass "pre" "cliOut" $ do
                          dynText $ fromMaybe "" . fmap ("err: " <>) . _evalJob_error <$> dRes
-                      el "pre" $ do
+                      elClass "pre" "cliOut" $ do
                          text ":: "
                          dynText $ fromMaybe "" . _evalJob_type <$> dRes
                     blank
